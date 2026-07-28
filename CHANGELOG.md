@@ -10,6 +10,19 @@ stable public contract exists.
 
 ### Added
 
+- A resumable full Holdings capture from POAP Compass, preserving cross-chain
+  `(id, chain)` identities in a source-compatible SQLite, deterministic D1 SQL
+  shards, local reconstruction checks, and content-addressed private R2 backup
+  packages with optional full round-trip verification. Shard completion is
+  proven by terminal empty pages and reconciled against fresh aggregate counts,
+  while any drift from the initial non-transactional count remains explicit.
+- A companion, source-compatible Drop SQLite for every Drop referenced by the
+  full Holdings capture, including complete raw Graph objects, explicit missing
+  IDs, deterministic D1 SQL, and bounded exact-ID/address-only metadata
+  fallback without exposing hidden records through public browsing.
+- Independent catalog and Holdings release identities, so current exact-address
+  and Drop-collector data can advance without rewriting the immutable catalog
+  snapshot or its artwork namespace.
 - Exact Drop collector lists with public address links, preserved token facts,
   clustered D1 keyset pagination, resumable snapshot backfill, and
   snapshot-versioned edge caching.

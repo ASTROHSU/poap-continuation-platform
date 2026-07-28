@@ -44,11 +44,15 @@ describe("personal export manifest", () => {
       schemaVersion: "poapin-personal-export-v1",
       address: ADDRESS,
       snapshots: {
+        catalog: "2026-07-02-v1",
         holdings: "2026-07-02-v1",
         collections: "collections-2026-07-22-v1",
         moments: "moments-2026-07-23-v1",
       },
       sources: {
+        catalog: {
+          snapshotId: "2026-07-02-v1",
+        },
         holdings: {
           snapshotId: "2026-07-02-v1",
         },
