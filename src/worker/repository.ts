@@ -411,9 +411,12 @@ export async function fetchOwner(
           collectionsSnapshotId,
         )
       : new Map<number, DropDetail>();
-  const holdingCandidateIds = privateCandidateIds.filter(
-    (dropId) => privateDrops.get(dropId)?.hasArtwork !== true,
-  );
+  const holdingCandidateIds = rows
+    .map((row) => row.drop_id)
+    .filter((dropId) => {
+      const presentation = catalog.get(dropId) ?? privateDrops.get(dropId);
+      return presentation?.hasArtwork !== true;
+    });
   const holdingDrops =
     holdingCandidateIds.length > 0
       ? await fetchHeldDropDetails(
@@ -427,12 +430,11 @@ export async function fetchOwner(
       : new Map<number, DropDetail>();
   const items = rows.map((row) => {
     const privateDrop = privateDrops.get(row.drop_id);
+    const presentation = catalog.get(row.drop_id) ?? privateDrop;
     const drop =
-      catalog.get(row.drop_id) ??
-      (privateDrop
-        ? withFallbackArtwork(privateDrop, holdingDrops.get(row.drop_id))
-        : holdingDrops.get(row.drop_id)) ??
-      fallbackDrop(row, mediaBaseUrl, catalogSnapshotId);
+      (presentation
+        ? withFallbackArtwork(presentation, holdingDrops.get(row.drop_id))
+        : holdingDrops.get(row.drop_id)) ?? fallbackDrop(row, mediaBaseUrl, catalogSnapshotId);
     return {
       ...drop,
       sourceUid: row.source_uid,
@@ -559,9 +561,12 @@ export async function fetchPersonalHoldingsPage(
           collectionsSnapshotId,
         )
       : new Map<number, DropDetail>();
-  const holdingCandidateIds = privateCandidateIds.filter(
-    (dropId) => privateDrops.get(dropId)?.hasArtwork !== true,
-  );
+  const holdingCandidateIds = rows
+    .map((row) => row.drop_id)
+    .filter((dropId) => {
+      const presentation = catalog.get(dropId) ?? privateDrops.get(dropId);
+      return presentation?.hasArtwork !== true;
+    });
   const holdingDrops =
     holdingCandidateIds.length > 0
       ? await fetchHeldDropDetails(
@@ -590,11 +595,10 @@ export async function fetchPersonalHoldingsPage(
   );
   const drops = referencedDropIds.flatMap((dropId) => {
     const privateDrop = privateDrops.get(dropId);
-    const drop =
-      catalog.get(dropId) ??
-      (privateDrop
-        ? withFallbackArtwork(privateDrop, holdingDrops.get(dropId))
-        : holdingDrops.get(dropId));
+    const presentation = catalog.get(dropId) ?? privateDrop;
+    const drop = presentation
+      ? withFallbackArtwork(presentation, holdingDrops.get(dropId))
+      : holdingDrops.get(dropId);
     return drop ? [drop] : [];
   });
   const unavailableDropIds = referencedDropIds.filter(

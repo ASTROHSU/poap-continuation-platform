@@ -139,10 +139,10 @@ export async function fetchHeldDropDetails(
  * Keeps the richer address-bound presentation metadata while allowing a
  * verified Holdings object to fill an otherwise missing artwork reference.
  */
-export function withFallbackArtwork(
-  presentation: DropDetail,
-  holding: DropDetail | undefined,
-): DropDetail {
+export function withFallbackArtwork<T extends Pick<DropDetail, "hasArtwork" | "imageUrl">>(
+  presentation: T,
+  holding: Pick<DropDetail, "hasArtwork" | "imageUrl"> | undefined,
+): T {
   if (presentation.hasArtwork || !holding?.hasArtwork) return presentation;
   return {
     ...presentation,
