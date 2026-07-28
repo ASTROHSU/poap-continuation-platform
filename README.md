@@ -57,7 +57,7 @@ No wallet connection is required.
 | Web         | React + Vite                     | Browsing, export collection, static-site generation, and ZIP creation |
 | API         | Hono on Cloudflare Workers       | Validation, bounded reads, and cache-safe responses                   |
 | Catalog     | Cloudflare D1 (`CATALOG_DB`)     | Drops, snapshot metadata, search fields, and artwork references       |
-| Holdings    | Cloudflare D1 (`HOLDINGS_DB`)    | Indexed address-to-token and exact-Drop collector lookup              |
+| Holdings    | Cloudflare D1 (`HOLDINGS_DB`)    | Clustered address-to-token and exact-Drop collector lookup            |
 | Collections | Cloudflare D1 (`COLLECTIONS_DB`) | Curated collections, memberships, sections, and export relations      |
 | Moments     | Cloudflare D1 (`MOMENTS_DB`)     | Moments, tags, Capsules, Drop links, albums, media proof, and exports |
 | Media       | Cloudflare R2 (`ARCHIVE_BUCKET`) | Immutable original artwork; derived thumbnails may follow later       |

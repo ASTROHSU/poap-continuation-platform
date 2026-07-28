@@ -117,29 +117,37 @@ const OWNER_NEXT_PAGE_SQL = `
 
 const DROP_COLLECTORS_FIRST_PAGE_SQL = `
   SELECT
-    source_uid,
-    poap_id,
-    minted_on,
-    owner_address_norm,
-    network,
-    transfer_count
-  FROM tokens INDEXED BY idx_tokens_drop_collectors
-  WHERE drop_id = ?1
-  ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC
+    r.source_uid,
+    r.poap_id,
+    t.minted_on,
+    r.owner_address_norm,
+    t.network,
+    t.transfer_count
+  FROM drop_collector_refs r
+  JOIN tokens t
+    ON t.owner_address_norm = r.owner_address_norm
+   AND t.poap_id = r.poap_id
+   AND t.source_uid = r.source_uid
+  WHERE r.drop_id = ?1
+  ORDER BY r.poap_id DESC, r.source_uid DESC, r.owner_address_norm DESC
   LIMIT ?2`;
 
 const DROP_COLLECTORS_NEXT_PAGE_SQL = `
   SELECT
-    source_uid,
-    poap_id,
-    minted_on,
-    owner_address_norm,
-    network,
-    transfer_count
-  FROM tokens INDEXED BY idx_tokens_drop_collectors
-  WHERE drop_id = ?1
-    AND (poap_id, source_uid, owner_address_norm) < (?2, ?3, ?4)
-  ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC
+    r.source_uid,
+    r.poap_id,
+    t.minted_on,
+    r.owner_address_norm,
+    t.network,
+    t.transfer_count
+  FROM drop_collector_refs r
+  JOIN tokens t
+    ON t.owner_address_norm = r.owner_address_norm
+   AND t.poap_id = r.poap_id
+   AND t.source_uid = r.source_uid
+  WHERE r.drop_id = ?1
+    AND (r.poap_id, r.source_uid, r.owner_address_norm) < (?2, ?3, ?4)
+  ORDER BY r.poap_id DESC, r.source_uid DESC, r.owner_address_norm DESC
   LIMIT ?5`;
 
 const PERSONAL_HOLDINGS_FIRST_PAGE_SQL = `

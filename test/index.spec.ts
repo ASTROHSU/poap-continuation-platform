@@ -241,18 +241,30 @@ describe("archive API", () => {
     const plan = await bindings.HOLDINGS_DB.prepare(
       `
         EXPLAIN QUERY PLAN
-        SELECT source_uid, poap_id, minted_on, owner_address_norm, network, transfer_count
-        FROM tokens
-        WHERE drop_id = ?1
-        ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC
+        SELECT
+          r.source_uid,
+          r.poap_id,
+          t.minted_on,
+          r.owner_address_norm,
+          t.network,
+          t.transfer_count
+        FROM drop_collector_refs r
+        JOIN tokens t
+          ON t.owner_address_norm = r.owner_address_norm
+         AND t.poap_id = r.poap_id
+         AND t.source_uid = r.source_uid
+        WHERE r.drop_id = ?1
+        ORDER BY r.poap_id DESC, r.source_uid DESC, r.owner_address_norm DESC
         LIMIT ?2
       `,
     )
       .bind(2, 49)
       .all<{ detail: string }>();
     const details = plan.results.map((row) => row.detail).join("\n");
-    expect(details).toContain("idx_tokens_drop_collectors");
+    expect(details).toContain("SEARCH r USING PRIMARY KEY");
+    expect(details).toContain("SEARCH t USING PRIMARY KEY");
     expect(details).not.toContain("SCAN tokens");
+    expect(details).not.toContain("SCAN drop_collector_refs");
     expect(details).not.toContain("USE TEMP B-TREE");
   });
 

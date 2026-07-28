@@ -293,7 +293,9 @@ const ROLES = {
     "tokens",
     "owner_stats",
     "import_shards",
-    "idx_tokens_drop_collectors",
+    "drop_collector_refs",
+    "drop_collector_backfill",
+    "tokens_drop_collector_ref_after_insert",
   ],
 };
 

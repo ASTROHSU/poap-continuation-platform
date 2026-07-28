@@ -146,5 +146,7 @@ aggregation, and media work outside the Worker request path.
   every holder view is labeled as a historical snapshot.
 - The complete production import measured 84.08 MB for the catalog D1 and
   778.83 MB for the holdings D1; exact-address lookups use the `tokens` primary
-  key and exact-Drop collector pages require `idx_tokens_drop_collectors`.
-  Repeat size, query-plan, and rows-read measurements for every future snapshot.
+  key. Exact-Drop collector pages use the separately clustered,
+  incrementally populated `drop_collector_refs` relation. Repeat size,
+  query-plan, reference-coverage, and rows-read measurements for every future
+  snapshot.

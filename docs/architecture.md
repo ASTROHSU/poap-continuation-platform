@@ -112,14 +112,21 @@ responses, or Collection projections.
 
 `GET /api/drops/:id/collectors` is a bounded exact-ID view over the historical
 Holdings snapshot. It first applies the same exact Drop availability gate, then
-reads at most 49 token rows through
-`idx_tokens_drop_collectors(drop_id, poap_id DESC, source_uid DESC,
-owner_address_norm DESC)`. The route names the index explicitly so a deployment
-with a missing migration fails closed instead of scanning all 6.2 million
-Holdings rows. Its keyset cursor is bound to the Drop ID, page size, and snapshot;
-the response exposes the public holder address and preserved token facts, but
-does not resolve ENS names or copy Drop metadata into the collector payload.
-Snapshot-versioned pages are edge-cached for seven days.
+reads at most 49 rows from `drop_collector_refs`, a `WITHOUT ROWID` relation
+clustered by `(drop_id, poap_id DESC, source_uid DESC,
+owner_address_norm DESC)`. Each page performs bounded primary-key joins back to
+`tokens` for preserved mint, network, and transfer facts. This avoids both an
+unbounded request-time scan and the memory peak of building a wide secondary
+index over the 6.2-million-row `tokens` table.
+
+Fresh snapshot imports populate the relation incrementally through a token
+insert trigger. Existing snapshots use a resumable owner-address range backfill;
+the Worker is not activated until reference and token counts match and both
+query-plan steps use clustered primary keys. Its keyset cursor is bound to the
+Drop ID, page size, and snapshot. The response exposes the public holder address
+and preserved token facts, but does not resolve ENS names or copy Drop metadata
+into the collector payload. Snapshot-versioned pages are edge-cached for seven
+days.
 
 This endpoint is not cross-Drop address discovery and does not represent live
 ownership. A known private, non-hidden Drop may use the same collector view,

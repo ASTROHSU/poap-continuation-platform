@@ -20,10 +20,19 @@ const ROLES = {
   catalog: {
     tables: ["archive_meta", "drops", "drop_stats", "import_shards"],
     indexes: [],
+    triggers: [],
   },
   holdings: {
-    tables: ["archive_meta", "tokens", "owner_stats", "import_shards"],
-    indexes: ["idx_tokens_drop_collectors"],
+    tables: [
+      "archive_meta",
+      "tokens",
+      "owner_stats",
+      "import_shards",
+      "drop_collector_refs",
+      "drop_collector_backfill",
+    ],
+    indexes: [],
+    triggers: ["tokens_drop_collector_ref_after_insert"],
   },
 };
 
@@ -358,15 +367,18 @@ async function createWranglerClient(target, options, dependencies) {
 
 async function inspectTarget(role, client) {
   const names = await client.query(
-    "SELECT name FROM sqlite_schema WHERE type IN ('table', 'view', 'index') ORDER BY name;",
+    "SELECT name FROM sqlite_schema WHERE type IN ('table', 'view', 'index', 'trigger') ORDER BY name;",
   );
   const found = new Set(names.map((row) => row.name));
-  const required = [...ROLES[role].tables, ...ROLES[role].indexes];
+  const required = [...ROLES[role].tables, ...ROLES[role].indexes, ...ROLES[role].triggers];
   const missing = required.filter((name) => !found.has(name));
   if (missing.length > 0) {
     throw new Error(`${role} is missing required migration objects: ${missing.join(", ")}.`);
   }
-  const dataTables = role === "catalog" ? ["drops", "drop_stats"] : ["tokens", "owner_stats"];
+  const dataTables =
+    role === "catalog"
+      ? ["drops", "drop_stats"]
+      : ["tokens", "owner_stats", "drop_collector_refs", "drop_collector_backfill"];
   const [state] = await client.query(`SELECT
     EXISTS(SELECT 1 FROM archive_meta LIMIT 1) AS has_meta,
     EXISTS(SELECT 1 FROM import_shards LIMIT 1) AS has_journal,

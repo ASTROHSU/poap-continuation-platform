@@ -47,6 +47,7 @@ export async function verifyImportOutput({ inputDirectory, migrationsRoot }) {
       `SELECT json_object(
       'tokens', (SELECT COUNT(*) FROM tokens),
       'owners', (SELECT COUNT(*) FROM owner_stats),
+      'dropCollectorRefs', (SELECT COUNT(*) FROM drop_collector_refs),
       'tokenCountFromOwnerStats', (SELECT COALESCE(SUM(token_count), 0) FROM owner_stats),
       'integrity', (SELECT integrity_check FROM pragma_integrity_check)
     )`,
@@ -80,10 +81,20 @@ export async function verifyImportOutput({ inputDirectory, migrationsRoot }) {
     const dropCollectorPlan = await querySmallJsonDocument(
       holdingsDatabase,
       `EXPLAIN QUERY PLAN
-      SELECT source_uid, poap_id, minted_on, owner_address_norm, network, transfer_count
-      FROM tokens INDEXED BY idx_tokens_drop_collectors
-      WHERE drop_id = 0
-      ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC
+      SELECT
+        r.source_uid,
+        r.poap_id,
+        t.minted_on,
+        r.owner_address_norm,
+        t.network,
+        t.transfer_count
+      FROM drop_collector_refs r
+      JOIN tokens t
+        ON t.owner_address_norm = r.owner_address_norm
+       AND t.poap_id = r.poap_id
+       AND t.source_uid = r.source_uid
+      WHERE r.drop_id = 0
+      ORDER BY r.poap_id DESC, r.source_uid DESC, r.owner_address_norm DESC
       LIMIT 49`,
     );
 
@@ -104,6 +115,10 @@ export async function verifyImportOutput({ inputDirectory, migrationsRoot }) {
     invariant(
       holdings.tokens === report.counts.accepted.tokens,
       "Holdings token count differs from report.json.",
+    );
+    invariant(
+      holdings.dropCollectorRefs === holdings.tokens,
+      "Drop collector references do not cover every accepted token.",
     );
     invariant(
       holdings.owners === report.counts.accepted.owners,
@@ -168,10 +183,12 @@ export async function verifyImportOutput({ inputDirectory, migrationsRoot }) {
       "Owner lookup does not use the clustered tokens primary key.",
     );
     invariant(
-      dropCollectorPlan.some((row) => String(row.detail).includes("idx_tokens_drop_collectors")) &&
+      dropCollectorPlan.filter((row) => String(row.detail).includes("USING PRIMARY KEY")).length >=
+        2 &&
         !dropCollectorPlan.some((row) => String(row.detail).includes("SCAN tokens")) &&
+        !dropCollectorPlan.some((row) => String(row.detail).includes("SCAN drop_collector_refs")) &&
         !dropCollectorPlan.some((row) => String(row.detail).includes("USE TEMP B-TREE")),
-      "Drop collector lookup does not use the required ordered tokens index.",
+      "Drop collector lookup does not use both clustered primary-key paths.",
     );
 
     return {

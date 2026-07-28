@@ -197,45 +197,58 @@ Synthetic development rows live under `fixtures/`, outside the migration
 chain. `npm run db:setup:local` applies them only to the local databases. Never
 run a fixture file with `--remote`.
 
-## Holdings Drop collector index gate
+## Holdings Drop collector projection gate
 
 Exact Drop pages list preserved collector records by `drop_id`. Migration
-`migrations/holdings/0003_drop_collectors.sql` creates the only permitted query
-path:
+`migrations/holdings/0003_drop_collectors.sql` creates a narrow,
+`WITHOUT ROWID` relation clustered in the exact query order, a resumable
+backfill journal, and an insert trigger for future snapshot imports.
 
 ```sql
-CREATE INDEX idx_tokens_drop_collectors
-  ON tokens(drop_id, poap_id DESC, source_uid DESC, owner_address_norm DESC);
+PRIMARY KEY (
+  drop_id,
+  poap_id DESC,
+  source_uid DESC,
+  owner_address_norm DESC
+)
 ```
 
-The production query uses `INDEXED BY idx_tokens_drop_collectors`. Apply and
-verify this migration before deploying a Worker version that exposes
-`/api/drops/:id/collectors`; without the index, the route intentionally fails
-instead of scanning the complete Holdings table.
+Do not replace this relation with a secondary index on `tokens`. Because
+`tokens` is `WITHOUT ROWID`, that index repeats its wide address-first primary
+key and requires one unbounded sort; the complete production snapshot exceeded
+D1's migration memory while attempting that shape.
 
-Validate locally, then apply to the active snapshot-bound Holdings database:
+Fresh snapshot imports populate the relation incrementally through
+`tokens_drop_collector_ref_after_insert`. For an existing snapshot, apply the
+schema and run the adaptive, owner-primary-key-range backfill before deploying a
+Worker version that exposes `/api/drops/:id/collectors`:
 
 ```bash
 npx wrangler d1 migrations apply HOLDINGS_DB --local
-npx wrangler d1 execute HOLDINGS_DB --local --command \
-  "EXPLAIN QUERY PLAN SELECT source_uid, poap_id, minted_on, owner_address_norm, network, transfer_count FROM tokens INDEXED BY idx_tokens_drop_collectors WHERE drop_id = 2 ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC LIMIT 49;"
+npm run test:worker
 npx wrangler d1 migrations list HOLDINGS_DB --remote
 npx wrangler d1 migrations apply HOLDINGS_DB --remote
+node tools/archive-import/backfill-drop-collectors.mjs --remote
 npx wrangler d1 execute HOLDINGS_DB --remote --command \
-  "EXPLAIN QUERY PLAN SELECT source_uid, poap_id, minted_on, owner_address_norm, network, transfer_count FROM tokens INDEXED BY idx_tokens_drop_collectors WHERE drop_id = 186032 ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC LIMIT 49;"
+  "SELECT (SELECT COUNT(*) FROM tokens) AS tokens, (SELECT COUNT(*) FROM drop_collector_refs) AS refs;"
+npx wrangler d1 execute HOLDINGS_DB --remote --command \
+  "EXPLAIN QUERY PLAN SELECT r.source_uid, r.poap_id, t.minted_on, r.owner_address_norm, t.network, t.transfer_count FROM drop_collector_refs r JOIN tokens t ON t.owner_address_norm = r.owner_address_norm AND t.poap_id = r.poap_id AND t.source_uid = r.source_uid WHERE r.drop_id = 186032 ORDER BY r.poap_id DESC, r.source_uid DESC, r.owner_address_norm DESC LIMIT 49;"
 ```
 
-Require the plan to name `idx_tokens_drop_collectors`, with neither a full
-`SCAN tokens` nor `USE TEMP B-TREE`. Also run the bounded production query for
-Drop `186032` and record D1 `rows_read`; it should scale with the requested
-page, not the 6.2-million-row table.
+The backfill begins with 16 address ranges and recursively splits only a range
+that exceeds D1 memory or duration. Completed ranges are journaled, so the same
+command resumes safely after a transient interruption. Require exact equality
+between `tokens` and `drop_collector_refs`. The representative plan must show
+`SEARCH r USING PRIMARY KEY` and `SEARCH t USING PRIMARY KEY`, with no full scan
+or temporary sort. Also run the bounded production query for Drop `186032` and
+record D1 `rows_read`; it should scale with the requested page.
 
-Rollback the Worker before changing database schema. The index is safe to leave
-in place for an older Worker. If storage recovery later requires removal, add a
-new forward migration containing `DROP INDEX idx_tokens_drop_collectors` only
-after no deployed Worker references it. Never edit or delete migration `0003`;
-recovery is the corresponding forward `CREATE INDEX` migration followed by the
-same query-plan gate.
+Rollback the Worker before changing database schema. The projection and trigger
+are safe to leave in place for an older Worker. If storage recovery later
+requires removal, add a new forward migration that drops the trigger, journal,
+and projection only after no deployed Worker references them. Never edit or
+delete an applied migration `0003`; recovery recreates the schema in a new
+forward migration and repeats the coverage and query-plan gates.
 
 ## Collections owner index gate
 
@@ -362,7 +375,7 @@ After deployment, verify at least:
   arrays are disjoint and jointly cover the canonical requested IDs;
 - one exact Drop collector list across at least two cursor pages, confirming
   address links, stable token ordering, the Holdings snapshot ID, and the
-  `idx_tokens_drop_collectors` query plan;
+  two clustered primary-key query-plan steps;
 - `/api/collections`, one collection detail/items page, and each segmented
   collection export endpoint;
 - one formal held-Drop membership resolution, one batched Collection-profile
@@ -400,7 +413,7 @@ After deployment, verify at least:
 Record the Worker version, Git commit, snapshot ID, Collections and Moments
 release IDs, Moments source/build digests, Holdings migration
 `0003_drop_collectors.sql`, Collections migration `0004_owner_lookup.sql`, both
-index checks, migration state, and smoke test result in the release notes.
+query-plan gates, migration state, and smoke test result in the release notes.
 
 ## Deploying generated personal sites
 

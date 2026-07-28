@@ -11,7 +11,8 @@ stable public contract exists.
 ### Added
 
 - Exact Drop collector lists with public address links, preserved token facts,
-  index-enforced D1 keyset pagination, and snapshot-versioned edge caching.
+  clustered D1 keyset pagination, resumable snapshot backfill, and
+  snapshot-versioned edge caching.
 - Exact-ID detail for private, non-hidden Drops, with private records still
   excluded from browse, search, batch export, collector payloads, and Collection
   projections.
