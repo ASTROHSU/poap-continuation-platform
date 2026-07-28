@@ -77,6 +77,15 @@ export async function verifyImportOutput({ inputDirectory, migrationsRoot }) {
       ORDER BY poap_id DESC, source_uid DESC
       LIMIT 48`,
     );
+    const dropCollectorPlan = await querySmallJsonDocument(
+      holdingsDatabase,
+      `EXPLAIN QUERY PLAN
+      SELECT source_uid, poap_id, minted_on, owner_address_norm, network, transfer_count
+      FROM tokens INDEXED BY idx_tokens_drop_collectors
+      WHERE drop_id = 0
+      ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC
+      LIMIT 49`,
+    );
 
     invariant(catalog.integrity === "ok", `Catalog integrity check failed: ${catalog.integrity}`);
     invariant(
@@ -158,6 +167,12 @@ export async function verifyImportOutput({ inputDirectory, migrationsRoot }) {
       plan.some((row) => String(row.detail).includes("PRIMARY KEY")),
       "Owner lookup does not use the clustered tokens primary key.",
     );
+    invariant(
+      dropCollectorPlan.some((row) => String(row.detail).includes("idx_tokens_drop_collectors")) &&
+        !dropCollectorPlan.some((row) => String(row.detail).includes("SCAN tokens")) &&
+        !dropCollectorPlan.some((row) => String(row.detail).includes("USE TEMP B-TREE")),
+      "Drop collector lookup does not use the required ordered tokens index.",
+    );
 
     return {
       verified: true,
@@ -166,6 +181,7 @@ export async function verifyImportOutput({ inputDirectory, migrationsRoot }) {
       catalog,
       holdings,
       ownerLookupPlan: plan.map((row) => row.detail),
+      dropCollectorLookupPlan: dropCollectorPlan.map((row) => row.detail),
     };
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });

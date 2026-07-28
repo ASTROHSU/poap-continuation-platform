@@ -197,6 +197,46 @@ Synthetic development rows live under `fixtures/`, outside the migration
 chain. `npm run db:setup:local` applies them only to the local databases. Never
 run a fixture file with `--remote`.
 
+## Holdings Drop collector index gate
+
+Exact Drop pages list preserved collector records by `drop_id`. Migration
+`migrations/holdings/0003_drop_collectors.sql` creates the only permitted query
+path:
+
+```sql
+CREATE INDEX idx_tokens_drop_collectors
+  ON tokens(drop_id, poap_id DESC, source_uid DESC, owner_address_norm DESC);
+```
+
+The production query uses `INDEXED BY idx_tokens_drop_collectors`. Apply and
+verify this migration before deploying a Worker version that exposes
+`/api/drops/:id/collectors`; without the index, the route intentionally fails
+instead of scanning the complete Holdings table.
+
+Validate locally, then apply to the active snapshot-bound Holdings database:
+
+```bash
+npx wrangler d1 migrations apply HOLDINGS_DB --local
+npx wrangler d1 execute HOLDINGS_DB --local --command \
+  "EXPLAIN QUERY PLAN SELECT source_uid, poap_id, minted_on, owner_address_norm, network, transfer_count FROM tokens INDEXED BY idx_tokens_drop_collectors WHERE drop_id = 2 ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC LIMIT 49;"
+npx wrangler d1 migrations list HOLDINGS_DB --remote
+npx wrangler d1 migrations apply HOLDINGS_DB --remote
+npx wrangler d1 execute HOLDINGS_DB --remote --command \
+  "EXPLAIN QUERY PLAN SELECT source_uid, poap_id, minted_on, owner_address_norm, network, transfer_count FROM tokens INDEXED BY idx_tokens_drop_collectors WHERE drop_id = 186032 ORDER BY poap_id DESC, source_uid DESC, owner_address_norm DESC LIMIT 49;"
+```
+
+Require the plan to name `idx_tokens_drop_collectors`, with neither a full
+`SCAN tokens` nor `USE TEMP B-TREE`. Also run the bounded production query for
+Drop `186032` and record D1 `rows_read`; it should scale with the requested
+page, not the 6.2-million-row table.
+
+Rollback the Worker before changing database schema. The index is safe to leave
+in place for an older Worker. If storage recovery later requires removal, add a
+new forward migration containing `DROP INDEX idx_tokens_drop_collectors` only
+after no deployed Worker references it. Never edit or delete migration `0003`;
+recovery is the corresponding forward `CREATE INDEX` migration followed by the
+same query-plan gate.
+
 ## Collections owner index gate
 
 Personal-site export adds exact archived-owner pagination for Collections.
@@ -320,6 +360,9 @@ After deployment, verify at least:
 - `/api/meta`, one page each of browse and address results, and a 96-ID
   `/api/drops/export/batch` boundary request whose public and unavailable
   arrays are disjoint and jointly cover the canonical requested IDs;
+- one exact Drop collector list across at least two cursor pages, confirming
+  address links, stable token ordering, the Holdings snapshot ID, and the
+  `idx_tokens_drop_collectors` query plan;
 - `/api/collections`, one collection detail/items page, and each segmented
   collection export endpoint;
 - one formal held-Drop membership resolution, one batched Collection-profile
@@ -355,9 +398,9 @@ After deployment, verify at least:
 - observability without secrets, response bodies, or unnecessary address data.
 
 Record the Worker version, Git commit, snapshot ID, Collections and Moments
-release IDs, Moments source/build digests, Collections migration
-`0004_owner_lookup.sql` and index evidence, migration state, and smoke test result
-in the release notes.
+release IDs, Moments source/build digests, Holdings migration
+`0003_drop_collectors.sql`, Collections migration `0004_owner_lookup.sql`, both
+index checks, migration state, and smoke test result in the release notes.
 
 ## Deploying generated personal sites
 

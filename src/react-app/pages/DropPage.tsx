@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDrop } from "../api";
+import { DropCollectors } from "../components/DropCollectors";
 import { ErrorState } from "../components/States";
 import { CalendarIcon, ExternalIcon, LocationIcon } from "../icons";
 import { Link } from "../router";
@@ -246,6 +247,8 @@ export function DropPage({ dropId }: { dropId: number }) {
           </p>
         </div>
       </article>
+
+      <DropCollectors dropId={drop.dropId} tokenCount={drop.tokenCount} />
     </main>
   );
 }

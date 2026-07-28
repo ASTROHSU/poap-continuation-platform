@@ -30,6 +30,7 @@ import {
 } from "./moments-repository";
 import {
   fetchDrop,
+  fetchDropCollectors,
   fetchDropDetailBatch,
   fetchDrops,
   fetchMeta,
@@ -39,7 +40,7 @@ import {
   fetchSnapshotAt,
 } from "./repository";
 import { fetchExactCollectionDropDetail } from "./private-held-drops";
-import type { AppEnv, Bindings } from "./types";
+import type { AppEnv, Bindings, DropDetail } from "./types";
 import {
   ApiError,
   assertNoQuery,
@@ -52,6 +53,7 @@ import {
   parseCollectionsQuery,
   parseDropIdsQuery,
   parseDropId,
+  parseDropCollectorsQuery,
   parseDropDetailBatchQuery,
   parseDropsQuery,
   parseMomentId,
@@ -74,6 +76,7 @@ const OWNER_CACHE_SCHEMA = "owner-v3";
 const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v2";
 const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v2";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
+const DROP_COLLECTORS_CACHE_SCHEMA = "drop-collectors-v1";
 
 export function collectionsApiVersion(
   bindings: Pick<Bindings, "API_CACHE_VERSION" | "COLLECTIONS_RELEASE_ID">,
@@ -537,6 +540,37 @@ app.get("/api/drops/export/batch", async (context) => {
   );
 });
 
+app.get("/api/drops/:id/collectors", async (context) => {
+  const limited = await enforceRateLimit(context.env.BROWSE_RATE_LIMITER, context.req.raw);
+  if (limited) return limited;
+  const query = parseDropCollectorsQuery(
+    new URL(context.req.url),
+    context.req.param("id"),
+    context.env.SNAPSHOT_ID,
+  );
+  return withSnapshotCache(
+    {
+      requestUrl: context.req.url,
+      canonicalPath: `/api/drops/${query.dropId}/collectors`,
+      canonicalSearch: query.canonicalSearch,
+      snapshotId: context.env.SNAPSHOT_ID,
+      apiVersion: [
+        context.env.API_CACHE_VERSION,
+        DROP_COLLECTORS_CACHE_SCHEMA,
+        collectionsApiVersion(context.env),
+      ].join("."),
+      edgeTtlSeconds: 604_800,
+      browserTtlSeconds: 60,
+      executionCtx: context.executionCtx,
+    },
+    async () => {
+      await resolveExactDrop(context.env, query.dropId);
+      const holdingsDb = context.env.HOLDINGS_DB.withSession("first-primary");
+      return context.json(await fetchDropCollectors(holdingsDb, query, context.env.SNAPSHOT_ID));
+    },
+  );
+});
+
 app.get("/api/drops/:id", async (context) => {
   const limited = await enforceRateLimit(context.env.BROWSE_RATE_LIMITER, context.req.raw);
   if (limited) return limited;
@@ -554,29 +588,7 @@ app.get("/api/drops/:id", async (context) => {
       executionCtx: context.executionCtx,
     },
     async () => {
-      const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
-      const catalogDrop = await fetchDrop(
-        catalogDb,
-        dropId,
-        context.env.MEDIA_BASE_URL,
-        context.env.SNAPSHOT_ID,
-      );
-      if (catalogDrop && !catalogDrop.isPrivate) return context.json(catalogDrop);
-
-      const collectionsDb = context.env.COLLECTIONS_DB.withSession("first-primary");
-      const supplemental = await fetchExactCollectionDropDetail(
-        collectionsDb,
-        dropId,
-        context.env.MEDIA_BASE_URL,
-        context.env.SNAPSHOT_ID,
-        context.env.COLLECTIONS_SNAPSHOT_ID,
-      );
-      if (supplemental.state === "hidden") {
-        throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
-      }
-      const drop = supplemental.state === "available" ? supplemental.drop : catalogDrop;
-      if (!drop) throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
-      return context.json(drop);
+      return context.json(await resolveExactDrop(context.env, dropId));
     },
   );
 });
@@ -1279,6 +1291,32 @@ function collectionNotFound(): ApiError {
 
 function momentNotFound(): ApiError {
   return new ApiError(404, "Moment was not found in this snapshot.", "moment_not_found");
+}
+
+async function resolveExactDrop(bindings: Bindings, dropId: number): Promise<DropDetail> {
+  const catalogDb = bindings.CATALOG_DB.withSession("first-primary");
+  const catalogDrop = await fetchDrop(
+    catalogDb,
+    dropId,
+    bindings.MEDIA_BASE_URL,
+    bindings.SNAPSHOT_ID,
+  );
+  if (catalogDrop && !catalogDrop.isPrivate) return catalogDrop;
+
+  const collectionsDb = bindings.COLLECTIONS_DB.withSession("first-primary");
+  const supplemental = await fetchExactCollectionDropDetail(
+    collectionsDb,
+    dropId,
+    bindings.MEDIA_BASE_URL,
+    bindings.SNAPSHOT_ID,
+    bindings.COLLECTIONS_SNAPSHOT_ID,
+  );
+  if (supplemental.state === "hidden") {
+    throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
+  }
+  const drop = supplemental.state === "available" ? supplemental.drop : catalogDrop;
+  if (!drop) throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
+  return drop;
 }
 
 function collectionExportNextPath(

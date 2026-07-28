@@ -141,8 +141,10 @@ aggregation, and media work outside the Worker request path.
 - Source URLs and descriptions are untrusted input and must be validated or
   rendered as plain text.
 - Public blockchain data still creates privacy and enumeration concerns; the
-  service intentionally exposes exact-address lookup, not holder discovery.
+  service exposes exact-address lookup and bounded holder records only for a
+  known exact Drop ID. It does not provide cross-Drop address discovery, and
+  every holder view is labeled as a historical snapshot.
 - The complete production import measured 84.08 MB for the catalog D1 and
   778.83 MB for the holdings D1; exact-address lookups use the `tokens` primary
-  key. Repeat size, query-plan, and rows-read measurements for every future
-  snapshot.
+  key and exact-Drop collector pages require `idx_tokens_drop_collectors`.
+  Repeat size, query-plan, and rows-read measurements for every future snapshot.

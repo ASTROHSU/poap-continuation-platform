@@ -288,7 +288,13 @@ function fakeClient(role, context, activationOrder) {
 
 const ROLES = {
   catalog: ["archive_meta", "drops", "drop_stats", "import_shards"],
-  holdings: ["archive_meta", "tokens", "owner_stats", "import_shards"],
+  holdings: [
+    "archive_meta",
+    "tokens",
+    "owner_stats",
+    "import_shards",
+    "idx_tokens_drop_collectors",
+  ],
 };
 
 function digest(value) {

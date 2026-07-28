@@ -107,8 +107,23 @@ public Catalog result returns immediately; a private or missing result performs
 one primary-key lookup in the newer `collection_drop_cards` projection. Exact
 lookup may return a private, non-hidden card with `isPrivate: true`, but hidden
 records remain unavailable. Cache identity includes the Collections release.
-No private row is added to browse, search, batch export, holder lists, or
-Collection projections.
+No private Drop metadata is added to browse, search, batch export, collector
+responses, or Collection projections.
+
+`GET /api/drops/:id/collectors` is a bounded exact-ID view over the historical
+Holdings snapshot. It first applies the same exact Drop availability gate, then
+reads at most 49 token rows through
+`idx_tokens_drop_collectors(drop_id, poap_id DESC, source_uid DESC,
+owner_address_norm DESC)`. The route names the index explicitly so a deployment
+with a missing migration fails closed instead of scanning all 6.2 million
+Holdings rows. Its keyset cursor is bound to the Drop ID, page size, and snapshot;
+the response exposes the public holder address and preserved token facts, but
+does not resolve ENS names or copy Drop metadata into the collector payload.
+Snapshot-versioned pages are edge-cached for seven days.
+
+This endpoint is not cross-Drop address discovery and does not represent live
+ownership. A known private, non-hidden Drop may use the same collector view,
+while hidden or missing exact IDs remain unavailable.
 
 The personal Holdings endpoint reads up to 480 tokens with an indexed keyset
 query, then looks up complete public Drop details in `CATALOG_DB` in fixed

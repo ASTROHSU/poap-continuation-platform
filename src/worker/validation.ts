@@ -7,6 +7,8 @@ import type {
   CollectionItemsQuery,
   CollectionsQuery,
   CollectionType,
+  DropCollectorsCursor,
+  DropCollectorsQuery,
   DropCursor,
   DropSort,
   DropsQuery,
@@ -247,6 +249,31 @@ export function parseOwnerQuery(url: URL, rawAddress: string, snapshotId: string
   return { address, limit, cursor, filterKey, canonicalSearch: canonical.toString() };
 }
 
+export function parseDropCollectorsQuery(
+  url: URL,
+  rawDropId: string,
+  snapshotId: string,
+): DropCollectorsQuery {
+  assertKnownParams(url.searchParams, OWNER_PARAMS);
+  const dropId = parseDropId(rawDropId);
+  const limit = parseLimit(url.searchParams, 48);
+  const filterKey = JSON.stringify({ scope: "drop-collectors", dropId, limit });
+  const rawCursor = optionalParam(url.searchParams, "cursor");
+  const cursor =
+    rawCursor === null
+      ? null
+      : validateDropCollectorsCursor(
+          decodeCursor<DropCollectorsCursor>(rawCursor),
+          snapshotId,
+          filterKey,
+        );
+
+  const canonical = new URLSearchParams();
+  if (cursor) canonical.set("cursor", encodeCursor(cursor));
+  canonical.set("limit", String(limit));
+  return { dropId, limit, cursor, filterKey, canonicalSearch: canonical.toString() };
+}
+
 export function parsePersonalHoldingsQuery(
   url: URL,
   rawAddress: string,
@@ -410,6 +437,7 @@ export function encodeCursor(
   value:
     | DropCursor
     | OwnerCursor
+    | DropCollectorsCursor
     | PersonalHoldingsCursor
     | OwnedCollectionsCursor
     | CollectionCursor
@@ -628,6 +656,31 @@ function validateOwnerCursor(
     !SOURCE_UID.test(cursor.u)
   ) {
     throw new ApiError(400, "Cursor does not belong to this address or snapshot.");
+  }
+  return cursor;
+}
+
+function validateDropCollectorsCursor(
+  cursor: DropCollectorsCursor,
+  snapshotId: string,
+  filterKey: string,
+): DropCollectorsCursor {
+  if (
+    !isObject(cursor) ||
+    cursor.v !== 1 ||
+    cursor.c !== "drop-collectors" ||
+    cursor.s !== snapshotId ||
+    cursor.f !== filterKey ||
+    !Number.isInteger(cursor.p) ||
+    cursor.p < 2 ||
+    cursor.p > 10_000 ||
+    !Number.isSafeInteger(cursor.i) ||
+    cursor.i <= 0 ||
+    !SOURCE_UID.test(cursor.u) ||
+    !ADDRESS.test(cursor.a) ||
+    cursor.a !== cursor.a.toLowerCase()
+  ) {
+    throw new ApiError(400, "Cursor does not belong to this Drop or snapshot.");
   }
   return cursor;
 }

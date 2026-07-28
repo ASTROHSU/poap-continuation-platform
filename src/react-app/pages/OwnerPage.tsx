@@ -291,8 +291,9 @@ export function OwnerPage({ address, meta }: OwnerPageProps) {
         <strong>Public holdings, address-bound detail.</strong>
         <span>
           Preserved private Drop metadata appears only when this exact address held a matching
-          token. Private Drops can also be opened by an exact known Drop ID; address discovery,
-          holder lists, browsing, and search remain intentionally unavailable.
+          token. Private Drops can also be opened by an exact known Drop ID. Exact Drop pages may
+          list public holder addresses from the Holdings snapshot, while address discovery,
+          browsing, and search remain intentionally unavailable.
         </span>
       </div>
     </main>
