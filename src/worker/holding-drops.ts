@@ -1,4 +1,5 @@
 import type { D1ReadClient, DropDetail, HoldingDropRow } from "./types";
+import { holdingDropArtworkUrl } from "./media";
 import { ApiError } from "./validation";
 
 const LOOKUP_SIZE = 96;
@@ -8,28 +9,29 @@ const SNAPSHOT_ID_SQL = `
   FROM archive_meta
   WHERE key = 'snapshot_id'`;
 const DROP_COLUMNS = `
-  drop_id,
-  fancy_id,
-  title,
-  description,
-  start_date,
-  end_date,
-  expiry_date,
-  city,
-  country,
-  event_url,
-  year,
-  is_virtual,
-  is_private,
-  is_hidden,
-  channel,
-  platform,
-  location_type,
-  timezone,
-  integrator_id,
-  created_at,
-  token_count,
-  transfer_count`;
+  d.drop_id,
+  d.fancy_id,
+  d.title,
+  d.description,
+  d.start_date,
+  d.end_date,
+  d.expiry_date,
+  d.city,
+  d.country,
+  d.event_url,
+  d.year,
+  d.is_virtual,
+  d.is_private,
+  d.is_hidden,
+  d.channel,
+  d.platform,
+  d.location_type,
+  d.timezone,
+  d.integrator_id,
+  d.created_at,
+  d.token_count,
+  d.transfer_count,
+  a.object_key AS image_object_key`;
 
 type SnapshotIdRow = {
   value: string;
@@ -47,6 +49,9 @@ export async function fetchExactHoldingDropDetail(
   db: D1ReadClient,
   dropId: number,
   snapshotId: string,
+  mediaBaseUrl: string,
+  archiveSnapshotId: string,
+  collectionsSnapshotId: string,
 ): Promise<ExactHoldingDropLookup> {
   if (!Number.isSafeInteger(dropId) || dropId <= 0) {
     throw new ApiError(400, "Drop ID must be a positive integer.");
@@ -56,8 +61,9 @@ export async function fetchExactHoldingDropDetail(
     db
       .prepare(
         `SELECT ${DROP_COLUMNS}
-         FROM holding_drops
-         WHERE drop_id = ?1
+         FROM holding_drops d
+         LEFT JOIN holding_drop_artwork a ON a.drop_id = d.drop_id
+         WHERE d.drop_id = ?1
          LIMIT 1`,
       )
       .bind(dropId),
@@ -65,7 +71,16 @@ export async function fetchExactHoldingDropDetail(
   assertSnapshot(snapshot.results[0] as SnapshotIdRow | undefined, snapshotId);
   const row = detail.results[0] as HoldingDropRow | undefined;
   if (!row) return { state: "missing" };
-  return { state: "available", drop: toHoldingDropDetail(row) };
+  return {
+    state: "available",
+    drop: toHoldingDropDetail(
+      row,
+      mediaBaseUrl,
+      archiveSnapshotId,
+      snapshotId,
+      collectionsSnapshotId,
+    ),
+  };
 }
 
 /**
@@ -76,6 +91,9 @@ export async function fetchHeldDropDetails(
   db: D1ReadClient,
   dropIds: number[],
   snapshotId: string,
+  mediaBaseUrl: string,
+  archiveSnapshotId: string,
+  collectionsSnapshotId: string,
 ): Promise<Map<number, DropDetail>> {
   const uniqueIds = [
     ...new Set(dropIds.filter((dropId) => Number.isSafeInteger(dropId) && dropId > 0)),
@@ -92,9 +110,10 @@ export async function fetchHeldDropDetails(
       db
         .prepare(
           `SELECT ${DROP_COLUMNS}
-           FROM holding_drops
-           WHERE drop_id IN (${placeholders})
-           ORDER BY drop_id`,
+           FROM holding_drops d
+           LEFT JOIN holding_drop_artwork a ON a.drop_id = d.drop_id
+           WHERE d.drop_id IN (${placeholders})
+           ORDER BY d.drop_id`,
         )
         .bind(...chunk),
     );
@@ -108,13 +127,46 @@ export async function fetchHeldDropDetails(
     if (!allowed.has(dropId) || drops.has(dropId)) {
       throw new ApiError(503, "Held-Drop lookup escaped its bounded ID set.");
     }
-    drops.set(dropId, toHoldingDropDetail(row));
+    drops.set(
+      dropId,
+      toHoldingDropDetail(row, mediaBaseUrl, archiveSnapshotId, snapshotId, collectionsSnapshotId),
+    );
   }
   return drops;
 }
 
-function toHoldingDropDetail(row: HoldingDropRow): DropDetail {
+/**
+ * Keeps the richer address-bound presentation metadata while allowing a
+ * verified Holdings object to fill an otherwise missing artwork reference.
+ */
+export function withFallbackArtwork(
+  presentation: DropDetail,
+  holding: DropDetail | undefined,
+): DropDetail {
+  if (presentation.hasArtwork || !holding?.hasArtwork) return presentation;
+  return {
+    ...presentation,
+    imageUrl: holding.imageUrl,
+    hasArtwork: true,
+  };
+}
+
+function toHoldingDropDetail(
+  row: HoldingDropRow,
+  mediaBaseUrl: string,
+  archiveSnapshotId: string,
+  holdingsSnapshotId: string,
+  collectionsSnapshotId: string,
+): DropDetail {
   const dropId = numberValue(row.drop_id);
+  const imageUrl = holdingDropArtworkUrl(
+    mediaBaseUrl,
+    row.image_object_key,
+    archiveSnapshotId,
+    holdingsSnapshotId,
+    collectionsSnapshotId,
+    dropId,
+  );
   return {
     dropId,
     fancyId: row.fancy_id ?? "",
@@ -134,10 +186,10 @@ function toHoldingDropDetail(row: HoldingDropRow): DropDetail {
     timezone: row.timezone,
     integratorId: row.integrator_id,
     createdAt: row.created_at ?? "",
-    // Source media URLs remain preserved in the private backup/D1. Public
-    // responses switch to the immutable R2 copy only after media ingestion.
-    imageUrl: "",
-    hasArtwork: false,
+    // Source media URLs remain preserved in the private backup/D1. Responses
+    // expose only a verified immutable R2 object from an active snapshot.
+    imageUrl: imageUrl ?? "",
+    hasArtwork: imageUrl !== null,
     tokenCount: numberValue(row.token_count),
     dropTransferCount: numberValue(row.transfer_count),
     reservationsTotal: 0,

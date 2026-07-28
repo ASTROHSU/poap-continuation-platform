@@ -108,6 +108,14 @@ Holdings database SHA-256. The build stages both databases as deterministic SQL
 into a new snapshot-scoped Holdings D1; it never mutates the active historical
 D1 in place.
 
+The optional `holding_drop_artwork` D1 relation is an additive activation
+ledger for verified originals discovered after the metadata snapshot. Each row
+records the immutable R2 key, observed SHA-256, exact byte length, MIME type,
+preserved source URL, and archive time. R2 objects must be uploaded and read
+back with the same digest before the row is activated. Checked-in release
+manifests under `artwork-releases/` make these incremental batches auditable;
+they do not change the identity or contents of either source SQLite database.
+
 The private R2 backup stores both SQLite databases inside bounded, hashed
 package parts so it remains compatible with Wrangler's 300 MiB per-object
 upload limit. Every D1 SQL artifact is also stored as an individual object for

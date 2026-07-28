@@ -98,6 +98,13 @@ it from the catalog isolates a much larger relation, makes address export
 traffic visible, and leaves room to shard or replace holdings storage without
 rewriting catalog routes.
 
+`holding_drop_artwork` activates an original only after the object is archived
+and verified. Its row binds one referenced Drop to a snapshot-scoped fixed
+Archive path or content-addressed Collections/Holdings R2 path, together with
+the observed digest, byte length, MIME type, source URL, and archive time.
+Responses expose only the immutable R2 path; the mutable source URL remains
+preservation evidence in D1.
+
 API responses may join the two datasets in application code only with bounded
 ID lists. Never implement an unbounded request fan-out.
 

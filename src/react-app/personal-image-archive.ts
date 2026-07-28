@@ -63,6 +63,7 @@ export interface PersonalImageArchivePlan {
   address: string;
   generatedAt: string;
   snapshots: {
+    catalog: string;
     holdings: string;
     collections: string;
     moments: string;
@@ -135,7 +136,12 @@ interface ArchiveByteSink {
  */
 export function buildMediaArchivePlan(snapshot: PersonalArchiveSnapshot): PersonalImageArchivePlan {
   assertSnapshotIdentity(snapshot);
-  const snapshots = { ...snapshot.manifest.snapshots };
+  const snapshots = {
+    catalog: snapshot.manifest.snapshots.catalog ?? snapshot.manifest.snapshots.holdings,
+    holdings: snapshot.manifest.snapshots.holdings,
+    collections: snapshot.manifest.snapshots.collections,
+    moments: snapshot.manifest.snapshots.moments,
+  };
   const entries = new Map<string, MutableArchiveEntry>();
   const paths = new Map<string, string>();
 
@@ -202,8 +208,14 @@ export function buildMediaArchivePlan(snapshot: PersonalArchiveSnapshot): Person
       "poaps",
       { kind: "drop-artwork", ownerId: String(drop.dropId) },
       (value) =>
-        validateDropArtworkUrl(value, snapshots.holdings, drop.dropId) ??
-        validateCollectionDropUrl(value, snapshots.holdings, snapshots.collections, drop.dropId),
+        validateDropArtworkUrl(value, snapshots.catalog, drop.dropId) ??
+        validateCollectionDropUrl(
+          value,
+          snapshots.catalog,
+          snapshots.holdings,
+          snapshots.collections,
+          drop.dropId,
+        ),
       null,
       null,
     );
@@ -509,6 +521,7 @@ function addOwnedCollectionDropImages(
         (value) =>
           validateCollectionDropUrl(
             value,
+            snapshots.catalog,
             snapshots.holdings,
             snapshots.collections,
             dropId as number,
@@ -700,14 +713,46 @@ function validateCollectionUrl(
 
 function validateCollectionDropUrl(
   value: string,
+  catalogSnapshotId: string,
   holdingsSnapshotId: string,
   collectionsSnapshotId: string,
   dropId: number,
 ): ValidatedMediaUrl | null {
   return (
-    validateDropArtworkUrl(value, holdingsSnapshotId, dropId) ??
+    validateDropArtworkUrl(value, catalogSnapshotId, dropId) ??
+    validateHoldingUrl(value, holdingsSnapshotId, "drop-artwork") ??
     validateCollectionUrl(value, collectionsSnapshotId, "drop-artwork")
   );
+}
+
+function validateHoldingUrl(
+  value: string,
+  snapshotId: string,
+  family: "drop-artwork",
+): ValidatedMediaUrl | null {
+  const url = parseCanonicalMediaUrl(value);
+  if (!url) return null;
+  const segments = url.pathname.split("/");
+  if (
+    segments.length !== 8 ||
+    segments[1] !== "snapshots" ||
+    segments[2] !== snapshotId ||
+    segments[3] !== "holdings" ||
+    segments[4] !== family ||
+    segments[5] !== "sha256" ||
+    !/^[0-9a-f]{2}$/.test(segments[6] ?? "")
+  ) {
+    return null;
+  }
+  const match = /^([0-9a-f]{64})\.([a-z0-9]+)$/.exec(segments[7] ?? "");
+  if (
+    !match ||
+    segments[6] !== match[1].slice(0, 2) ||
+    !COLLECTION_IMAGE_EXTENSIONS.has(match[2])
+  ) {
+    return null;
+  }
+  return validatedMediaUrl(url, match[2], match[1]);
 }
 
 function validateMomentImageUrl(value: string, snapshotId: string): ValidatedMediaUrl | null {
@@ -867,6 +912,7 @@ function assertPlan(plan: PersonalImageArchivePlan): void {
     plan.knownBytes < 0 ||
     plan.knownBytes >= MAX_CLASSIC_ZIP_BYTES ||
     !Number.isFinite(Date.parse(plan.generatedAt)) ||
+    !SNAPSHOT_ID.test(plan.snapshots.catalog) ||
     !SNAPSHOT_ID.test(plan.snapshots.holdings) ||
     !SNAPSHOT_ID.test(plan.snapshots.collections) ||
     !SNAPSHOT_ID.test(plan.snapshots.moments)
@@ -935,12 +981,13 @@ function validatePlannedUrl(
   if (artworkMatch) {
     const dropId = Number(artworkMatch[1]);
     if (Number.isSafeInteger(dropId)) {
-      return validateDropArtworkUrl(value, snapshots.holdings, dropId);
+      return validateDropArtworkUrl(value, snapshots.catalog, dropId);
     }
   }
   return (
     validateCollectionUrl(value, snapshots.collections, "media") ??
     validateCollectionUrl(value, snapshots.collections, "drop-artwork") ??
+    validateHoldingUrl(value, snapshots.holdings, "drop-artwork") ??
     validateMomentImageUrl(value, snapshots.moments)
   );
 }
@@ -1101,6 +1148,7 @@ function imageArchiveReadme(plan: PersonalImageArchivePlan): string {
 This ZIP contains ${plan.count.toLocaleString("en-US")} unique public image files referenced by the immutable POAPin archive snapshots for ${plan.address}.
 
 - Generated: ${plan.generatedAt}
+- Catalog snapshot: ${plan.snapshots.catalog}
 - Holdings snapshot: ${plan.snapshots.holdings}
 - Collections snapshot: ${plan.snapshots.collections}
 - Moments snapshot: ${plan.snapshots.moments}

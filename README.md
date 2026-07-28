@@ -211,10 +211,13 @@ The deployable ZIP remains metadata-focused: its generated page mounts an image,
 video, or audio source only after a visitor explicitly asks to load it. A
 separate, opt-in browser export can download the address's deduplicated archived
 images as an image ZIP without putting those binaries into the website package.
-Video and audio are not included in that image archive. The website ZIP also
-includes integrity metadata and deployment prompts for Cloudflare, Vercel,
-Filebase, and ICP. After extraction, `index.html` can be opened directly without
-a local server; the same files remain deployable to an ordinary static origin.
+It accepts only immutable objects in the active Archive, Collections, or
+Holdings snapshot namespaces; preserved mutable source URLs are never download
+targets. Video and audio are not included in that image archive. The website
+ZIP also includes integrity metadata and deployment prompts for Cloudflare,
+Vercel, Filebase, and ICP. After extraction, `index.html` can be opened directly
+without a local server; the same files remain deployable to an ordinary static
+origin.
 
 See [Portable personal-site export](docs/personal-site-export.md) for the API,
 data, packaging, media-loading, and deployment contracts. The legacy one-file

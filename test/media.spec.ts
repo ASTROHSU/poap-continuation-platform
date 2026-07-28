@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { collectionDropArtworkUrl, collectionMediaObjectUrl } from "../src/worker/media";
+import {
+  collectionDropArtworkUrl,
+  collectionMediaObjectUrl,
+  holdingDropArtworkUrl,
+} from "../src/worker/media";
 
 const MEDIA_ORIGIN = "https://media.poap.in";
 const ARCHIVE_SNAPSHOT = "2026-07-02-v1";
 const COLLECTIONS_SNAPSHOT = "collections-2026-07-22-v1";
+const HOLDINGS_SNAPSHOT = "compass-holdings-2026-07-28-v1";
 const SHA256 = "ab" + "c".repeat(62);
 const COLLECTION_MEDIA_KEY = `snapshots/${COLLECTIONS_SNAPSHOT}/collections/media/sha256/ab/${SHA256}.png`;
 const COLLECTION_DROP_KEY = `snapshots/${COLLECTIONS_SNAPSHOT}/collections/drop-artwork/sha256/ab/${SHA256}.gif`;
 const ARCHIVE_DROP_KEY = `snapshots/${ARCHIVE_SNAPSHOT}/artwork/42.webp`;
+const HOLDING_DROP_KEY = `snapshots/${HOLDINGS_SNAPSHOT}/holdings/drop-artwork/sha256/ab/${SHA256}.png`;
 
 describe("public media object-key policy", () => {
   it("maps only current-snapshot Collection branding objects", () => {
@@ -55,6 +61,39 @@ describe("public media object-key policy", () => {
     ]) {
       expect(
         collectionDropArtworkUrl(MEDIA_ORIGIN, key, ARCHIVE_SNAPSHOT, COLLECTIONS_SNAPSHOT, 42),
+      ).toBeNull();
+    }
+  });
+
+  it("maps holder-only artwork only from active archive, Collections, or Holdings snapshots", () => {
+    for (const key of [ARCHIVE_DROP_KEY, COLLECTION_DROP_KEY, HOLDING_DROP_KEY]) {
+      expect(
+        holdingDropArtworkUrl(
+          MEDIA_ORIGIN,
+          key,
+          ARCHIVE_SNAPSHOT,
+          HOLDINGS_SNAPSHOT,
+          COLLECTIONS_SNAPSHOT,
+          42,
+        ),
+      ).toBe(`${MEDIA_ORIGIN}/${key}`);
+    }
+
+    for (const key of [
+      `snapshots/older-holdings/holdings/drop-artwork/sha256/ab/${SHA256}.png`,
+      `snapshots/${HOLDINGS_SNAPSHOT}/collections/drop-artwork/sha256/ab/${SHA256}.png`,
+      `snapshots/${HOLDINGS_SNAPSHOT}/holdings/drop-artwork/sha256/00/${SHA256}.png`,
+      "private/backup.tar.gz",
+    ]) {
+      expect(
+        holdingDropArtworkUrl(
+          MEDIA_ORIGIN,
+          key,
+          ARCHIVE_SNAPSHOT,
+          HOLDINGS_SNAPSHOT,
+          COLLECTIONS_SNAPSHOT,
+          42,
+        ),
       ).toBeNull();
     }
   });

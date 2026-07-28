@@ -17,7 +17,8 @@ import type { CollectionProfile, Drop, MomentDetail } from "../src/react-app/typ
 
 const ADDRESS = "0x1111111111111111111111111111111111111111";
 const SNAPSHOTS = {
-  holdings: "holdings-2026-07-02-v1",
+  catalog: "catalog-2026-07-02-v1",
+  holdings: "holdings-2026-07-28-v1",
   collections: "collections-2026-07-14-v1",
   moments: "moments-2026-07-23-v1",
 };
@@ -116,8 +117,8 @@ describe("personal image archive planning", () => {
     );
   });
 
-  it("includes address-bound hidden artwork stored in the Collections snapshot", () => {
-    const hiddenArtwork = collectionUrl("drop-artwork", hash("9"), "png");
+  it("includes address-bound hidden artwork stored in the Holdings snapshot", () => {
+    const hiddenArtwork = holdingsUrl("drop-artwork", hash("9"), "png");
     const snapshot = personalSnapshot({
       drops: [
         {
@@ -559,6 +560,7 @@ function personalSnapshot(
       address: ADDRESS,
       snapshots: SNAPSHOTS,
       sources: {
+        catalog: { snapshotId: SNAPSHOTS.catalog },
         holdings: { snapshotId: SNAPSHOTS.holdings },
         collections: {
           snapshotId: SNAPSHOTS.collections,
@@ -829,7 +831,7 @@ function twoDropPlan(): PersonalImageArchivePlan {
 }
 
 function artworkUrl(dropId: number): string {
-  return `https://media.poap.in/snapshots/${SNAPSHOTS.holdings}/artwork/${dropId}.webp`;
+  return `https://media.poap.in/snapshots/${SNAPSHOTS.catalog}/artwork/${dropId}.webp`;
 }
 
 function collectionUrl(
@@ -838,6 +840,10 @@ function collectionUrl(
   extension: string,
 ): string {
   return `https://media.poap.in/snapshots/${SNAPSHOTS.collections}/collections/${family}/sha256/${sha256.slice(0, 2)}/${sha256}.${extension}`;
+}
+
+function holdingsUrl(family: "drop-artwork", sha256: string, extension: string): string {
+  return `https://media.poap.in/snapshots/${SNAPSHOTS.holdings}/holdings/${family}/sha256/${sha256.slice(0, 2)}/${sha256}.${extension}`;
 }
 
 function momentUrl(variant: "original" | "thumbnail", sha256: string, extension: string): string {

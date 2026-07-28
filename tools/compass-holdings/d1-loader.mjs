@@ -26,6 +26,7 @@ const REQUIRED_TABLES = [
   "drop_collector_refs",
   "drop_collector_backfill",
   "holding_drops",
+  "holding_drop_artwork",
 ];
 const REQUIRED_TRIGGERS = ["tokens_drop_collector_ref_after_insert"];
 const PREPARE_PATHS = [
@@ -33,6 +34,7 @@ const PREPARE_PATHS = [
   "prepare/000002_import_shards.sql",
   "prepare/000003_drop_collectors.sql",
   "prepare/000004_referenced_drops.sql",
+  "prepare/000005_artwork.sql",
 ];
 
 const HELP = `POAP.in Compass Holdings D1 staging loader
@@ -234,6 +236,7 @@ async function assertCanonicalMigrations(artifacts) {
     "migrations/holdings/0002_import_shards.sql",
     "migrations/holdings/0003_drop_collectors.sql",
     "migrations/holdings/0004_referenced_drops.sql",
+    "migrations/holdings/0005_artwork.sql",
   ];
   for (let index = 0; index < sources.length; index += 1) {
     const expected = await readFile(resolve(PROJECT_ROOT, sources[index]));

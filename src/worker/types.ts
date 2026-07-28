@@ -242,6 +242,7 @@ export interface HoldingDropRow {
   created_at: string;
   token_count: number;
   transfer_count: number;
+  image_object_key: string | null;
 }
 
 export interface DropCollectorRow {

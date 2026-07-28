@@ -23,6 +23,7 @@ import {
 } from "../src/worker/validation";
 
 const ADDRESS = "0x1111111111111111111111111111111111111111";
+const HOLDING_ARTWORK_SHA = `ab${"c".repeat(62)}`;
 interface TestBindings extends Bindings {
   TEST_CATALOG_FIXTURE: string;
   TEST_CATALOG_MIGRATIONS: D1Migration[];
@@ -84,6 +85,23 @@ beforeAll(async () => {
           '2026-04-02T00:00:00Z', NULL, NULL, 1, 0)
     `,
   ).run();
+  await bindings.HOLDINGS_DB.prepare(
+    `
+      INSERT INTO holding_drop_artwork (
+        drop_id, object_key, sha256, byte_length, content_type, source_url, archived_at
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+    `,
+  )
+    .bind(
+      2002,
+      `snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/ab/${HOLDING_ARTWORK_SHA}.png`,
+      HOLDING_ARTWORK_SHA,
+      1234,
+      "image/png",
+      "https://assets.poap.xyz/hidden.png",
+      "2026-07-28T00:00:00.000Z",
+    )
+    .run();
   await bindings.HOLDINGS_DB.prepare(
     `
       INSERT INTO tokens (
@@ -194,7 +212,7 @@ describe("archive API", () => {
     const response = await SELF.fetch("https://poap.in/api/drops/2");
     expect(response.status).toBe(200);
     expect(response.headers.get("x-archive-api-version")).toBe(
-      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v5`,
+      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v6`,
     );
     expect(await response.json()).toMatchObject({
       dropId: 2,
@@ -224,6 +242,8 @@ describe("archive API", () => {
       dropId: 2002,
       title: "Graph Hidden Drop",
       isHidden: true,
+      hasArtwork: true,
+      imageUrl: `https://media.poap.in/snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/ab/${HOLDING_ARTWORK_SHA}.png`,
     });
 
     const owner = await SELF.fetch(
@@ -385,7 +405,7 @@ describe("archive API", () => {
     const first = await SELF.fetch(`https://poap.in/api/owners/${ADDRESS}?limit=1`);
     expect(first.status).toBe(200);
     expect(first.headers.get("x-archive-api-version")).toBe(
-      `v1.owner-v4.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
+      `v1.owner-v5.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
     );
     const page = await first.json<{
       address: string;

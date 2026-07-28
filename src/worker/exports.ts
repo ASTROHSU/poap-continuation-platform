@@ -1,5 +1,5 @@
 import { artworkUrl } from "./media";
-import { fetchHeldDropDetails } from "./holding-drops";
+import { fetchHeldDropDetails, withFallbackArtwork } from "./holding-drops";
 import { fetchPrivateHeldDropDetails } from "./private-held-drops";
 import {
   EXPORT_BATCH_SIZE,
@@ -127,10 +127,19 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
               )
             : new Map<number, DropDetail>();
         for (const [dropId, drop] of fetchedPrivateDrops) privateDropCache.set(dropId, drop);
-        const holdingDropIds = privateDropIds.filter((dropId) => !fetchedPrivateDrops.has(dropId));
+        const holdingDropIds = privateDropIds.filter(
+          (dropId) => fetchedPrivateDrops.get(dropId)?.hasArtwork !== true,
+        );
         const fetchedHoldingDrops =
           holdingDropIds.length > 0
-            ? await fetchHeldDropDetails(options.holdingsDb, holdingDropIds, options.snapshotId)
+            ? await fetchHeldDropDetails(
+                options.holdingsDb,
+                holdingDropIds,
+                options.snapshotId,
+                options.mediaBaseUrl,
+                options.catalogSnapshotId,
+                options.collectionsSnapshotId,
+              )
             : new Map<number, DropDetail>();
         for (const [dropId, drop] of fetchedHoldingDrops) holdingDropCache.set(dropId, drop);
         for (const dropId of missingDropIds) resolvedDropIds.add(dropId);
@@ -139,7 +148,10 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
             options,
             holding,
             catalogCache.get(holding.drop_id),
-            privateDropCache.get(holding.drop_id) ?? holdingDropCache.get(holding.drop_id),
+            resolvePrivateDrop(
+              privateDropCache.get(holding.drop_id),
+              holdingDropCache.get(holding.drop_id),
+            ),
           ),
         );
         const payload =
@@ -165,6 +177,13 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
       }
     },
   });
+}
+
+function resolvePrivateDrop(
+  presentation: DropDetail | undefined,
+  holding: DropDetail | undefined,
+): DropDetail | undefined {
+  return presentation ? withFallbackArtwork(presentation, holding) : holding;
 }
 
 function toExportRecord(
