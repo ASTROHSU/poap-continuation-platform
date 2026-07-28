@@ -252,8 +252,10 @@ async function collectHoldings(
         }),
     );
     if (
-      page.schemaVersion !== "poapin-personal-holdings-page-v1" ||
+      page.schemaVersion !== "poapin-personal-holdings-page-v2" ||
       page.snapshotId !== manifest.snapshots.holdings ||
+      page.collectionsSnapshotId !== manifest.sources.collections.snapshotId ||
+      page.collectionsReleaseId !== manifest.sources.collections.releaseId ||
       page.address !== address ||
       page.total !== manifest.counts.holdings ||
       !Array.isArray(page.drops) ||

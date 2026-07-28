@@ -640,14 +640,15 @@ export function buildSiteJs(): string {
       element("h3", "", "Archive context"),
       grid([
         metric("Related collection profiles", counts.collectionProfiles),
-        metric("Unavailable public Drop details", counts.unavailableDropReferences),
+        metric("Private held Drops", counts.privateHeldDrops),
+        metric("Unavailable Drop details", counts.unavailableDropReferences),
       ], "summary-grid summary-grid--secondary"),
     );
     view.replaceChildren(
       heading("Archive summary", "Exact public relationships recorded in manifest.json."),
       grid([
         metric("POAP holdings", counts.holdings),
-        metric("Unique public Drops", counts.uniqueDrops),
+        metric("Preserved Drops", counts.uniqueDrops),
         metric("Owned Collections at snapshot", counts.ownedCollections),
         metric("Public authored Moments", counts.publicAuthoredMoments),
         metric("Public tagged Moments", counts.publicTaggedMoments),
@@ -941,6 +942,7 @@ export function buildSiteJs(): string {
       "Token " + item.poapId,
       "Drop " + item.dropId,
       item.network || "",
+      drop?.isPrivate ? "Private Drop" : "",
       formatMintedDate(item.mintedOn),
       item.transferCount !== undefined ? item.transferCount + " transfers" : "",
     ]));
@@ -1026,6 +1028,7 @@ export function buildSiteJs(): string {
       item.year ? String(item.year) : "",
       item.city || item.country || "",
       item.dropId !== undefined ? "Drop " + item.dropId : "",
+      item.isPrivate ? "Private Drop" : "",
     ]));
     if (item.hasArtwork !== false && item.imageUrl) {
       card.append(mediaButton("Load archived artwork", item.imageUrl, "image", ""));
@@ -1040,10 +1043,10 @@ export function buildSiteJs(): string {
       element(
         "p",
         "",
-        "No public Drop detail was available in this archive snapshot. This may be a private or missing record.",
+        "No preserved Drop detail was available in this archive snapshot. This may be a missing or hidden record.",
       ),
     );
-    card.append(meta(["Reference preserved", "No private fields exported"]));
+    card.append(meta(["Reference preserved", "Metadata unavailable"]));
     return withArchiveFields(card, item);
   }
 
@@ -1507,8 +1510,9 @@ Address: \`${manifest.address}\`
 
 ## What is included
 
-- ${manifest.counts.holdings} token-level POAP holdings and ${manifest.counts.uniqueDrops} available Drop records
-- ${manifest.counts.unavailableDropReferences} referenced Drop IDs without public details (private and missing are intentionally indistinguishable)
+- ${manifest.counts.holdings} token-level POAP holdings and ${manifest.counts.uniqueDrops} preserved Drop records
+- ${manifest.counts.privateHeldDrops} private Drop records included because this exact address held a matching token
+- ${manifest.counts.unavailableDropReferences} referenced Drop IDs without preserved details (missing and hidden records remain unavailable)
 - ${manifest.counts.collectionProfiles} related collection profiles
 - ${manifest.counts.heldDropMemberships} formal held-Drop → Collection memberships
 - ${manifest.counts.authoredMomentAssociations} authored-Moment → Collection associations

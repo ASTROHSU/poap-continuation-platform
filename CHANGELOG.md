@@ -10,6 +10,9 @@ stable public contract exists.
 
 ### Added
 
+- Address-bound private Drop enrichment for exact holder lookups, personal-site
+  ZIPs, and CSV/JSON exports, while global Drop and Collection APIs remain
+  redacted.
 - Public archive browser at [poap.in](https://poap.in) for the fixed
   `2026-07-02-v1` snapshot.
 - Indexed D1 catalog and holdings queries, exact-address CSV/JSON exports, and

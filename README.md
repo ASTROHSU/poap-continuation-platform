@@ -37,9 +37,10 @@ artwork served from [`media.poap.in`](https://media.poap.in).
   including shareable paths such as `/address/poap.eth`, then opens the matching
   preserved collection without connecting a wallet.
 - A browser-built, deployable personal-site ZIP containing complete paginated
-  Holdings, normalized public and unavailable Drop references, relevant
-  Collection profiles and owned-Collection exports, public authored and tagged
-  Moments, and historically owned Capsules.
+  Holdings, normalized public and holder-proven private Drop records, opaque
+  missing or hidden Drop references, relevant Collection profiles and
+  owned-Collection exports, public authored and tagged Moments, and historically
+  owned Capsules.
 - A transparent archive: every published dataset should identify its source,
   capture time, checksum, and known limitations.
 - A small service that can remain affordable even when it becomes popular.
@@ -193,12 +194,13 @@ The address page can collect a complete personal archive through the paginated
 APIs and build a pure-static ZIP in the browser. Each dataset is held to one
 unchanged release identity during collection; Holdings, Collections, and
 Moments remain three independent snapshots rather than one shared capture time.
-The package contains normalized Holdings; public details for every referenced
-Drop the Catalog can expose; opaque Drop-ID references where private and missing
-records are intentionally indistinguishable; three distinct Collection
-relationship views; complete public exports for historically owned
-Collections; separate public authored and tagged Moment views; and public
-Capsules whose archived owner is the address.
+The package contains normalized Holdings; public Catalog details; preserved
+private Drop metadata only where that exact address's Holdings snapshot proves
+the relation; opaque Drop-ID references for missing or hidden records; three
+distinct Collection relationship views; complete public exports for
+historically owned Collections; separate public authored and tagged Moment
+views; and public Capsules whose archived owner is the address. Global Drop and
+Collection browsing continues to redact private metadata.
 
 The deployable ZIP remains metadata-focused: its generated page mounts an image,
 video, or audio source only after a visitor explicitly asks to load it. A

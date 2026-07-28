@@ -93,20 +93,22 @@ partitions:
 
 - token-level `items` containing `sourceUid`, `poapId`, `dropId`, `mintedOn`,
   archived owner address, network, and transfer count;
-- page-unique `drops` containing each referenced public Drop's numeric and
-  fancy IDs, title, description, dates, location, classification, safe event
-  and immutable artwork URLs, and public aggregates; and
+- page-unique `drops` containing each referenced public Drop—or private Drop
+  proven to be held by this exact address—along with numeric and fancy IDs,
+  title, description, dates, location, classification, safe event and immutable
+  artwork URLs where published, and preserved aggregates; and
 - page-unique `unavailableDropIds` containing only a referenced positive Drop
-  ID when no public detail can be returned.
+  ID when no preserved holder-safe detail can be returned.
 
 The Worker first reads a keyset page from `HOLDINGS_DB`, then loads the
 corresponding unique public Drop details from `CATALOG_DB` in fixed 96-ID
-lookups. It does not perform an unbounded cross-database join, and multiple
-tokens from the same Drop do not repeat that Drop's metadata in either
-availability array. `drops` contains public details only. A private or missing
-Catalog Drop is represented only by its ID in `unavailableDropIds`; those two
-cases are intentionally indistinguishable, and the response contains no
-reason, placeholder metadata, private description, URL, artwork, or aggregate.
+lookups. IDs absent from that public projection are then checked against
+`COLLECTIONS_DB` in the same bounded page, but only because the Holdings result
+has already proven that the queried address references them. A private,
+non-hidden card may therefore appear in `drops` with `isPrivate: true`.
+Multiple tokens from the same Drop do not repeat its metadata. Missing and
+hidden records stay ID-only in `unavailableDropIds`, with no reason field or
+placeholder metadata. No global private-ID lookup is added.
 
 For each page, the unique `dropId` set referenced by `items` must equal the
 disjoint union of `drops[].dropId` and `unavailableDropIds`. An ID can never
@@ -117,10 +119,11 @@ best-effort hint.
 bound to the normalized address, page limit, Holdings snapshot, and export
 scope, so it cannot be reused for a different query.
 
-The browser validates that exact partition on every page, merges the token
-references, deduplicates unchanged public Drop records across pages, and keeps
-a unique unavailable-ID set. If an ID changes between public and unavailable
-across pages, collection stops rather than guessing.
+The response also carries the Collections snapshot and release identities.
+The browser validates those identities and the exact partition on every page,
+merges the token references, deduplicates unchanged Drop records across pages,
+and keeps a unique unavailable-ID set. If an ID changes between available and
+unavailable across pages, collection stops rather than guessing.
 
 ## Complete Drop reference coverage
 
@@ -175,10 +178,10 @@ resolution, it does not treat artist-Drop links or suggestions as membership.
 It describes a content relationship; it does not say that the Moment author
 owns or joined the Collection.
 
-Held-Drop membership resolution receives only IDs for which the Catalog
-returned public Drop detail. An opaque `unavailableDropId` is preserved as a
-reference but is not sent to the Collection resolver, so the service does not
-use another dataset to distinguish a private Drop from a missing one.
+Held-Drop membership resolution receives the distinct Drop IDs proved by the
+address's Holdings snapshot, including private and unavailable references. The
+resolver returns formal Collection memberships but retains the Collection API's
+normal private card redaction.
 
 Profiles are fetched once for the union of those IDs. The reasons remain in
 their respective records: held-Drop membership rows, owned-Collection exports,
@@ -281,13 +284,13 @@ paths are relative, and the page uses hash navigation, so the same folder works
 when opened directly through `file://`, at an HTTP origin, an IPFS root, or an
 asset canister without server rewrites.
 
-Public details remain in the `drops` dataset. Every referenced ID without
-public detail appears once in the `unavailable-drop-references` dataset with
-only its Drop ID and the generic `not-public-or-not-found` classification. The
-manifest's `counts.uniqueDrops` counts public Drop records, while
-`counts.unavailableDropReferences` counts the opaque unavailable references.
-The two counts describe disjoint sets; the latter never separates private from
-missing Catalog rows.
+Preserved public and holder-proven private details remain in the `drops`
+dataset. Every referenced ID without holder-safe detail appears once in the
+`unavailable-drop-references` dataset with only its Drop ID and the generic
+`not-public-or-not-found` classification. The manifest's `counts.uniqueDrops`
+counts preserved Drop records, `counts.privateHeldDrops` identifies the private
+subset, and `counts.unavailableDropReferences` counts opaque missing or hidden
+references. These availability sets are disjoint.
 
 Decoded JSON chunks are strictly smaller than 3.5 MiB. Their unpadded Base64URL
 transport wrappers, the runtime index, and every other extracted file are each
@@ -380,7 +383,8 @@ The original endpoints remain available:
 
 They synchronously stream one file and are capped at 5,000 holdings. An address
 above that limit receives `413 export_too_large`. Those endpoints contain the
-legacy address export and do not assemble Collections, Moments, a static
+address-export-v2 token rows, including `is_private` and the same holder-bound
+private Drop enrichment, but do not assemble Collections, Moments, a static
 viewer, or deployment guidance.
 
 The personal-site path has no equivalent whole-address response. It starts with
@@ -449,13 +453,15 @@ Before exposing the personal-site control in production:
   5,000-record limit, an address with all three Collection relationship types,
   an address with authored and tagged overlap, an independent owner Capsule,
   and authored/tagged image, video, and audio Moments;
-- test Holdings and Drop-detail batch responses containing public, private, and
-  missing IDs; require an exact public/unavailable partition and verify that
-  private and missing entries remain indistinguishable;
+- test address Holdings responses containing public, held-private, hidden, and
+  missing IDs; require an exact available/unavailable partition and verify that
+  only the holder-proven private card is enriched;
+- verify the same private ID remains redacted through global Drop detail,
+  Drop-detail batch, and ordinary Collection APIs;
 - confirm a generated manifest against the extracted ZIP bytes, including
   `counts.unavailableDropReferences` and the
   `unavailable-drop-references` dataset;
-- require the public and unavailable portable datasets to partition every Drop
+- require the available and unavailable portable datasets to partition every Drop
   ID referenced anywhere in the package;
 - serve the extracted folder locally and verify that Overview does not request
   data chunks or remote media;

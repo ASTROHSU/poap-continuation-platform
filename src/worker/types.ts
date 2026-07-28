@@ -233,6 +233,11 @@ export interface DropSummary {
   imageUrl: string;
   hasArtwork: boolean;
   tokenCount: number;
+  /**
+   * Present only when an exact-address holdings lookup proves that the
+   * queried address references a preserved private Drop.
+   */
+  isPrivate?: true;
 }
 
 export interface DropDetail extends DropSummary {
@@ -277,8 +282,10 @@ export interface PersonalHoldingReference {
 }
 
 export interface PersonalHoldingsPage {
-  schemaVersion: "poapin-personal-holdings-page-v1";
+  schemaVersion: "poapin-personal-holdings-page-v2";
   snapshotId: string;
+  collectionsSnapshotId: string;
+  collectionsReleaseId: string;
   address: string;
   total: number;
   items: PersonalHoldingReference[];
@@ -304,6 +311,7 @@ export interface ExportRecord {
   minted_on: number | null;
   transfer_count: number;
   artwork_url: string | null;
+  is_private: boolean;
 }
 
 export interface CollectionSummaryRow {

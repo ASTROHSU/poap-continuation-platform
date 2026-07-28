@@ -141,7 +141,9 @@ describe("archive API", () => {
   it("paginates exact owner lookups without exposing address discovery", async () => {
     const first = await SELF.fetch(`https://poap.in/api/owners/${ADDRESS}?limit=1`);
     expect(first.status).toBe(200);
-    expect(first.headers.get("x-archive-api-version")).toBe("v1.owner-v2");
+    expect(first.headers.get("x-archive-api-version")).toBe(
+      `v1.owner-v3.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
+    );
     const page = await first.json<{
       address: string;
       total: number;
@@ -173,7 +175,7 @@ describe("archive API", () => {
       count: number;
       tokens: Array<{ source_uid: string; artwork_url: string }>;
     }>();
-    expect(body.schema_version).toBe("poapin-address-export-v1");
+    expect(body.schema_version).toBe("poapin-address-export-v2");
     expect(body.queried_address).toBe(ADDRESS);
     expect(body.count).toBe(2);
     expect(body.tokens).toHaveLength(2);

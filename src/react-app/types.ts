@@ -58,6 +58,8 @@ export interface Drop {
   reservationsTotal?: number;
   reservationsMinted?: number;
   reservationsUnminted?: number;
+  /** Included only in an exact-address export or holdings response. */
+  isPrivate?: true;
 }
 
 export interface Holding extends Drop {
@@ -409,8 +411,10 @@ export interface PersonalExportManifest {
 }
 
 export interface PersonalHoldingsPage extends PageResponse<PersonalHoldingReference> {
-  schemaVersion: "poapin-personal-holdings-page-v1";
+  schemaVersion: "poapin-personal-holdings-page-v2";
   snapshotId: string;
+  collectionsSnapshotId: string;
+  collectionsReleaseId: string;
   address: string;
   total: number;
   drops: Drop[];
