@@ -309,6 +309,16 @@ test("exact private Drop detail is labeled and excluded from indexing", async ({
       },
     }),
   );
+  await page.route("**/api/drops/99/collectors?*", (route) =>
+    route.fulfill({
+      json: {
+        snapshotId: archiveMeta.snapshotId,
+        dropId: 99,
+        items: [],
+        nextCursor: null,
+      },
+    }),
+  );
 
   await page.goto("/drop/99");
 
@@ -320,6 +330,83 @@ test("exact private Drop detail is labeled and excluded from indexing", async ({
     }),
   ).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex,nofollow");
+});
+
+test("Drop detail lists archived collectors and loads every cursor page", async ({ page }) => {
+  const firstAddress = "0x1111111111111111111111111111111111111111";
+  const secondAddress = "0x2222222222222222222222222222222222222222";
+  const thirdAddress = "0x3333333333333333333333333333333333333333";
+  await page.route("**/api/drops/98", (route) =>
+    route.fulfill({
+      json: {
+        ...drop(98, "Collector archive record"),
+        description: "A Drop with archived holder records.",
+        endDate: "2026-01-01T01:00:00.000Z",
+        tokenCount: 3,
+      },
+    }),
+  );
+  await page.route("**/api/drops/98/collectors?*", (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor");
+    return route.fulfill({
+      json: {
+        snapshotId: archiveMeta.snapshotId,
+        dropId: 98,
+        items: cursor
+          ? [
+              {
+                poapId: 9801,
+                ownerAddress: thirdAddress,
+                mintedOn: null,
+                network: "mainnet",
+                transferCount: 2,
+              },
+            ]
+          : [
+              {
+                poapId: 9803,
+                ownerAddress: firstAddress,
+                mintedOn: 1_767_225_600,
+                network: "xdai",
+                transferCount: 0,
+              },
+              {
+                poapId: 9802,
+                ownerAddress: secondAddress,
+                mintedOn: 1_767_312_000,
+                network: "xdai",
+                transferCount: 1,
+              },
+            ],
+        nextCursor: cursor ? null : "next-collectors",
+      },
+    });
+  });
+
+  await page.goto("/drop/98");
+
+  await expect(page.getByRole("heading", { name: "Collectors", exact: true })).toBeVisible();
+  await expect(page.getByText("2 of 3 records loaded", { exact: true })).toBeVisible();
+  await expect(page.locator(".drop-collectors__list > li")).toHaveCount(2);
+  await expect(page.locator(`a[href="/address/${firstAddress}"]`)).toHaveCount(1);
+  await expect(page.getByText("POAP #9803", { exact: true })).toBeVisible();
+  await expect(page.getByText("0 transfers", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 transfer", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Load more collectors" }).click();
+
+  await expect(page.locator(".drop-collectors__list > li")).toHaveCount(3);
+  await expect(page.getByText("3 of 3 records loaded", { exact: true })).toBeVisible();
+  await expect(page.getByText("Mint date unavailable", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Load more collectors" })).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      content: document.documentElement.scrollWidth,
+    })),
+  ).toEqual({ viewport: 390, content: 390 });
 });
 
 test("personal site exporter uses compact hierarchy and recognizable deployment cards", async ({

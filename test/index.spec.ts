@@ -40,6 +40,23 @@ beforeAll(async () => {
   await executeSql(bindings.CATALOG_DB, bindings.TEST_CATALOG_FIXTURE);
   await executeSql(bindings.HOLDINGS_DB, bindings.TEST_HOLDINGS_FIXTURE);
   await executeSql(bindings.COLLECTIONS_DB, bindings.TEST_COLLECTIONS_FIXTURE);
+  await bindings.HOLDINGS_DB.prepare(
+    `
+      INSERT INTO tokens (
+        source_uid,
+        poap_id,
+        drop_id,
+        minted_on,
+        owner_address_norm,
+        network,
+        transfer_count
+      ) VALUES
+        ('collector-fixture-200', 200, 2, 1540944000,
+          '0x2222222222222222222222222222222222222222', 'xdai', 0),
+        ('collector-fixture-199', 199, 2, 1540857600,
+          '0x4444444444444444444444444444444444444444', 'xdai', 2)
+    `,
+  ).run();
   await bindings.CATALOG_DB.prepare(
     "UPDATE drops SET event_url = 'javascript:alert(1)' WHERE drop_id = 2",
   ).run();
@@ -168,6 +185,104 @@ describe("archive API", () => {
 
     const hidden = await SELF.fetch("https://poap.in/api/drops/1004");
     expect(hidden.status).toBe(404);
+  });
+
+  it("lists every archived collector record for an exact Drop with an indexed keyset", async () => {
+    const first = await SELF.fetch("https://poap.in/api/drops/2/collectors?limit=1");
+    expect(first.status).toBe(200);
+    expect(first.headers.get("x-archive-api-version")).toBe(
+      `v1.drop-collectors-v1.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
+    );
+    const firstPage = await first.json<{
+      snapshotId: string;
+      dropId: number;
+      items: Array<{
+        poapId: number;
+        ownerAddress: string;
+        mintedOn: number;
+        network: string;
+        transferCount: number;
+      }>;
+      nextCursor: string;
+    }>();
+    expect(firstPage).toMatchObject({
+      snapshotId: "2026-07-02-v1",
+      dropId: 2,
+      items: [
+        {
+          poapId: 200,
+          ownerAddress: "0x2222222222222222222222222222222222222222",
+          mintedOn: 1540944000,
+          network: "xdai",
+          transferCount: 0,
+        },
+      ],
+    });
+
+    const secondSearch = new URLSearchParams({
+      cursor: firstPage.nextCursor,
+      limit: "1",
+    });
+    const secondPage = await (
+      await SELF.fetch(`https://poap.in/api/drops/2/collectors?${secondSearch}`)
+    ).json<{ items: Array<{ poapId: number }>; nextCursor: string }>();
+    expect(secondPage.items.map((item) => item.poapId)).toEqual([199]);
+
+    const thirdSearch = new URLSearchParams({
+      limit: "1",
+      cursor: secondPage.nextCursor,
+    });
+    const thirdPage = await (
+      await SELF.fetch(`https://poap.in/api/drops/2/collectors?${thirdSearch}`)
+    ).json<{ items: Array<{ poapId: number }>; nextCursor: null }>();
+    expect(thirdPage.items.map((item) => item.poapId)).toEqual([2]);
+    expect(thirdPage.nextCursor).toBeNull();
+
+    const plan = await bindings.HOLDINGS_DB.prepare(
+      `
+        EXPLAIN QUERY PLAN
+        SELECT
+          r.source_uid,
+          r.poap_id,
+          t.minted_on,
+          r.owner_address_norm,
+          t.network,
+          t.transfer_count
+        FROM drop_collector_refs r
+        JOIN tokens t
+          ON t.owner_address_norm = r.owner_address_norm
+         AND t.poap_id = r.poap_id
+         AND t.source_uid = r.source_uid
+        WHERE r.drop_id = ?1
+        ORDER BY r.poap_id DESC, r.source_uid DESC, r.owner_address_norm DESC
+        LIMIT ?2
+      `,
+    )
+      .bind(2, 49)
+      .all<{ detail: string }>();
+    const details = plan.results.map((row) => row.detail).join("\n");
+    expect(details).toContain("SEARCH r USING PRIMARY KEY");
+    expect(details).toContain("SEARCH t USING PRIMARY KEY");
+    expect(details).not.toContain("SCAN tokens");
+    expect(details).not.toContain("SCAN drop_collector_refs");
+    expect(details).not.toContain("USE TEMP B-TREE");
+  });
+
+  it("fails closed for hidden Drops and rejects collector scan amplification", async () => {
+    const [hidden, privateDrop, badLimit, unknown, badCursor] = await Promise.all([
+      SELF.fetch("https://poap.in/api/drops/1004/collectors?limit=48"),
+      SELF.fetch("https://poap.in/api/drops/1002/collectors?limit=48"),
+      SELF.fetch("https://poap.in/api/drops/2/collectors?limit=49"),
+      SELF.fetch("https://poap.in/api/drops/2/collectors?offset=1"),
+      SELF.fetch("https://poap.in/api/drops/2/collectors?cursor=not-a-cursor"),
+    ]);
+    expect(hidden.status).toBe(404);
+    expect(privateDrop.status).toBe(200);
+    await expect(privateDrop.json()).resolves.toMatchObject({ dropId: 1002, items: [] });
+    expect([badLimit.status, unknown.status, badCursor.status]).toEqual([400, 400, 400]);
+    for (const response of [hidden, badLimit, unknown, badCursor]) {
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    }
   });
 
   it("paginates exact owner lookups without exposing address discovery", async () => {

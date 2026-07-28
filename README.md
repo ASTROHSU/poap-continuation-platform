@@ -36,6 +36,8 @@ artwork served from [`media.poap.in`](https://media.poap.in).
 - Address lookup that accepts either a complete `0x` address or an ENS name,
   including shareable paths such as `/address/poap.eth`, then opens the matching
   preserved collection without connecting a wallet.
+- Exact Drop pages with a cursor-paginated list of every holder record preserved
+  in the historical Holdings snapshot.
 - A browser-built, deployable personal-site ZIP containing complete paginated
   Holdings, normalized public and holder-proven private Drop records, opaque
   missing or hidden Drop references, relevant Collection profiles and
@@ -55,7 +57,7 @@ No wallet connection is required.
 | Web         | React + Vite                     | Browsing, export collection, static-site generation, and ZIP creation |
 | API         | Hono on Cloudflare Workers       | Validation, bounded reads, and cache-safe responses                   |
 | Catalog     | Cloudflare D1 (`CATALOG_DB`)     | Drops, snapshot metadata, search fields, and artwork references       |
-| Holdings    | Cloudflare D1 (`HOLDINGS_DB`)    | Address-to-token lookup, isolated from catalog traffic                |
+| Holdings    | Cloudflare D1 (`HOLDINGS_DB`)    | Clustered address-to-token and exact-Drop collector lookup            |
 | Collections | Cloudflare D1 (`COLLECTIONS_DB`) | Curated collections, memberships, sections, and export relations      |
 | Moments     | Cloudflare D1 (`MOMENTS_DB`)     | Moments, tags, Capsules, Drop links, albums, media proof, and exports |
 | Media       | Cloudflare R2 (`ARCHIVE_BUCKET`) | Immutable original artwork; derived thumbnails may follow later       |
@@ -201,8 +203,9 @@ distinct Collection relationship views; complete public exports for
 historically owned Collections; separate public authored and tagged Moment
 views; and public Capsules whose archived owner is the address. A private,
 non-hidden Drop can also be opened when its exact ID is known. Drop browse,
-search, batch export, holder lists, and Collection projections continue to
-redact private metadata.
+search, batch export, collector responses, and Collection projections continue
+to redact private Drop metadata; an exact Drop page may separately list the
+public holder addresses preserved in Holdings.
 
 The deployable ZIP remains metadata-focused: its generated page mounts an image,
 video, or audio source only after a visitor explicitly asks to load it. A

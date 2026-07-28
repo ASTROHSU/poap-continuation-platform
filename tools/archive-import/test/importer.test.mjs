@@ -112,6 +112,7 @@ test("generates deterministic D1 shards, quality report, and R2 manifest", async
     assert.equal(verification.catalog.drops, 2);
     assert.equal(verification.holdings.tokens, 3);
     assert.match(verification.ownerLookupPlan.join("\n"), /PRIMARY KEY/);
+    assert.match(verification.dropCollectorLookupPlan.join("\n"), /SEARCH r USING PRIMARY KEY/);
 
     const inventoryEntries = [
       {

@@ -76,6 +76,19 @@ export interface Holding extends Drop {
   transferCount: number;
 }
 
+export interface DropCollector {
+  poapId: number;
+  ownerAddress: string;
+  mintedOn: number | null;
+  network: string;
+  transferCount: number;
+}
+
+export interface DropCollectorsPage extends PageResponse<DropCollector> {
+  snapshotId: string;
+  dropId: number;
+}
+
 export interface PersonalHoldingReference {
   sourceUid: string;
   poapId: number;

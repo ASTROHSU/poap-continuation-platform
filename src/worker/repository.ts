@@ -5,6 +5,9 @@ import type {
   CatalogDetailRow,
   CatalogSummaryRow,
   D1ReadClient,
+  DropCollectorRow,
+  DropCollectorsPage,
+  DropCollectorsQuery,
   DropDetail,
   DropDetailBatch,
   DropSummary,
@@ -111,6 +114,41 @@ const OWNER_NEXT_PAGE_SQL = `
     AND (poap_id, source_uid) < (?2, ?3)
   ORDER BY poap_id DESC, source_uid DESC
   LIMIT ?4`;
+
+const DROP_COLLECTORS_FIRST_PAGE_SQL = `
+  SELECT
+    r.source_uid,
+    r.poap_id,
+    t.minted_on,
+    r.owner_address_norm,
+    t.network,
+    t.transfer_count
+  FROM drop_collector_refs r
+  JOIN tokens t
+    ON t.owner_address_norm = r.owner_address_norm
+   AND t.poap_id = r.poap_id
+   AND t.source_uid = r.source_uid
+  WHERE r.drop_id = ?1
+  ORDER BY r.poap_id DESC, r.source_uid DESC, r.owner_address_norm DESC
+  LIMIT ?2`;
+
+const DROP_COLLECTORS_NEXT_PAGE_SQL = `
+  SELECT
+    r.source_uid,
+    r.poap_id,
+    t.minted_on,
+    r.owner_address_norm,
+    t.network,
+    t.transfer_count
+  FROM drop_collector_refs r
+  JOIN tokens t
+    ON t.owner_address_norm = r.owner_address_norm
+   AND t.poap_id = r.poap_id
+   AND t.source_uid = r.source_uid
+  WHERE r.drop_id = ?1
+    AND (r.poap_id, r.source_uid, r.owner_address_norm) < (?2, ?3, ?4)
+  ORDER BY r.poap_id DESC, r.source_uid DESC, r.owner_address_norm DESC
+  LIMIT ?5`;
 
 const PERSONAL_HOLDINGS_FIRST_PAGE_SQL = `
   SELECT ${HOLDING_COLUMNS}
@@ -372,6 +410,56 @@ export async function fetchOwner(
         })
       : null;
   return { address: query.address, total, uniqueDrops, items, nextCursor };
+}
+
+export async function fetchDropCollectors(
+  db: D1ReadClient,
+  query: DropCollectorsQuery,
+  snapshotId: string,
+): Promise<DropCollectorsPage> {
+  const collectorStatement = query.cursor
+    ? db
+        .prepare(DROP_COLLECTORS_NEXT_PAGE_SQL)
+        .bind(query.dropId, query.cursor.i, query.cursor.u, query.cursor.a, query.limit + 1)
+    : db.prepare(DROP_COLLECTORS_FIRST_PAGE_SQL).bind(query.dropId, query.limit + 1);
+  const [snapshotResult, collectorResult] = await db.batch<SnapshotIdRow | DropCollectorRow>([
+    db.prepare(SNAPSHOT_ID_SQL),
+    collectorStatement,
+  ]);
+  assertSnapshotId((snapshotResult.results[0] as SnapshotIdRow | undefined)?.value, snapshotId);
+
+  const allRows = collectorResult.results as DropCollectorRow[];
+  const hasNext = allRows.length > query.limit;
+  const rows = allRows.slice(0, query.limit);
+  const items = rows.map((row) => ({
+    poapId: numeric(row.poap_id),
+    ownerAddress: row.owner_address_norm,
+    mintedOn: nullableNumber(row.minted_on),
+    network: row.network,
+    transferCount: numeric(row.transfer_count),
+  }));
+  const last = rows.at(-1);
+  const currentPage = query.cursor?.p ?? 1;
+  const nextCursor =
+    hasNext && last
+      ? encodeCursor({
+          v: 1,
+          c: "drop-collectors",
+          s: snapshotId,
+          f: query.filterKey,
+          p: currentPage + 1,
+          i: numeric(last.poap_id),
+          u: last.source_uid,
+          a: last.owner_address_norm,
+        })
+      : null;
+
+  return {
+    snapshotId,
+    dropId: query.dropId,
+    items,
+    nextCursor,
+  };
 }
 
 export async function fetchPersonalHoldingsPage(

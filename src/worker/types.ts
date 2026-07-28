@@ -49,6 +49,14 @@ export interface OwnerQuery {
   canonicalSearch: string;
 }
 
+export interface DropCollectorsQuery {
+  dropId: number;
+  limit: number;
+  cursor: DropCollectorsCursor | null;
+  filterKey: string;
+  canonicalSearch: string;
+}
+
 export interface PersonalHoldingsQuery {
   address: string;
   limit: number;
@@ -110,6 +118,17 @@ export interface OwnerCursor {
   f: string;
   p: number;
   u: string;
+}
+
+export interface DropCollectorsCursor {
+  v: 1;
+  c: "drop-collectors";
+  s: string;
+  f: string;
+  p: number;
+  i: number;
+  u: string;
+  a: string;
 }
 
 export interface PersonalHoldingsCursor {
@@ -197,6 +216,30 @@ export interface HoldingRow {
   minted_on: number;
   network: string;
   transfer_count: number;
+}
+
+export interface DropCollectorRow {
+  source_uid: string;
+  poap_id: number;
+  minted_on: number | null;
+  owner_address_norm: string;
+  network: string;
+  transfer_count: number;
+}
+
+export interface DropCollector {
+  poapId: number;
+  ownerAddress: string;
+  mintedOn: number | null;
+  network: string;
+  transferCount: number;
+}
+
+export interface DropCollectorsPage {
+  snapshotId: string;
+  dropId: number;
+  items: DropCollector[];
+  nextCursor: string | null;
 }
 
 export interface ExportCatalogRow {

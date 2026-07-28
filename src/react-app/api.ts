@@ -10,6 +10,7 @@ import type {
   CollectionType,
   CapsuleOwnerExportPage,
   Drop,
+  DropCollectorsPage,
   DropDetailBatchResponse,
   DropSort,
   EventType,
@@ -112,6 +113,12 @@ export function getDrops(query: DropQuery, signal?: AbortSignal) {
 
 export function getDrop(dropId: number, signal?: AbortSignal) {
   return requestJson<Drop>(`/api/drops/${dropId}`, signal);
+}
+
+export function getDropCollectors(dropId: number, cursor?: string | null, signal?: AbortSignal) {
+  const params = new URLSearchParams({ limit: "48" });
+  if (cursor) params.set("cursor", cursor);
+  return requestJson<DropCollectorsPage>(`/api/drops/${dropId}/collectors?${params}`, signal);
 }
 
 export function getDropDetailsBatch(dropIds: number[], signal?: AbortSignal) {
