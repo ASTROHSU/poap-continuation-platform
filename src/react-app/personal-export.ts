@@ -254,6 +254,8 @@ async function collectHoldings(
     if (
       page.schemaVersion !== "poapin-personal-holdings-page-v2" ||
       page.snapshotId !== manifest.snapshots.holdings ||
+      (page.catalogSnapshotId ?? page.snapshotId) !==
+        (manifest.snapshots.catalog ?? manifest.snapshots.holdings) ||
       page.collectionsSnapshotId !== manifest.sources.collections.snapshotId ||
       page.collectionsReleaseId !== manifest.sources.collections.releaseId ||
       page.address !== address ||
@@ -1058,6 +1060,10 @@ function assertPersonalManifest(manifest: PersonalExportManifest, address: strin
     !manifest.sources.holdings ||
     !manifest.sources.collections ||
     !manifest.sources.moments ||
+    ((manifest.snapshots.catalog !== undefined || manifest.sources.catalog !== undefined) &&
+      (!manifest.snapshots.catalog ||
+        !manifest.sources.catalog ||
+        manifest.sources.catalog.snapshotId !== manifest.snapshots.catalog)) ||
     manifest.sources.holdings.snapshotId !== manifest.snapshots.holdings ||
     manifest.sources.collections.snapshotId !== manifest.snapshots.collections ||
     !manifest.sources.collections.releaseId ||

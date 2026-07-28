@@ -33,12 +33,14 @@ import {
   fetchDropCollectors,
   fetchDropDetailBatch,
   fetchDrops,
+  fetchHoldingsMeta,
   fetchMeta,
   fetchOwner,
   fetchPersonalHoldingsPage,
   fetchOwnerTotal,
   fetchSnapshotAt,
 } from "./repository";
+import { fetchExactHoldingDropDetail } from "./holding-drops";
 import { fetchExactCollectionDropDetail } from "./private-held-drops";
 import type { AppEnv, Bindings, DropDetail } from "./types";
 import {
@@ -74,7 +76,7 @@ const MOMENTS_CACHE_SCHEMA = "moments-v2";
 const MOMENTS_META_CACHE_SCHEMA = "public-meta-v2";
 const OWNER_CACHE_SCHEMA = "owner-v3";
 const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v2";
-const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v2";
+const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v3";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
 const DROP_COLLECTORS_CACHE_SCHEMA = "drop-collectors-v1";
 
@@ -124,6 +126,7 @@ function personalExportCacheIdentity(bindings: Bindings): {
 } {
   return {
     snapshotId: [
+      bindings.HOLDINGS_SNAPSHOT_ID,
       bindings.SNAPSHOT_ID,
       bindings.COLLECTIONS_SNAPSHOT_ID,
       bindings.MOMENTS_SNAPSHOT_ID,
@@ -152,15 +155,29 @@ app.get("/api/meta", async (context) => {
     {
       requestUrl: context.req.url,
       canonicalPath: "/api/meta",
-      snapshotId: context.env.SNAPSHOT_ID,
+      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}`,
       apiVersion: context.env.API_CACHE_VERSION,
       edgeTtlSeconds: 2_592_000,
       browserTtlSeconds: 300,
       executionCtx: context.executionCtx,
     },
     async () => {
-      const db = context.env.CATALOG_DB.withSession("first-primary");
-      return context.json(await fetchMeta(db, context.env.SNAPSHOT_ID));
+      const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
+      const holdingsDb = context.env.HOLDINGS_DB.withSession("first-primary");
+      const [catalog, holdings] = await Promise.all([
+        fetchMeta(catalogDb, context.env.SNAPSHOT_ID),
+        fetchHoldingsMeta(holdingsDb, context.env.HOLDINGS_SNAPSHOT_ID),
+      ]);
+      return context.json({
+        ...catalog,
+        holdingsSnapshotId: holdings.snapshotId,
+        holdingsSnapshotAt: holdings.snapshotAt,
+        counts: {
+          ...catalog.counts,
+          tokens: holdings.tokens,
+          owners: holdings.owners,
+        },
+      });
     },
   );
 });
@@ -546,14 +563,14 @@ app.get("/api/drops/:id/collectors", async (context) => {
   const query = parseDropCollectorsQuery(
     new URL(context.req.url),
     context.req.param("id"),
-    context.env.SNAPSHOT_ID,
+    context.env.HOLDINGS_SNAPSHOT_ID,
   );
   return withSnapshotCache(
     {
       requestUrl: context.req.url,
       canonicalPath: `/api/drops/${query.dropId}/collectors`,
       canonicalSearch: query.canonicalSearch,
-      snapshotId: context.env.SNAPSHOT_ID,
+      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}`,
       apiVersion: [
         context.env.API_CACHE_VERSION,
         DROP_COLLECTORS_CACHE_SCHEMA,
@@ -566,7 +583,9 @@ app.get("/api/drops/:id/collectors", async (context) => {
     async () => {
       await resolveExactDrop(context.env, query.dropId);
       const holdingsDb = context.env.HOLDINGS_DB.withSession("first-primary");
-      return context.json(await fetchDropCollectors(holdingsDb, query, context.env.SNAPSHOT_ID));
+      return context.json(
+        await fetchDropCollectors(holdingsDb, query, context.env.HOLDINGS_SNAPSHOT_ID),
+      );
     },
   );
 });
@@ -581,7 +600,7 @@ app.get("/api/drops/:id", async (context) => {
     {
       requestUrl: context.req.url,
       canonicalPath: `/api/drops/${dropId}`,
-      snapshotId: context.env.SNAPSHOT_ID,
+      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}`,
       apiVersion: `${collectionsApiVersion(context.env)}.${DROP_DETAIL_CACHE_SCHEMA}`,
       edgeTtlSeconds: 2_592_000,
       browserTtlSeconds: 300,
@@ -1070,7 +1089,7 @@ app.get("/api/owners/:address/export/manifest", async (context) => {
       const collectionsDb = context.env.COLLECTIONS_DB.withSession("first-primary");
       const momentsDb = context.env.MOMENTS_DB.withSession("first-primary");
       const [holdings, ownedCollections, momentRelations] = await Promise.all([
-        fetchOwnerTotal(holdingsDb, address, context.env.SNAPSHOT_ID),
+        fetchOwnerTotal(holdingsDb, address, context.env.HOLDINGS_SNAPSHOT_ID),
         fetchOwnedCollectionCount(collectionsDb, address, context.env.COLLECTIONS_SNAPSHOT_ID),
         fetchPersonalMomentRelationCounts(momentsDb, address, momentsReleaseIdentity(context.env)),
       ]);
@@ -1078,13 +1097,17 @@ app.get("/api/owners/:address/export/manifest", async (context) => {
         schemaVersion: "poapin-personal-export-v1",
         address,
         snapshots: {
-          holdings: context.env.SNAPSHOT_ID,
+          catalog: context.env.SNAPSHOT_ID,
+          holdings: context.env.HOLDINGS_SNAPSHOT_ID,
           collections: context.env.COLLECTIONS_SNAPSHOT_ID,
           moments: context.env.MOMENTS_SNAPSHOT_ID,
         },
         sources: {
-          holdings: {
+          catalog: {
             snapshotId: context.env.SNAPSHOT_ID,
+          },
+          holdings: {
+            snapshotId: context.env.HOLDINGS_SNAPSHOT_ID,
           },
           collections: {
             snapshotId: context.env.COLLECTIONS_SNAPSHOT_ID,
@@ -1137,14 +1160,14 @@ app.get("/api/owners/:address/export/holdings", async (context) => {
   const query = parsePersonalHoldingsQuery(
     new URL(context.req.url),
     context.req.param("address"),
-    context.env.SNAPSHOT_ID,
+    context.env.HOLDINGS_SNAPSHOT_ID,
   );
   return withSnapshotCache(
     {
       requestUrl: context.req.url,
       canonicalPath: `/api/owners/${query.address}/export/holdings`,
       canonicalSearch: query.canonicalSearch,
-      snapshotId: context.env.SNAPSHOT_ID,
+      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.SNAPSHOT_ID}`,
       apiVersion: [
         context.env.API_CACHE_VERSION,
         PERSONAL_EXPORT_CACHE_SCHEMA,
@@ -1165,6 +1188,7 @@ app.get("/api/owners/:address/export/holdings", async (context) => {
           catalogDb,
           collectionsDb,
           query,
+          context.env.HOLDINGS_SNAPSHOT_ID,
           context.env.SNAPSHOT_ID,
           context.env.COLLECTIONS_SNAPSHOT_ID,
           context.env.COLLECTIONS_RELEASE_ID,
@@ -1181,14 +1205,14 @@ app.get("/api/owners/:address", async (context) => {
   const query = parseOwnerQuery(
     new URL(context.req.url),
     context.req.param("address"),
-    context.env.SNAPSHOT_ID,
+    context.env.HOLDINGS_SNAPSHOT_ID,
   );
   return withSnapshotCache(
     {
       requestUrl: context.req.url,
       canonicalPath: `/api/owners/${query.address}`,
       canonicalSearch: query.canonicalSearch,
-      snapshotId: context.env.SNAPSHOT_ID,
+      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.SNAPSHOT_ID}`,
       apiVersion: [
         context.env.API_CACHE_VERSION,
         OWNER_CACHE_SCHEMA,
@@ -1208,6 +1232,7 @@ app.get("/api/owners/:address", async (context) => {
           catalogDb,
           collectionsDb,
           query,
+          context.env.HOLDINGS_SNAPSHOT_ID,
           context.env.SNAPSHOT_ID,
           context.env.COLLECTIONS_SNAPSHOT_ID,
           context.env.MEDIA_BASE_URL,
@@ -1227,8 +1252,8 @@ for (const format of ["csv", "json"] as const) {
     const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
     const collectionsDb = context.env.COLLECTIONS_DB.withSession("first-primary");
     const [total, snapshotAt] = await Promise.all([
-      fetchOwnerTotal(holdingsDb, address, context.env.SNAPSHOT_ID),
-      fetchSnapshotAt(catalogDb, context.env.SNAPSHOT_ID),
+      fetchOwnerTotal(holdingsDb, address, context.env.HOLDINGS_SNAPSHOT_ID),
+      fetchSnapshotAt(holdingsDb, context.env.HOLDINGS_SNAPSHOT_ID),
     ]);
     if (total > MAX_SYNC_EXPORT_RECORDS) {
       throw new ApiError(
@@ -1241,7 +1266,8 @@ for (const format of ["csv", "json"] as const) {
       format,
       address,
       total,
-      snapshotId: context.env.SNAPSHOT_ID,
+      snapshotId: context.env.HOLDINGS_SNAPSHOT_ID,
+      catalogSnapshotId: context.env.SNAPSHOT_ID,
       snapshotAt,
       holdingsDb,
       catalogDb,
@@ -1249,7 +1275,7 @@ for (const format of ["csv", "json"] as const) {
       collectionsSnapshotId: context.env.COLLECTIONS_SNAPSHOT_ID,
       mediaBaseUrl: context.env.MEDIA_BASE_URL,
     });
-    response.headers.set("X-Archive-Snapshot", context.env.SNAPSHOT_ID);
+    response.headers.set("X-Archive-Snapshot", context.env.HOLDINGS_SNAPSHOT_ID);
     response.headers.set("X-Archive-API-Version", context.env.API_CACHE_VERSION);
     return response;
   });
@@ -1301,22 +1327,52 @@ async function resolveExactDrop(bindings: Bindings, dropId: number): Promise<Dro
     bindings.MEDIA_BASE_URL,
     bindings.SNAPSHOT_ID,
   );
-  if (catalogDrop && !catalogDrop.isPrivate) return catalogDrop;
+  let presentationDrop = catalogDrop;
+  if (!catalogDrop || catalogDrop.isPrivate) {
+    const collectionsDb = bindings.COLLECTIONS_DB.withSession("first-primary");
+    const supplemental = await fetchExactCollectionDropDetail(
+      collectionsDb,
+      dropId,
+      bindings.MEDIA_BASE_URL,
+      bindings.SNAPSHOT_ID,
+      bindings.COLLECTIONS_SNAPSHOT_ID,
+    );
+    if (supplemental.state === "hidden") {
+      throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
+    }
+    if (supplemental.state === "available") presentationDrop = supplemental.drop;
+  }
 
-  const collectionsDb = bindings.COLLECTIONS_DB.withSession("first-primary");
-  const supplemental = await fetchExactCollectionDropDetail(
-    collectionsDb,
+  const holdingsDb = bindings.HOLDINGS_DB.withSession("first-primary");
+  const holdingDrop = await fetchExactHoldingDropDetail(
+    holdingsDb,
     dropId,
-    bindings.MEDIA_BASE_URL,
-    bindings.SNAPSHOT_ID,
-    bindings.COLLECTIONS_SNAPSHOT_ID,
+    bindings.HOLDINGS_SNAPSHOT_ID,
   );
-  if (supplemental.state === "hidden") {
+  if (holdingDrop.state === "hidden") {
     throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
   }
-  const drop = supplemental.state === "available" ? supplemental.drop : catalogDrop;
+  const drop =
+    holdingDrop.state === "available"
+      ? mergeHoldingDrop(holdingDrop.drop, presentationDrop)
+      : presentationDrop;
   if (!drop) throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
   return drop;
+}
+
+function mergeHoldingDrop(holding: DropDetail, presentation: DropDetail | null): DropDetail {
+  if (!presentation) return holding;
+  return {
+    ...presentation,
+    ...holding,
+    imageUrl: presentation.imageUrl,
+    hasArtwork: presentation.hasArtwork,
+    reservationsTotal: presentation.reservationsTotal,
+    reservationsMinted: presentation.reservationsMinted,
+    reservationsUnminted: presentation.reservationsUnminted,
+    featuredOn: presentation.featuredOn,
+    momentsUploaded: presentation.momentsUploaded,
+  };
 }
 
 function collectionExportNextPath(

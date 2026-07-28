@@ -26,6 +26,7 @@ export default defineWorkersConfig({
             TEST_COLLECTIONS_MIGRATIONS: collectionsMigrations,
             TEST_MOMENTS_FIXTURE: momentsFixture,
             TEST_MOMENTS_MIGRATIONS: momentsMigrations,
+            HOLDINGS_SNAPSHOT_ID: "2026-07-02-v1",
             MOMENTS_SNAPSHOT_ID: "moments-2026-07-23-v1",
             MOMENTS_RELEASE_ID: "moments-test-release",
             MOMENTS_SOURCE_DATABASE_SHA256: "a".repeat(64),

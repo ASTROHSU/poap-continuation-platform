@@ -26,8 +26,8 @@
     },
     {
       "binding": "HOLDINGS_DB",
-      "database_name": "poapin-archive-holdings",
-      "database_id": "1b085d43-c467-4daa-a3f8-8396677dc9ca",
+      "database_name": "poapin-archive-holdings-20260728-v1",
+      "database_id": "69000ed7-6455-4114-8bed-28761b512e52",
       "migrations_dir": "migrations/holdings",
     },
     {
@@ -68,6 +68,7 @@
   ],
   "vars": {
     "SNAPSHOT_ID": "2026-07-02-v1",
+    "HOLDINGS_SNAPSHOT_ID": "compass-holdings-2026-07-28-v1",
     "COLLECTIONS_SNAPSHOT_ID": "collections-2026-07-22-v1",
     "COLLECTIONS_RELEASE_ID": "collections-2026-07-22-v1-c1f9213b",
     "MOMENTS_SNAPSHOT_ID": "moments-2026-07-23-v1",

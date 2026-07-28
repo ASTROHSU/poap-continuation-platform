@@ -1,4 +1,5 @@
 import { artworkUrl } from "./media";
+import { fetchHeldDropDetails } from "./holding-drops";
 import { fetchPrivateHeldDropDetails } from "./private-held-drops";
 import type {
   ArchiveMeta,
@@ -83,6 +84,11 @@ const SNAPSHOT_META_SQL = `
   SELECT key, value
   FROM archive_meta
   WHERE key IN ('snapshot_id', 'snapshot_at')`;
+
+const HOLDINGS_META_SQL = `
+  SELECT key, value
+  FROM archive_meta
+  WHERE key IN ('snapshot_id', 'snapshot_at', 'tokens_count', 'owners_count')`;
 
 const SNAPSHOT_ID_SQL = `
   SELECT value
@@ -231,6 +237,25 @@ export async function fetchSnapshotAt(db: D1ReadClient, snapshotId: string): Pro
   return snapshotAt;
 }
 
+export async function fetchHoldingsMeta(
+  db: D1ReadClient,
+  snapshotId: string,
+): Promise<{ snapshotId: string; snapshotAt: string; tokens: number; owners: number }> {
+  const result = await db.prepare(HOLDINGS_META_SQL).all<MetaRow>();
+  const values = new Map(result.results.map((row) => [row.key, row.value]));
+  assertSnapshotId(values.get("snapshot_id"), snapshotId);
+  const snapshotAt = values.get("snapshot_at");
+  if (!snapshotAt) {
+    throw new ApiError(503, "Holdings metadata is not available.", "archive_unavailable");
+  }
+  return {
+    snapshotId,
+    snapshotAt,
+    tokens: parseStoredCount(values.get("tokens_count")),
+    owners: parseStoredCount(values.get("owners_count")),
+  };
+}
+
 export async function fetchDrops(
   db: D1ReadClient,
   query: DropsQuery,
@@ -333,7 +358,8 @@ export async function fetchOwner(
   catalogDb: D1ReadClient,
   collectionsDb: D1ReadClient,
   query: OwnerQuery,
-  snapshotId: string,
+  holdingsSnapshotId: string,
+  catalogSnapshotId: string,
   collectionsSnapshotId: string,
   mediaBaseUrl: string,
 ): Promise<{
@@ -356,7 +382,10 @@ export async function fetchOwner(
     holdingsDb.prepare(OWNER_STATS_SQL).bind(query.address),
     tokenStatement,
   ]);
-  assertSnapshotId((snapshotResult.results[0] as SnapshotIdRow | undefined)?.value, snapshotId);
+  assertSnapshotId(
+    (snapshotResult.results[0] as SnapshotIdRow | undefined)?.value,
+    holdingsSnapshotId,
+  );
   const stats = statsResult.results[0] as OwnerStatsRow | undefined;
   const total = numeric(stats?.token_count);
   const uniqueDrops = numeric(stats?.unique_drop_count);
@@ -367,7 +396,7 @@ export async function fetchOwner(
     catalogDb,
     rows.map((row) => row.drop_id),
     mediaBaseUrl,
-    snapshotId,
+    catalogSnapshotId,
   );
   const privateCandidateIds = rows
     .map((row) => row.drop_id)
@@ -378,15 +407,21 @@ export async function fetchOwner(
           collectionsDb,
           privateCandidateIds,
           mediaBaseUrl,
-          snapshotId,
+          catalogSnapshotId,
           collectionsSnapshotId,
         )
+      : new Map<number, DropDetail>();
+  const holdingCandidateIds = privateCandidateIds.filter((dropId) => !privateDrops.has(dropId));
+  const holdingDrops =
+    holdingCandidateIds.length > 0
+      ? await fetchHeldDropDetails(holdingsDb, holdingCandidateIds, holdingsSnapshotId)
       : new Map<number, DropDetail>();
   const items = rows.map((row) => {
     const drop =
       catalog.get(row.drop_id) ??
       privateDrops.get(row.drop_id) ??
-      fallbackDrop(row, mediaBaseUrl, snapshotId);
+      holdingDrops.get(row.drop_id) ??
+      fallbackDrop(row, mediaBaseUrl, catalogSnapshotId);
     return {
       ...drop,
       sourceUid: row.source_uid,
@@ -403,7 +438,7 @@ export async function fetchOwner(
     hasNext && last
       ? encodeCursor({
           v: 1,
-          s: snapshotId,
+          s: holdingsSnapshotId,
           f: query.filterKey,
           p: numeric(last.poap_id),
           u: last.source_uid,
@@ -467,7 +502,8 @@ export async function fetchPersonalHoldingsPage(
   catalogDb: D1ReadClient,
   collectionsDb: D1ReadClient,
   query: PersonalHoldingsQuery,
-  snapshotId: string,
+  holdingsSnapshotId: string,
+  catalogSnapshotId: string,
   collectionsSnapshotId: string,
   collectionsReleaseId: string,
   mediaBaseUrl: string,
@@ -484,7 +520,10 @@ export async function fetchPersonalHoldingsPage(
     holdingsDb.prepare(OWNER_STATS_SQL).bind(query.address),
     tokenStatement,
   ]);
-  assertSnapshotId((snapshotResult.results[0] as SnapshotIdRow | undefined)?.value, snapshotId);
+  assertSnapshotId(
+    (snapshotResult.results[0] as SnapshotIdRow | undefined)?.value,
+    holdingsSnapshotId,
+  );
 
   const total = numeric((statsResult.results[0] as OwnerStatsRow | undefined)?.token_count);
   const allRows = tokenResult.results as HoldingRow[];
@@ -494,7 +533,7 @@ export async function fetchPersonalHoldingsPage(
     catalogDb,
     rows.map((row) => row.drop_id),
     mediaBaseUrl,
-    snapshotId,
+    catalogSnapshotId,
   );
   const privateCandidateIds = rows
     .map((row) => row.drop_id)
@@ -505,9 +544,14 @@ export async function fetchPersonalHoldingsPage(
           collectionsDb,
           privateCandidateIds,
           mediaBaseUrl,
-          snapshotId,
+          catalogSnapshotId,
           collectionsSnapshotId,
         )
+      : new Map<number, DropDetail>();
+  const holdingCandidateIds = privateCandidateIds.filter((dropId) => !privateDrops.has(dropId));
+  const holdingDrops =
+    holdingCandidateIds.length > 0
+      ? await fetchHeldDropDetails(holdingsDb, holdingCandidateIds, holdingsSnapshotId)
       : new Map<number, DropDetail>();
   const items = rows.map((row): PersonalHoldingReference => {
     const dropId = numeric(row.drop_id);
@@ -525,11 +569,11 @@ export async function fetchPersonalHoldingsPage(
     (left, right) => left - right,
   );
   const drops = referencedDropIds.flatMap((dropId) => {
-    const drop = catalog.get(dropId) ?? privateDrops.get(dropId);
+    const drop = catalog.get(dropId) ?? privateDrops.get(dropId) ?? holdingDrops.get(dropId);
     return drop ? [drop] : [];
   });
   const unavailableDropIds = referencedDropIds.filter(
-    (dropId) => !catalog.has(dropId) && !privateDrops.has(dropId),
+    (dropId) => !catalog.has(dropId) && !privateDrops.has(dropId) && !holdingDrops.has(dropId),
   );
   const last = rows.at(-1);
   const nextCursor =
@@ -537,7 +581,7 @@ export async function fetchPersonalHoldingsPage(
       ? encodeCursor({
           v: 1,
           c: "personal-holdings",
-          s: snapshotId,
+          s: holdingsSnapshotId,
           f: query.filterKey,
           p: numeric(last.poap_id),
           u: last.source_uid,
@@ -546,7 +590,8 @@ export async function fetchPersonalHoldingsPage(
 
   return {
     schemaVersion: "poapin-personal-holdings-page-v2",
-    snapshotId,
+    snapshotId: holdingsSnapshotId,
+    catalogSnapshotId,
     collectionsSnapshotId,
     collectionsReleaseId,
     address: query.address,

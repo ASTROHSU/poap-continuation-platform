@@ -839,10 +839,14 @@ function assertSnapshotIdentity(snapshot: PersonalArchiveSnapshot): void {
     throw new Error("The personal archive snapshot identity is invalid.");
   }
   const { holdings, collections, moments } = snapshot.manifest.snapshots;
+  const catalog = snapshot.manifest.snapshots.catalog ?? holdings;
+  const catalogSource = snapshot.manifest.sources.catalog?.snapshotId ?? holdings;
   if (
+    !SNAPSHOT_ID.test(catalog) ||
     !SNAPSHOT_ID.test(holdings) ||
     !SNAPSHOT_ID.test(collections) ||
     !SNAPSHOT_ID.test(moments) ||
+    catalogSource !== catalog ||
     snapshot.manifest.sources.holdings.snapshotId !== holdings ||
     snapshot.manifest.sources.collections.snapshotId !== collections ||
     snapshot.manifest.sources.moments.snapshotId !== moments ||

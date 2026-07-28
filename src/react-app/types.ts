@@ -8,6 +8,8 @@ export interface ArchiveCounts {
 export interface ArchiveMeta {
   snapshotId: string;
   snapshotAt: string;
+  holdingsSnapshotId?: string;
+  holdingsSnapshotAt?: string;
   counts: ArchiveCounts;
   years: number[];
 }
@@ -393,11 +395,15 @@ export interface PersonalExportManifest {
   schemaVersion: "poapin-personal-export-v1";
   address: string;
   snapshots: {
+    catalog?: string;
     holdings: string;
     collections: string;
     moments: string;
   };
   sources: {
+    catalog?: {
+      snapshotId: string;
+    };
     holdings: {
       snapshotId: string;
     };
@@ -431,6 +437,7 @@ export interface PersonalExportManifest {
 export interface PersonalHoldingsPage extends PageResponse<PersonalHoldingReference> {
   schemaVersion: "poapin-personal-holdings-page-v2";
   snapshotId: string;
+  catalogSnapshotId?: string;
   collectionsSnapshotId: string;
   collectionsReleaseId: string;
   address: string;

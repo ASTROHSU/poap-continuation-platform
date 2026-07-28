@@ -1,4 +1,5 @@
 import { artworkUrl } from "./media";
+import { fetchHeldDropDetails } from "./holding-drops";
 import { fetchPrivateHeldDropDetails } from "./private-held-drops";
 import {
   EXPORT_BATCH_SIZE,
@@ -17,6 +18,7 @@ interface ExportOptions {
   address: string;
   total: number;
   snapshotId: string;
+  catalogSnapshotId: string;
   snapshotAt: string;
   holdingsDb: D1ReadClient;
   catalogDb: D1ReadClient;
@@ -69,6 +71,7 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
   let cursor: { poapId: number; sourceUid: string } | null = null;
   const catalogCache = new Map<number, ExportCatalogRow>();
   const privateDropCache = new Map<number, DropDetail>();
+  const holdingDropCache = new Map<number, DropDetail>();
   const resolvedDropIds = new Set<number>();
 
   return new ReadableStream<Uint8Array>({
@@ -81,6 +84,7 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
           const envelope = JSON.stringify({
             schema_version: "poapin-address-export-v2",
             snapshot_id: options.snapshotId,
+            catalog_snapshot_id: options.catalogSnapshotId,
             snapshot_at: options.snapshotAt,
             generated_at: new Date().toISOString(),
             queried_address: options.address,
@@ -117,18 +121,24 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
                 options.collectionsDb,
                 privateDropIds,
                 options.mediaBaseUrl,
-                options.snapshotId,
+                options.catalogSnapshotId,
                 options.collectionsSnapshotId,
               )
             : new Map<number, DropDetail>();
         for (const [dropId, drop] of fetchedPrivateDrops) privateDropCache.set(dropId, drop);
+        const holdingDropIds = privateDropIds.filter((dropId) => !fetchedPrivateDrops.has(dropId));
+        const fetchedHoldingDrops =
+          holdingDropIds.length > 0
+            ? await fetchHeldDropDetails(options.holdingsDb, holdingDropIds, options.snapshotId)
+            : new Map<number, DropDetail>();
+        for (const [dropId, drop] of fetchedHoldingDrops) holdingDropCache.set(dropId, drop);
         for (const dropId of missingDropIds) resolvedDropIds.add(dropId);
         const records = holdings.map((holding) =>
           toExportRecord(
             options,
             holding,
             catalogCache.get(holding.drop_id),
-            privateDropCache.get(holding.drop_id),
+            privateDropCache.get(holding.drop_id) ?? holdingDropCache.get(holding.drop_id),
           ),
         );
         const payload =
@@ -181,7 +191,7 @@ function toExportRecord(
     artwork_url:
       privateDrop?.imageUrl ||
       (numericArtworkAvailable(drop)
-        ? artworkUrl(options.mediaBaseUrl, options.snapshotId, holding.drop_id)
+        ? artworkUrl(options.mediaBaseUrl, options.catalogSnapshotId, holding.drop_id)
         : null),
     is_private: privateDrop?.isPrivate === true,
   };

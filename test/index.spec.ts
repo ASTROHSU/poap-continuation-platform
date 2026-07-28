@@ -60,6 +60,49 @@ beforeAll(async () => {
   await bindings.CATALOG_DB.prepare(
     "UPDATE drops SET event_url = 'javascript:alert(1)' WHERE drop_id = 2",
   ).run();
+  await bindings.HOLDINGS_DB.prepare(
+    `
+      INSERT INTO holding_drops (
+        drop_id, fancy_id, title, description, start_date, end_date,
+        expiry_date, city, country, event_url, year, is_virtual, is_private,
+        is_hidden, channel, platform, location_type, timezone, integrator_id,
+        created_at, image_url, animation_url, token_count, transfer_count
+      ) VALUES
+        (2, 'updated-drop-2', 'Updated Drop Two', 'Newer Graph metadata',
+          '2018-10-29T00:00:00Z', '2018-10-30T00:00:00Z', NULL, 'Prague',
+          'Czechia', 'javascript:alert(1)', 2018, 0, 0, 0, NULL, NULL,
+          'in-person', 'UTC', NULL, '2018-10-01T00:00:00Z',
+          'https://assets.poap.xyz/drop-2.png', NULL, 3, 3),
+        (2001, 'graph-private', 'Graph Private Drop', 'Preserved for its holder',
+          '2026-05-01T00:00:00Z', '2026-05-02T00:00:00Z', NULL, 'Cannes',
+          'France', 'https://events.example.invalid/private', 2026, 0, 1, 0,
+          NULL, NULL, 'in-person', 'Europe/Paris', 'graph-fixture',
+          '2026-04-01T00:00:00Z', 'https://assets.poap.xyz/private.png', NULL, 1, 0),
+        (2002, 'graph-hidden', 'Graph Hidden Drop', 'Must not be exposed',
+          '2026-05-03T00:00:00Z', '2026-05-04T00:00:00Z', NULL, NULL, NULL,
+          NULL, 2026, 1, 1, 1, NULL, NULL, 'virtual', 'UTC', NULL,
+          '2026-04-02T00:00:00Z', NULL, NULL, 1, 0)
+    `,
+  ).run();
+  await bindings.HOLDINGS_DB.prepare(
+    `
+      INSERT INTO tokens (
+        source_uid, poap_id, drop_id, minted_on, owner_address_norm, network, transfer_count
+      ) VALUES (
+        'graph-private-token', 7587009, 2001, 1777593600,
+        '0x5555555555555555555555555555555555555555', 'xdai', 0
+      )
+    `,
+  ).run();
+  await bindings.HOLDINGS_DB.prepare(
+    `
+      INSERT INTO owner_stats (
+        owner_address_norm, token_count, unique_drop_count, first_minted_on, last_minted_on
+      ) VALUES (
+        '0x5555555555555555555555555555555555555555', 1, 1, 1777593600, 1777593600
+      )
+    `,
+  ).run();
 });
 
 async function executeSql(db: D1Database, sql: string): Promise<void> {
@@ -78,6 +121,8 @@ describe("archive API", () => {
     expect(await response.json()).toEqual({
       snapshotId: "2026-07-02-v1",
       snapshotAt: "2026-07-02T14:28:17.259Z",
+      holdingsSnapshotId: "2026-07-02-v1",
+      holdingsSnapshotAt: "2026-07-02T14:28:17.259Z",
       counts: { drops: 3, tokens: 3, owners: 2, artworks: 2 },
       years: [2018, 2015],
     });
@@ -148,13 +193,48 @@ describe("archive API", () => {
     const response = await SELF.fetch("https://poap.in/api/drops/2");
     expect(response.status).toBe(200);
     expect(response.headers.get("x-archive-api-version")).toBe(
-      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v2`,
+      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v3`,
     );
     expect(await response.json()).toMatchObject({
       dropId: 2,
       eventUrl: null,
+      tokenCount: 3,
       reservationsTotal: 2,
       reservationsMinted: 1,
+    });
+  });
+
+  it("uses bounded Holdings metadata for exact and holder-proven missing Drops", async () => {
+    const exact = await SELF.fetch("https://poap.in/api/drops/2001");
+    expect(exact.status).toBe(200);
+    await expect(exact.json()).resolves.toMatchObject({
+      dropId: 2001,
+      title: "Graph Private Drop",
+      city: "Cannes",
+      tokenCount: 1,
+      isPrivate: true,
+      imageUrl: "",
+      hasArtwork: false,
+    });
+
+    const hidden = await SELF.fetch("https://poap.in/api/drops/2002");
+    expect(hidden.status).toBe(404);
+
+    const owner = await SELF.fetch(
+      "https://poap.in/api/owners/0x5555555555555555555555555555555555555555?limit=48",
+    );
+    expect(owner.status).toBe(200);
+    await expect(owner.json()).resolves.toMatchObject({
+      total: 1,
+      uniqueDrops: 1,
+      items: [
+        {
+          poapId: 7587009,
+          dropId: 2001,
+          title: "Graph Private Drop",
+          isPrivate: true,
+        },
+      ],
     });
   });
 

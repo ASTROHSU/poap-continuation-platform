@@ -34,6 +34,7 @@ export class SqlShardWriter {
     rowsPerStatement,
     database,
     journal,
+    generatedHeader = GENERATED_HEADER,
   }) {
     this.outputRoot = resolve(outputRoot);
     this.directory = resolve(outputRoot, relativeDirectory);
@@ -47,6 +48,7 @@ export class SqlShardWriter {
     this.rowsPerStatement = rowsPerStatement;
     this.database = database;
     this.journal = journal;
+    this.generatedHeader = generatedHeader;
     this.pendingRows = [];
     this.pendingBytes = 0;
     this.current = null;
@@ -152,7 +154,7 @@ export class SqlShardWriter {
       statementCount: 0,
       maxStatementByteLength: 0,
     };
-    await this.#write(GENERATED_HEADER);
+    await this.#write(this.generatedHeader);
   }
 
   async #write(value, { payload = true } = {}) {

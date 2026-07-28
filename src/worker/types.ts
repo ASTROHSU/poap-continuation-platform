@@ -8,6 +8,7 @@ export interface Bindings {
   OWNER_RATE_LIMITER: RateLimit;
   EXPORT_RATE_LIMITER: RateLimit;
   SNAPSHOT_ID: string;
+  HOLDINGS_SNAPSHOT_ID: string;
   COLLECTIONS_SNAPSHOT_ID: string;
   COLLECTIONS_RELEASE_ID: string;
   MOMENTS_SNAPSHOT_ID: string;
@@ -218,6 +219,31 @@ export interface HoldingRow {
   transfer_count: number;
 }
 
+export interface HoldingDropRow {
+  drop_id: number;
+  fancy_id: string;
+  title: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  expiry_date: string | null;
+  city: string | null;
+  country: string | null;
+  event_url: string | null;
+  year: number;
+  is_virtual: number | null;
+  is_private: number;
+  is_hidden: number;
+  channel: string | null;
+  platform: string | null;
+  location_type: string | null;
+  timezone: string | null;
+  integrator_id: string | null;
+  created_at: string;
+  token_count: number;
+  transfer_count: number;
+}
+
 export interface DropCollectorRow {
   source_uid: string;
   poap_id: number;
@@ -333,6 +359,7 @@ export interface PersonalHoldingReference {
 export interface PersonalHoldingsPage {
   schemaVersion: "poapin-personal-holdings-page-v2";
   snapshotId: string;
+  catalogSnapshotId: string;
   collectionsSnapshotId: string;
   collectionsReleaseId: string;
   address: string;
