@@ -199,8 +199,10 @@ private Drop metadata only where that exact address's Holdings snapshot proves
 the relation; opaque Drop-ID references for missing or hidden records; three
 distinct Collection relationship views; complete public exports for
 historically owned Collections; separate public authored and tagged Moment
-views; and public Capsules whose archived owner is the address. Global Drop and
-Collection browsing continues to redact private metadata.
+views; and public Capsules whose archived owner is the address. A private,
+non-hidden Drop can also be opened when its exact ID is known. Drop browse,
+search, batch export, holder lists, and Collection projections continue to
+redact private metadata.
 
 The deployable ZIP remains metadata-focused: its generated page mounts an image,
 video, or audio source only after a visitor explicitly asks to load it. A

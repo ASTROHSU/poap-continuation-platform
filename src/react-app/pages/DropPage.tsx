@@ -45,6 +45,22 @@ export function DropPage({ dropId }: { dropId: number }) {
     return () => controller.abort();
   }, [dropId, retry]);
 
+  useEffect(() => {
+    if (!drop?.isPrivate) return;
+    const existing = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const robots = existing ?? document.createElement("meta");
+    const previousContent = existing?.content;
+    if (!existing) {
+      robots.name = "robots";
+      document.head.appendChild(robots);
+    }
+    robots.content = "noindex,nofollow";
+    return () => {
+      if (existing) robots.content = previousContent ?? "";
+      else robots.remove();
+    };
+  }, [drop?.isPrivate]);
+
   const eventUrl = useMemo(() => safeExternalUrl(drop?.eventUrl), [drop?.eventUrl]);
   const artworkUrl = useMemo(() => safeHttpUrl(drop?.imageUrl), [drop?.imageUrl]);
 
@@ -126,7 +142,7 @@ export function DropPage({ dropId }: { dropId: number }) {
 
         <div className="drop-detail__content glass-panel">
           <div className="detail-kicker">
-            <span>POAP Drop</span>
+            <span>{drop.isPrivate ? "Private POAP Drop" : "POAP Drop"}</span>
             <button type="button" onClick={copyDropId} aria-live="polite">
               #{drop.dropId} ·{" "}
               {copyStatus === "copied"
@@ -163,13 +179,37 @@ export function DropPage({ dropId }: { dropId: number }) {
           <dl className="metadata-grid">
             <MetaItem label="Year" value={String(drop.year)} />
             <MetaItem label="Collected" value={formatCount(drop.tokenCount)} />
+            {drop.fancyId?.trim() ? (
+              <MetaItem label="Fancy ID" value={drop.fancyId.trim()} />
+            ) : null}
             <MetaItem
               label="Platform"
               value={drop.platform?.trim() || drop.channel?.trim() || "—"}
             />
+            {drop.platform?.trim() && drop.channel?.trim() ? (
+              <MetaItem label="Channel" value={drop.channel.trim()} />
+            ) : null}
             <MetaItem label="Timezone" value={drop.timezone?.trim() || "—"} />
+            {drop.integratorId?.trim() ? (
+              <MetaItem label="Integrator" value={drop.integratorId.trim()} />
+            ) : null}
+            {typeof drop.dropTransferCount === "number" ? (
+              <MetaItem label="Drop transfers" value={formatCount(drop.dropTransferCount)} />
+            ) : null}
             {typeof drop.reservationsTotal === "number" ? (
               <MetaItem label="Reservations" value={formatCount(drop.reservationsTotal)} />
+            ) : null}
+            {typeof drop.momentsUploaded === "number" ? (
+              <MetaItem label="Moments uploaded" value={formatCount(drop.momentsUploaded)} />
+            ) : null}
+            {formatMetadataDate(drop.createdAt) ? (
+              <MetaItem label="Created" value={formatMetadataDate(drop.createdAt) ?? "—"} />
+            ) : null}
+            {formatMetadataDate(drop.expiryDate) ? (
+              <MetaItem label="Claim expiry" value={formatMetadataDate(drop.expiryDate) ?? "—"} />
+            ) : null}
+            {formatMetadataDate(drop.featuredOn) ? (
+              <MetaItem label="Featured" value={formatMetadataDate(drop.featuredOn) ?? "—"} />
             ) : null}
             <MetaItem label="Snapshot status" value="Preserved" />
           </dl>
@@ -200,8 +240,9 @@ export function DropPage({ dropId }: { dropId: number }) {
             </Link>
           </div>
           <p className="snapshot-note">
-            This record reflects a preserved snapshot and may not match current ownership or event
-            metadata.
+            {drop.isPrivate
+              ? "This private record is available by exact Drop ID and remains excluded from archive browsing."
+              : "This record reflects a preserved snapshot and may not match current ownership or event metadata."}
           </p>
         </div>
       </article>
@@ -245,6 +286,18 @@ function formatDateRange(startValue: string, endValue?: string | null) {
 
 function formatCount(value?: number) {
   return typeof value === "number" ? new Intl.NumberFormat("en").format(value) : "—";
+}
+
+function formatMetadataDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function utcDateKey(date: Date) {

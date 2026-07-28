@@ -11,6 +11,36 @@ const READINESS_SQL = `
   WHERE key IN ('snapshot_id', 'ready')
   LIMIT 2`;
 
+const DROP_DETAIL_COLUMNS = `
+  drop_id,
+  fancy_id,
+  title AS drop_title,
+  description AS drop_description,
+  start_date,
+  end_date,
+  expiry_date,
+  year AS drop_year,
+  city,
+  country,
+  event_url,
+  image_object_key,
+  is_virtual,
+  private_value,
+  is_hidden,
+  channel,
+  platform,
+  location_type,
+  timezone,
+  integrator_id,
+  created_date,
+  token_count,
+  transfer_count,
+  email_claims_minted,
+  email_claims_reserved,
+  email_claims_total,
+  featured_on AS drop_featured_on,
+  moments_uploaded`;
+
 type MetaRow = {
   key: string;
   value: string;
@@ -20,10 +50,52 @@ type PrivateDropRow = Omit<CollectionItemRow, "item_id" | "created_on"> & {
   drop_id: number;
 };
 
+export type ExactCollectionDropLookup =
+  { state: "available"; drop: DropDetail } | { state: "hidden" } | { state: "missing" };
+
+/**
+ * Resolves one explicitly requested Drop ID from the newer Collections
+ * snapshot. Exact lookup may return a private, non-hidden record, but it never
+ * turns that record into a browseable list or exposes hidden metadata.
+ */
+export async function fetchExactCollectionDropDetail(
+  db: D1ReadClient,
+  dropId: number,
+  mediaBaseUrl: string,
+  archiveSnapshotId: string,
+  collectionsSnapshotId: string,
+): Promise<ExactCollectionDropLookup> {
+  if (!Number.isSafeInteger(dropId) || dropId <= 0) {
+    throw new ApiError(400, "Drop ID must be a positive integer.");
+  }
+
+  const [readiness, detail] = await db.batch<MetaRow | PrivateDropRow>([
+    db.prepare(READINESS_SQL),
+    db
+      .prepare(
+        `
+          SELECT ${DROP_DETAIL_COLUMNS}
+          FROM collection_drop_cards
+          WHERE drop_id = ?1
+          LIMIT 1`,
+      )
+      .bind(dropId),
+  ]);
+  assertReadiness(readiness.results as MetaRow[], collectionsSnapshotId);
+
+  const row = detail.results[0] as PrivateDropRow | undefined;
+  if (!row) return { state: "missing" };
+  if (numberValue(row.is_hidden) === 1) return { state: "hidden" };
+  return {
+    state: "available",
+    drop: toCollectionDropDetail(row, mediaBaseUrl, archiveSnapshotId, collectionsSnapshotId),
+  };
+}
+
 /**
  * Resolves private metadata only for Drop IDs already proven by the caller to
- * belong to the exact queried address. This is deliberately not exposed as a
- * general-purpose private Drop lookup.
+ * belong to the exact queried address. This bounded path remains separate from
+ * exact single-ID lookup so address pagination cannot become enumeration.
  */
 export async function fetchPrivateHeldDropDetails(
   db: D1ReadClient,
@@ -48,35 +120,7 @@ export async function fetchPrivateHeldDropDetails(
       db
         .prepare(
           `
-            SELECT
-              drop_id,
-              fancy_id,
-              title AS drop_title,
-              description AS drop_description,
-              start_date,
-              end_date,
-              expiry_date,
-              year AS drop_year,
-              city,
-              country,
-              event_url,
-              image_object_key,
-              is_virtual,
-              private_value,
-              is_hidden,
-              channel,
-              platform,
-              location_type,
-              timezone,
-              integrator_id,
-              created_date,
-              token_count,
-              transfer_count,
-              email_claims_minted,
-              email_claims_reserved,
-              email_claims_total,
-              featured_on AS drop_featured_on,
-              moments_uploaded
+            SELECT ${DROP_DETAIL_COLUMNS}
             FROM collection_drop_cards
             WHERE drop_id IN (${placeholders})
               AND is_private = 1
@@ -99,13 +143,13 @@ export async function fetchPrivateHeldDropDetails(
     }
     drops.set(
       dropId,
-      toPrivateHeldDrop(row, mediaBaseUrl, archiveSnapshotId, collectionsSnapshotId),
+      toCollectionDropDetail(row, mediaBaseUrl, archiveSnapshotId, collectionsSnapshotId),
     );
   }
   return drops;
 }
 
-function toPrivateHeldDrop(
+function toCollectionDropDetail(
   row: PrivateDropRow,
   mediaBaseUrl: string,
   archiveSnapshotId: string,
@@ -126,6 +170,7 @@ function toPrivateHeldDrop(
     description: row.drop_description,
     startDate: row.start_date ?? "",
     endDate: row.end_date ?? "",
+    expiryDate: row.expiry_date,
     city: row.city,
     country: row.country,
     year: numberValue(row.drop_year),
@@ -135,14 +180,18 @@ function toPrivateHeldDrop(
     platform: row.platform,
     locationType: row.location_type,
     timezone: row.timezone,
+    integratorId: row.integrator_id,
     createdAt: row.created_date ?? "",
     imageUrl: imageUrl ?? "",
     hasArtwork: imageUrl !== null,
     tokenCount: numberValue(row.token_count),
+    dropTransferCount: numberValue(row.transfer_count),
     reservationsTotal: numberValue(row.email_claims_total),
     reservationsMinted: numberValue(row.email_claims_minted),
     reservationsUnminted: numberValue(row.email_claims_reserved),
-    isPrivate: true,
+    featuredOn: row.drop_featured_on,
+    momentsUploaded: row.moments_uploaded === null ? null : numberValue(row.moments_uploaded),
+    ...(row.private_value === "false" ? {} : { isPrivate: true as const }),
   };
 }
 

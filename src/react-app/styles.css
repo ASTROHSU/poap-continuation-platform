@@ -778,12 +778,6 @@ main[tabindex="-1"]:focus,
   transform: translateY(-4px);
 }
 
-.drop-card__link--static:hover {
-  background: rgba(255, 255, 255, 0.28);
-  box-shadow: none;
-  transform: none;
-}
-
 .drop-card__artwork {
   position: relative;
   overflow: hidden;

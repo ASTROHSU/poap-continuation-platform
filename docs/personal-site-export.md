@@ -108,7 +108,9 @@ has already proven that the queried address references them. A private,
 non-hidden card may therefore appear in `drops` with `isPrivate: true`.
 Multiple tokens from the same Drop do not repeat its metadata. Missing and
 hidden records stay ID-only in `unavailableDropIds`, with no reason field or
-placeholder metadata. No global private-ID lookup is added.
+placeholder metadata. Separately, `GET /api/drops/:id` can return a private,
+non-hidden record when its exact ID is known; this single-record route is not
+used to expand or enumerate the personal export.
 
 For each page, the unique `dropId` set referenced by `items` must equal the
 disjoint union of `drops[].dropId` and `unavailableDropIds`. An ID can never
@@ -456,8 +458,9 @@ Before exposing the personal-site control in production:
 - test address Holdings responses containing public, held-private, hidden, and
   missing IDs; require an exact available/unavailable partition and verify that
   only the holder-proven private card is enriched;
-- verify the same private ID remains redacted through global Drop detail,
-  Drop-detail batch, and ordinary Collection APIs;
+- verify the same private ID is complete through exact Drop detail but remains
+  redacted through Drop browse, search, Drop-detail batch, and ordinary
+  Collection APIs; verify hidden exact IDs still return not found;
 - confirm a generated manifest against the extracted ZIP bytes, including
   `counts.unavailableDropReferences` and the
   `unavailable-drop-references` dataset;

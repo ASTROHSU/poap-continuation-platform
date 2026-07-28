@@ -347,8 +347,9 @@ After deployment, verify at least:
 - an empty result and an invalid request;
 - image success and fallback behavior;
 - address-bound enrichment for a deliberately held private Drop, while the
-  same ID remains redacted in global Drop and Collection routes and hidden or
-  missing fixtures stay ID-only;
+  same private record is available only through exact Drop detail and remains
+  redacted in browse, search, batch, and Collection routes; hidden or missing
+  fixtures must stay unavailable;
 - JSON and CSV export metadata, including the legacy 5,000-record rejection;
 - cache headers and repeated-request behavior; and
 - observability without secrets, response bodies, or unnecessary address data.

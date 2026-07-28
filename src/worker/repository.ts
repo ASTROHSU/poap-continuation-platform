@@ -87,10 +87,10 @@ const SNAPSHOT_ID_SQL = `
   WHERE key = 'snapshot_id'`;
 
 const DROP_DETAIL_SQL = `
-  SELECT ${DETAIL_COLUMNS}
+  SELECT ${DETAIL_COLUMNS}, d.is_private
   FROM drops d
   LEFT JOIN drop_stats s ON s.drop_id = d.drop_id
-  WHERE d.drop_id = ?1 AND d.is_private = 0`;
+  WHERE d.drop_id = ?1`;
 
 const OWNER_STATS_SQL = `
   SELECT token_count, unique_drop_count
@@ -552,6 +552,7 @@ export function toDropDetail(
     reservationsTotal: numeric(row.email_reservations_total),
     reservationsMinted: numeric(row.email_reservations_minted),
     reservationsUnminted: numeric(row.email_reservations_unminted),
+    ...(numeric(row.is_private) === 1 ? { isPrivate: true as const } : {}),
   };
 }
 
