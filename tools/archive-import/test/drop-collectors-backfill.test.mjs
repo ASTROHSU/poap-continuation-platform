@@ -35,8 +35,12 @@ test("backfill SQL is resumable, bounded, and journals only a completed range", 
   assert.doesNotMatch(sql, /OFFSET|COUNT\(\*\)/);
 });
 
-test("only memory and duration failures trigger a smaller address range", () => {
+test("only D1 resource failures trigger a smaller address range", () => {
   assert.equal(shouldSplitFailure("out of memory: SQLITE_NOMEM [code: 7500]"), true);
+  assert.equal(
+    shouldSplitFailure('{"text":"internal error","notes":[{"text":"reference [code: 7500]"}]}'),
+    true,
+  );
   assert.equal(shouldSplitFailure("D1 query timed out"), true);
   assert.equal(shouldSplitFailure("authentication failed"), false);
   assert.equal(shouldSplitFailure("no such table: drop_collector_refs"), false);

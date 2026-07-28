@@ -236,9 +236,10 @@ npx wrangler d1 execute HOLDINGS_DB --remote --command \
 ```
 
 The backfill begins with 16 address ranges and recursively splits only a range
-that exceeds D1 memory or duration. Completed ranges are journaled, so the same
-command resumes safely after a transient interruption. Require exact equality
-between `tokens` and `drop_collector_refs`. The representative plan must show
+that exceeds D1 memory or duration, including D1's corresponding internal
+resource error. Completed ranges are journaled, so the same command resumes
+safely after a transient interruption. Require exact equality between `tokens`
+and `drop_collector_refs`. The representative plan must show
 `SEARCH r USING PRIMARY KEY` and `SEARCH t USING PRIMARY KEY`, with no full scan
 or temporary sort. Also run the bounded production query for Drop `186032` and
 record D1 `rows_read`; it should scale with the requested page.

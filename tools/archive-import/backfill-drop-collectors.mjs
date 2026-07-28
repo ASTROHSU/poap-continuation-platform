@@ -12,7 +12,8 @@ import { toErrorMessage } from "./lib/util.mjs";
 const HEX = "0123456789abcdef";
 const BINDING = /^[A-Z][A-Z0-9_]{0,63}$/;
 const PREFIX = /^[0-9a-f]{1,4}$/;
-const SPLITTABLE_FAILURE = /SQLITE_NOMEM|out of memory|timed? out|time limit|duration limit/i;
+const SPLITTABLE_FAILURE =
+  /SQLITE_NOMEM|out of memory|internal error[\s\S]*code:\s*7500|timed? out|time limit|duration limit/i;
 
 export async function main(argv = process.argv.slice(2), dependencies = {}) {
   const options = parseOptions(argv);
