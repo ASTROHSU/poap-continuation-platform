@@ -279,6 +279,27 @@ test("address page leads with the collection, exact relationships, and month gro
   await expect(page.locator(".drop-card__id")).toHaveCount(0);
 });
 
+test("address pages label held private Drops without linking to the global catalog", async ({
+  page,
+}) => {
+  await mockOwnerPage(page, {
+    items: [holding(99, 1_773_705_600, true)],
+    nextCursor: null,
+  });
+
+  await page.goto(`/address/${ADDRESS}`);
+
+  const card = page.locator(".drop-card").filter({ hasText: "Collected Drop 99" });
+  await expect(card.getByText("Private Drop", { exact: true })).toBeVisible();
+  await expect(card.locator(".drop-card__link--static")).toHaveCount(1);
+  await expect(card.locator('a[href="/drop/99"]')).toHaveCount(0);
+  await expect(
+    page.getByText("private Drop metadata appears only when this exact address", {
+      exact: false,
+    }),
+  ).toBeVisible();
+});
+
 test("personal site exporter uses compact hierarchy and recognizable deployment cards", async ({
   page,
 }) => {
@@ -684,8 +705,10 @@ async function mockMinimalImageArchive(
   await page.route(`**/api/owners/${ADDRESS}/export/holdings?*`, (route) =>
     route.fulfill({
       json: {
-        schemaVersion: "poapin-personal-holdings-page-v1",
+        schemaVersion: "poapin-personal-holdings-page-v2",
         snapshotId: snapshots.holdings,
+        collectionsSnapshotId: snapshots.collections,
+        collectionsReleaseId: "collections-2026-07-23-r1",
         address: ADDRESS,
         total: 0,
         items: [],
@@ -783,7 +806,7 @@ function imageMoment(imageUrl: string, byteLength: number) {
   };
 }
 
-function holding(dropId: number, mintedOn: number | null) {
+function holding(dropId: number, mintedOn: number | null, isPrivate = false) {
   return {
     ...drop(dropId, `Collected Drop ${dropId}`),
     sourceUid: `source-${dropId}`,
@@ -792,6 +815,7 @@ function holding(dropId: number, mintedOn: number | null) {
     ownerAddress: ADDRESS,
     network: "ethereum",
     transferCount: 0,
+    ...(isPrivate ? { isPrivate: true as const } : {}),
   };
 }
 

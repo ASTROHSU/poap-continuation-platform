@@ -103,19 +103,21 @@ ID lists. Never implement an unbounded request fan-out.
 
 The personal Holdings endpoint reads up to 480 tokens with an indexed keyset
 query, then looks up complete public Drop details in `CATALOG_DB` in fixed
-96-ID statements. Cursors are bound to the normalized address, page size,
-snapshot, and personal-export scope. Each page strictly partitions its unique
-token Drop references between complete public `drops` and ID-only
-`unavailableDropIds`. These arrays are mutually exclusive and jointly complete.
-A private and a missing Catalog row deliberately have the same unavailable
-form, with no placeholder metadata or reason field.
+96-ID statements. Catalog misses are checked against the private,
+non-hidden `collection_drop_cards` projection only for IDs already returned by
+that exact address's Holdings page. Cursors are bound to the normalized
+address, page size, snapshot, and personal-export scope; cache identity also
+includes the Collections release. Each page strictly partitions its unique
+token Drop references between complete available `drops` and ID-only
+`unavailableDropIds`. A holder-proven private row carries `isPrivate: true`;
+missing and hidden records retain the same opaque unavailable form.
 
 After Moments and owned-Collection segments are collected, the browser resolves
 their additional Drop references through `/api/drops/export/batch` in batches
 of at most 96 submitted IDs. That endpoint applies the same public-detail versus
-opaque-unavailable partition under the fixed Holdings/Catalog snapshot. This
-keeps complete reference coverage bounded without using another dataset to
-infer whether an unavailable Drop is private or absent.
+opaque-unavailable partition under the fixed Holdings/Catalog snapshot. It does
+not gain private enrichment because those additional references are not proof
+that the queried address held the Drop.
 
 ### D1 Collections
 
@@ -291,9 +293,10 @@ reads:
 2. Holdings, owned Collections, public authored Moments, public tagged
    Moments, and historically owner-matched public Capsules are collected by
    keyset cursor.
-3. Each Holdings page is verified as an exact partition of public and
-   unavailable Drop references. Only public held Drop IDs are resolved to
-   formal Collection membership, in 96-ID batches; relevant Collection
+3. Each Holdings page is verified as an exact partition of preserved and
+   unavailable Drop references. Holder-proven private cards may be enriched,
+   while missing and hidden cards remain opaque. All held Drop IDs are resolved
+   to formal Collection membership in 96-ID batches; relevant Collection
    profiles are loaded in 16-ID batches.
 4. Each owned Collection's export manifest is followed segment by segment until
    every `nextPath` is `null`.
@@ -301,7 +304,7 @@ reads:
    owned-Collection segments are resolved through the 96-ID public Drop-detail
    batch endpoint.
 6. The browser verifies that every packaged Drop reference belongs to exactly
-   one of the public `drops` or opaque `unavailable-drop-references` datasets,
+   one of the available `drops` or opaque `unavailable-drop-references` datasets,
    checks snapshot and count invariants, generates bounded data files, hashes
    every non-manifest file, and creates the ZIP.
 
@@ -312,8 +315,10 @@ fan-out. It runs either directly from an extracted `file://` folder or from a
 static HTTP origin and does not need the POAPin API after generation.
 
 The old CSV/JSON endpoints remain single-response exports capped at 5,000
-holdings. The personal-site flow is the complete path for larger addresses:
-there is no unbounded replacement endpoint, only a manifest plus bounded pages.
+holdings. Their v2 rows apply the same holder-bound private enrichment and add
+`is_private`; they still do not expose a private-ID lookup. The personal-site
+flow is the complete path for larger addresses: there is no unbounded
+replacement endpoint, only a manifest plus bounded pages.
 See [Portable personal-site export](personal-site-export.md) for response and
 package details.
 

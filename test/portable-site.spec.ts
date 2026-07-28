@@ -221,12 +221,12 @@ describe("portable personal site generator", () => {
     });
   });
 
-  it("rejects overlapping public and unavailable Drop availability", async () => {
+  it("rejects overlapping available and unavailable Drop availability", async () => {
     const input = fixture();
     input.unavailableDropIds = [42, 404];
 
     await expect(buildPortableSiteFiles(input)).rejects.toThrow(
-      "public and unavailable Drop sets must not overlap",
+      "available and unavailable Drop sets must not overlap",
     );
   });
 
@@ -310,8 +310,9 @@ describe("portable personal site generator", () => {
       'metric("Public Capsules owned at snapshot", counts.ownedCapsules)',
     );
     expect(javascript).toContain(
-      'metric("Unavailable public Drop details", counts.unavailableDropReferences)',
+      'metric("Unavailable Drop details", counts.unavailableDropReferences)',
     );
+    expect(javascript).toContain('metric("Private held Drops", counts.privateHeldDrops)');
     expect(javascript).toContain('momentAssociationCard(item, "Authored")');
     expect(javascript).toContain('momentAssociationCard(item, "Tagged")');
     for (const prompt of [
@@ -344,6 +345,27 @@ describe("portable personal site generator", () => {
     expect(footer).toContain('href="https://poap.in"');
     expect(footer).toContain('href="https://github.com/glorylab/poapin-archive"');
     expect(html).toMatch(/<\/footer>\s*<\/div>\s*<\/body>/);
+  });
+
+  it("preserves and labels address-bound private Drop metadata", async () => {
+    const input = fixture();
+    input.drops[0] = { ...input.drops[0]!, isPrivate: true };
+
+    const build = await buildPortableSiteBundle(input);
+    const dropData = dataJson(build, "data/drops-0001.data.js") as {
+      items: Array<{ dropId: number; isPrivate?: true; title: string }>;
+    };
+
+    expect(build.manifest.counts.privateHeldDrops).toBe(1);
+    expect(dropData.items[0]).toMatchObject({
+      dropId: 42,
+      title: "Portable POAP 1001",
+      isPrivate: true,
+    });
+    expect(file(build, "assets/site.js")).toContain('drop?.isPrivate ? "Private Drop"');
+    expect(file(build, "README.md")).toContain(
+      "private Drop records included because this exact address held a matching token",
+    );
   });
 
   it("keeps media dormant until a visitor clicks a load button", async () => {

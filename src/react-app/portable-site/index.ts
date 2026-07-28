@@ -404,7 +404,7 @@ function validateNormalizedDropCoverage(snapshot: PortableSiteSnapshot): void {
   }
   const unavailable = new Set(snapshot.unavailableDropIds);
   if (snapshot.unavailableDropIds.some((dropId) => dropIds.has(dropId))) {
-    throw new Error("Portable site public and unavailable Drop sets must not overlap.");
+    throw new Error("Portable site available and unavailable Drop sets must not overlap.");
   }
   const referenced = new Set<number>();
   const addReference = (dropId: number) => {
@@ -477,6 +477,7 @@ function normalizeDropRecord(
     reservationsTotal: drop.reservationsTotal ?? 0,
     reservationsMinted: drop.reservationsMinted ?? 0,
     reservationsUnminted: drop.reservationsUnminted ?? 0,
+    ...(drop.isPrivate === true ? { isPrivate: true as const } : {}),
   };
 }
 
@@ -697,6 +698,7 @@ function buildManifest(
     counts: {
       holdings: snapshot.holdings.length,
       uniqueDrops: snapshot.drops.length,
+      privateHeldDrops: snapshot.drops.filter((drop) => drop.isPrivate === true).length,
       unavailableDropReferences: snapshot.unavailableDropIds.length,
       collectionProfiles: snapshot.collectionProfiles.length,
       heldDropMemberships: snapshot.heldDropMemberships.length,

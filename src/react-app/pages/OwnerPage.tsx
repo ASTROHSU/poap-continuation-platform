@@ -142,7 +142,7 @@ export function OwnerPage({ address, meta }: OwnerPageProps) {
       </Link>
       <section className="owner-intro glass-panel">
         <div className="owner-intro__copy">
-          <span className="eyebrow">Public collection snapshot</span>
+          <span className="eyebrow">Address-bound collection snapshot</span>
           <h1>POAP collection</h1>
           <div className="owner-identity">
             <strong>{shortAddress(address)}</strong>
@@ -250,8 +250,9 @@ export function OwnerPage({ address, meta }: OwnerPageProps) {
           <span className="eyebrow">Portable by design</span>
           <h2>Take the whole history with you</h2>
           <p>
-            Build a deployable personal site containing the available Drops, Collections, authored
-            and tagged Moments, and public Capsules—or keep a simple holdings file.
+            Build a deployable personal site containing every preserved held Drop—including private
+            Drop metadata tied to this address—plus Collections, authored and tagged Moments, and
+            public Capsules.
           </p>
         </div>
         <div className="export-panel__actions">
@@ -287,9 +288,10 @@ export function OwnerPage({ address, meta }: OwnerPageProps) {
       </section>
 
       <div className="privacy-note">
-        <strong>Public, but personal.</strong>
+        <strong>Public holdings, address-bound detail.</strong>
         <span>
-          Exact-address lookup is supported; address discovery and holder lists are intentionally
+          Preserved private Drop metadata appears only when this exact address held a matching
+          token. Address discovery, holder lists, and global private Drop lookup are intentionally
           not provided.
         </span>
       </div>

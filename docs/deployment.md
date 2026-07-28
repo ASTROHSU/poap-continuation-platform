@@ -346,8 +346,9 @@ After deployment, verify at least:
   `Access-Control-Allow-Origin: https://poap.in` after the hostname purge;
 - an empty result and an invalid request;
 - image success and fallback behavior;
-- identical ID-only output for deliberately private and missing Drop-detail
-  fixtures, without a reason or private field;
+- address-bound enrichment for a deliberately held private Drop, while the
+  same ID remains redacted in global Drop and Collection routes and hidden or
+  missing fixtures stay ID-only;
 - JSON and CSV export metadata, including the legacy 5,000-record rejection;
 - cache headers and repeated-request behavior; and
 - observability without secrets, response bodies, or unnecessary address data.

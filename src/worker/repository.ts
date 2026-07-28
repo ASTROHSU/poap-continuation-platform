@@ -1,4 +1,5 @@
 import { artworkUrl } from "./media";
+import { fetchPrivateHeldDropDetails } from "./private-held-drops";
 import type {
   ArchiveMeta,
   CatalogDetailRow,
@@ -292,8 +293,10 @@ export async function fetchDropDetailBatch(
 export async function fetchOwner(
   holdingsDb: D1ReadClient,
   catalogDb: D1ReadClient,
+  collectionsDb: D1ReadClient,
   query: OwnerQuery,
   snapshotId: string,
+  collectionsSnapshotId: string,
   mediaBaseUrl: string,
 ): Promise<{
   address: string;
@@ -328,8 +331,24 @@ export async function fetchOwner(
     mediaBaseUrl,
     snapshotId,
   );
+  const privateCandidateIds = rows
+    .map((row) => row.drop_id)
+    .filter((dropId) => !catalog.has(dropId));
+  const privateDrops =
+    privateCandidateIds.length > 0
+      ? await fetchPrivateHeldDropDetails(
+          collectionsDb,
+          privateCandidateIds,
+          mediaBaseUrl,
+          snapshotId,
+          collectionsSnapshotId,
+        )
+      : new Map<number, DropDetail>();
   const items = rows.map((row) => {
-    const drop = catalog.get(row.drop_id) ?? fallbackDrop(row, mediaBaseUrl, snapshotId);
+    const drop =
+      catalog.get(row.drop_id) ??
+      privateDrops.get(row.drop_id) ??
+      fallbackDrop(row, mediaBaseUrl, snapshotId);
     return {
       ...drop,
       sourceUid: row.source_uid,
@@ -358,8 +377,11 @@ export async function fetchOwner(
 export async function fetchPersonalHoldingsPage(
   holdingsDb: D1ReadClient,
   catalogDb: D1ReadClient,
+  collectionsDb: D1ReadClient,
   query: PersonalHoldingsQuery,
   snapshotId: string,
+  collectionsSnapshotId: string,
+  collectionsReleaseId: string,
   mediaBaseUrl: string,
 ): Promise<PersonalHoldingsPage> {
   const tokenStatement = query.cursor
@@ -386,6 +408,19 @@ export async function fetchPersonalHoldingsPage(
     mediaBaseUrl,
     snapshotId,
   );
+  const privateCandidateIds = rows
+    .map((row) => row.drop_id)
+    .filter((dropId) => !catalog.has(dropId));
+  const privateDrops =
+    privateCandidateIds.length > 0
+      ? await fetchPrivateHeldDropDetails(
+          collectionsDb,
+          privateCandidateIds,
+          mediaBaseUrl,
+          snapshotId,
+          collectionsSnapshotId,
+        )
+      : new Map<number, DropDetail>();
   const items = rows.map((row): PersonalHoldingReference => {
     const dropId = numeric(row.drop_id);
     return {
@@ -402,10 +437,12 @@ export async function fetchPersonalHoldingsPage(
     (left, right) => left - right,
   );
   const drops = referencedDropIds.flatMap((dropId) => {
-    const drop = catalog.get(dropId);
+    const drop = catalog.get(dropId) ?? privateDrops.get(dropId);
     return drop ? [drop] : [];
   });
-  const unavailableDropIds = referencedDropIds.filter((dropId) => !catalog.has(dropId));
+  const unavailableDropIds = referencedDropIds.filter(
+    (dropId) => !catalog.has(dropId) && !privateDrops.has(dropId),
+  );
   const last = rows.at(-1);
   const nextCursor =
     hasNext && last
@@ -420,8 +457,10 @@ export async function fetchPersonalHoldingsPage(
       : null;
 
   return {
-    schemaVersion: "poapin-personal-holdings-page-v1",
+    schemaVersion: "poapin-personal-holdings-page-v2",
     snapshotId,
+    collectionsSnapshotId,
+    collectionsReleaseId,
     address: query.address,
     total,
     items,

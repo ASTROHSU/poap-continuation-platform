@@ -1,11 +1,12 @@
 import { artworkUrl } from "./media";
+import { fetchPrivateHeldDropDetails } from "./private-held-drops";
 import {
   EXPORT_BATCH_SIZE,
   fetchExportCatalog,
   fetchExportHoldingBatch,
   safeExternalUrl,
 } from "./repository";
-import type { D1ReadClient, ExportCatalogRow, ExportRecord, HoldingRow } from "./types";
+import type { D1ReadClient, DropDetail, ExportCatalogRow, ExportRecord, HoldingRow } from "./types";
 
 export const MAX_SYNC_EXPORT_RECORDS = 5_000;
 
@@ -19,6 +20,8 @@ interface ExportOptions {
   snapshotAt: string;
   holdingsDb: D1ReadClient;
   catalogDb: D1ReadClient;
+  collectionsDb: D1ReadClient;
+  collectionsSnapshotId: string;
   mediaBaseUrl: string;
 }
 
@@ -39,6 +42,7 @@ const CSV_HEADER = [
   "minted_on",
   "transfer_count",
   "artwork_url",
+  "is_private",
 ].join(",");
 
 export function createExportResponse(options: ExportOptions): Response {
@@ -64,6 +68,8 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
   let emitted = 0;
   let cursor: { poapId: number; sourceUid: string } | null = null;
   const catalogCache = new Map<number, ExportCatalogRow>();
+  const privateDropCache = new Map<number, DropDetail>();
+  const resolvedDropIds = new Set<number>();
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -73,14 +79,14 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
           controller.enqueue(encoder.encode(`\uFEFF${CSV_HEADER}\r\n`));
         } else {
           const envelope = JSON.stringify({
-            schema_version: "poapin-address-export-v1",
+            schema_version: "poapin-address-export-v2",
             snapshot_id: options.snapshotId,
             snapshot_at: options.snapshotAt,
             generated_at: new Date().toISOString(),
             queried_address: options.address,
             count: options.total,
             notice:
-              "Public onchain holdings recorded at a fixed archive snapshot; this is not live wallet data.",
+              "Onchain holdings and address-bound preserved Drop metadata recorded at fixed archive snapshots; this is not live wallet data.",
           });
           controller.enqueue(encoder.encode(`${envelope.slice(0, -1)},"tokens":[`));
         }
@@ -101,11 +107,29 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
 
         const missingDropIds = holdings
           .map((holding) => holding.drop_id)
-          .filter((dropId) => !catalogCache.has(dropId));
+          .filter((dropId) => !resolvedDropIds.has(dropId));
         const fetchedCatalog = await fetchExportCatalog(options.catalogDb, missingDropIds);
         for (const [dropId, drop] of fetchedCatalog) catalogCache.set(dropId, drop);
+        const privateDropIds = missingDropIds.filter((dropId) => !fetchedCatalog.has(dropId));
+        const fetchedPrivateDrops =
+          privateDropIds.length > 0
+            ? await fetchPrivateHeldDropDetails(
+                options.collectionsDb,
+                privateDropIds,
+                options.mediaBaseUrl,
+                options.snapshotId,
+                options.collectionsSnapshotId,
+              )
+            : new Map<number, DropDetail>();
+        for (const [dropId, drop] of fetchedPrivateDrops) privateDropCache.set(dropId, drop);
+        for (const dropId of missingDropIds) resolvedDropIds.add(dropId);
         const records = holdings.map((holding) =>
-          toExportRecord(options, holding, catalogCache.get(holding.drop_id)),
+          toExportRecord(
+            options,
+            holding,
+            catalogCache.get(holding.drop_id),
+            privateDropCache.get(holding.drop_id),
+          ),
         );
         const payload =
           options.format === "csv"
@@ -136,6 +160,7 @@ function toExportRecord(
   options: ExportOptions,
   holding: HoldingRow,
   drop: ExportCatalogRow | undefined,
+  privateDrop: DropDetail | undefined,
 ): ExportRecord {
   return {
     snapshot_id: options.snapshotId,
@@ -144,18 +169,21 @@ function toExportRecord(
     source_uid: holding.source_uid,
     poap_id: holding.poap_id,
     drop_id: holding.drop_id,
-    title: drop?.title ?? `Archived POAP #${holding.poap_id}`,
-    start_date: drop?.start_date ?? "",
-    end_date: drop?.end_date ?? "",
-    city: drop?.city ?? null,
-    country: drop?.country ?? null,
-    event_url: safeExternalUrl(drop?.event_url ?? null),
+    title: drop?.title ?? privateDrop?.title ?? `Archived POAP #${holding.poap_id}`,
+    start_date: drop?.start_date ?? privateDrop?.startDate ?? "",
+    end_date: drop?.end_date ?? privateDrop?.endDate ?? "",
+    city: drop?.city ?? privateDrop?.city ?? null,
+    country: drop?.country ?? privateDrop?.country ?? null,
+    event_url: safeExternalUrl(drop?.event_url ?? privateDrop?.eventUrl ?? null),
     network: holding.network,
     minted_on: holding.minted_on,
     transfer_count: holding.transfer_count,
-    artwork_url: numericArtworkAvailable(drop)
-      ? artworkUrl(options.mediaBaseUrl, options.snapshotId, holding.drop_id)
-      : null,
+    artwork_url:
+      privateDrop?.imageUrl ||
+      (numericArtworkAvailable(drop)
+        ? artworkUrl(options.mediaBaseUrl, options.snapshotId, holding.drop_id)
+        : null),
+    is_private: privateDrop?.isPrivate === true,
   };
 }
 
@@ -178,6 +206,7 @@ function toCsvRow(record: ExportRecord): string {
       record.minted_on,
       record.transfer_count,
       record.artwork_url,
+      record.is_private,
     ]
       .map(csvCell)
       .join(",") + "\r\n"
@@ -189,7 +218,7 @@ function numericArtworkAvailable(drop: ExportCatalogRow | undefined): boolean {
 }
 
 /** RFC 4180 quoting plus spreadsheet formula neutralization. */
-export function csvCell(value: string | number | null): string {
+export function csvCell(value: string | number | boolean | null): string {
   let text = value === null ? "" : String(value);
   if (/^[\t\r\n ]*[=+\-@]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '""')}"`;

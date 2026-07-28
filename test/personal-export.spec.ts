@@ -197,8 +197,10 @@ function installFetchFixture(options: FetchFixtureOptions = {}) {
     }
     if (url.pathname.endsWith("/export/holdings")) {
       return json({
-        schemaVersion: "poapin-personal-holdings-page-v1",
+        schemaVersion: "poapin-personal-holdings-page-v2",
         snapshotId: options.holdingsSnapshot ?? SNAPSHOTS.holdings,
+        collectionsSnapshotId: SNAPSHOTS.collections,
+        collectionsReleaseId: COLLECTIONS_RELEASE,
         address: ADDRESS,
         total: 1,
         items: [holdingReference()],

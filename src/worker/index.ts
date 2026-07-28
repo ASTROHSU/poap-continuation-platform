@@ -69,8 +69,8 @@ export const app = new Hono<AppEnv>();
 const COLLECTIONS_CACHE_SCHEMA = "collections-v3";
 const MOMENTS_CACHE_SCHEMA = "moments-v2";
 const MOMENTS_META_CACHE_SCHEMA = "public-meta-v2";
-const OWNER_CACHE_SCHEMA = "owner-v2";
-const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v1";
+const OWNER_CACHE_SCHEMA = "owner-v3";
+const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v2";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
 
 export function collectionsApiVersion(
@@ -1112,7 +1112,12 @@ app.get("/api/owners/:address/export/holdings", async (context) => {
       canonicalPath: `/api/owners/${query.address}/export/holdings`,
       canonicalSearch: query.canonicalSearch,
       snapshotId: context.env.SNAPSHOT_ID,
-      apiVersion: `${context.env.API_CACHE_VERSION}.${PERSONAL_EXPORT_CACHE_SCHEMA}.holdings`,
+      apiVersion: [
+        context.env.API_CACHE_VERSION,
+        PERSONAL_EXPORT_CACHE_SCHEMA,
+        "holdings",
+        collectionsApiVersion(context.env),
+      ].join("."),
       edgeTtlSeconds: 86_400,
       browserTtlSeconds: 0,
       executionCtx: context.executionCtx,
@@ -1120,12 +1125,16 @@ app.get("/api/owners/:address/export/holdings", async (context) => {
     async () => {
       const holdingsDb = context.env.HOLDINGS_DB.withSession("first-primary");
       const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
+      const collectionsDb = context.env.COLLECTIONS_DB.withSession("first-primary");
       return context.json(
         await fetchPersonalHoldingsPage(
           holdingsDb,
           catalogDb,
+          collectionsDb,
           query,
           context.env.SNAPSHOT_ID,
+          context.env.COLLECTIONS_SNAPSHOT_ID,
+          context.env.COLLECTIONS_RELEASE_ID,
           context.env.MEDIA_BASE_URL,
         ),
       );
@@ -1147,7 +1156,11 @@ app.get("/api/owners/:address", async (context) => {
       canonicalPath: `/api/owners/${query.address}`,
       canonicalSearch: query.canonicalSearch,
       snapshotId: context.env.SNAPSHOT_ID,
-      apiVersion: `${context.env.API_CACHE_VERSION}.${OWNER_CACHE_SCHEMA}`,
+      apiVersion: [
+        context.env.API_CACHE_VERSION,
+        OWNER_CACHE_SCHEMA,
+        collectionsApiVersion(context.env),
+      ].join("."),
       edgeTtlSeconds: 86_400,
       browserTtlSeconds: 0,
       executionCtx: context.executionCtx,
@@ -1155,12 +1168,15 @@ app.get("/api/owners/:address", async (context) => {
     async () => {
       const holdingsDb = context.env.HOLDINGS_DB.withSession("first-primary");
       const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
+      const collectionsDb = context.env.COLLECTIONS_DB.withSession("first-primary");
       return context.json(
         await fetchOwner(
           holdingsDb,
           catalogDb,
+          collectionsDb,
           query,
           context.env.SNAPSHOT_ID,
+          context.env.COLLECTIONS_SNAPSHOT_ID,
           context.env.MEDIA_BASE_URL,
         ),
       );
@@ -1176,6 +1192,7 @@ for (const format of ["csv", "json"] as const) {
     const address = normalizeAddress(context.req.param("address"));
     const holdingsDb = context.env.HOLDINGS_DB.withSession("first-primary");
     const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
+    const collectionsDb = context.env.COLLECTIONS_DB.withSession("first-primary");
     const [total, snapshotAt] = await Promise.all([
       fetchOwnerTotal(holdingsDb, address, context.env.SNAPSHOT_ID),
       fetchSnapshotAt(catalogDb, context.env.SNAPSHOT_ID),
@@ -1195,6 +1212,8 @@ for (const format of ["csv", "json"] as const) {
       snapshotAt,
       holdingsDb,
       catalogDb,
+      collectionsDb,
+      collectionsSnapshotId: context.env.COLLECTIONS_SNAPSHOT_ID,
       mediaBaseUrl: context.env.MEDIA_BASE_URL,
     });
     response.headers.set("X-Archive-Snapshot", context.env.SNAPSHOT_ID);

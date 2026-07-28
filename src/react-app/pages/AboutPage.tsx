@@ -67,9 +67,10 @@ export function AboutPage({ meta }: { meta: ArchiveMeta | null }) {
             delivered directly from R2 through Cloudflare’s CDN.
           </p>
           <p>
-            CSV and JSON exports contain public snapshot data and stable source identifiers.
-            Descriptions are rendered as plain text, and event links are treated as untrusted
-            external destinations.
+            CSV and JSON exports contain snapshot data and stable source identifiers. For an exact
+            address, they can include preserved private Drop metadata proven by that address’s
+            holdings; global browsing remains redacted. Descriptions are rendered as plain text, and
+            event links are treated as untrusted external destinations.
           </p>
         </div>
       </section>

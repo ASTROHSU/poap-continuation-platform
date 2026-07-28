@@ -38,7 +38,7 @@ describe("personal export manifest", () => {
       `https://poap.in/api/owners/0x${ADDRESS.slice(2).toUpperCase()}/export/manifest`,
     );
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-archive-api-version")).toContain("personal-export-v1");
+    expect(response.headers.get("x-archive-api-version")).toContain("personal-export-v2");
     expect(response.headers.get("cache-control")).toContain("max-age=0");
     await expect(response.json()).resolves.toEqual({
       schemaVersion: "poapin-personal-export-v1",
@@ -120,8 +120,10 @@ describe("paginated personal holdings", () => {
     expect(first.status).toBe(200);
     const firstPage = await first.json<PersonalHoldingsPage>();
     expect(firstPage).toMatchObject({
-      schemaVersion: "poapin-personal-holdings-page-v1",
+      schemaVersion: "poapin-personal-holdings-page-v2",
       snapshotId: "2026-07-02-v1",
+      collectionsSnapshotId: "collections-2026-07-22-v1",
+      collectionsReleaseId: bindings.COLLECTIONS_RELEASE_ID,
       address: ADDRESS,
       total: 2,
     });
@@ -174,7 +176,7 @@ describe("paginated personal holdings", () => {
     expect(rejected.map((response) => response.status)).toEqual([400, 400]);
   });
 
-  it("partitions repeated private and missing Drops without revealing which is which", async () => {
+  it("returns a held private Drop from Collections while missing records stay unavailable", async () => {
     const response = await SELF.fetch(
       `https://poap.in/api/owners/${PRIVATE_HOLDER}/export/holdings?limit=5`,
     );
@@ -188,8 +190,17 @@ describe("paginated personal holdings", () => {
       { dropId: 99, poapId: 100 },
       { dropId: 99, poapId: 99 },
     ]);
-    expect(page.drops).toEqual([expect.objectContaining({ dropId: 1, title: "DappCon" })]);
-    expect(page.unavailableDropIds).toEqual([99, 404]);
+    expect(page.drops).toEqual([
+      expect.objectContaining({ dropId: 1, title: "DappCon" }),
+      expect.objectContaining({
+        dropId: 99,
+        title: "Private address-bound fixture",
+        description: "Private metadata preserved in the Collections snapshot.",
+        eventUrl: "https://private-holder.example.invalid/event",
+        isPrivate: true,
+      }),
+    ]);
+    expect(page.unavailableDropIds).toEqual([404]);
     expectStrictDropPartition(page);
     expect(JSON.stringify(page)).not.toContain("private catalog secret");
     expect(JSON.stringify(page)).not.toContain("private.example.invalid");
@@ -214,12 +225,73 @@ describe("paginated personal holdings", () => {
     expect(third.unavailableDropIds).toEqual([404]);
     expect(fourth.items).toEqual([expect.objectContaining({ dropId: 99, poapId: 100 })]);
     expect(fifth.items).toEqual([expect.objectContaining({ dropId: 99, poapId: 99 })]);
-    expect(fourth.unavailableDropIds).toEqual([99]);
-    expect(fifth.unavailableDropIds).toEqual([99]);
+    expect(fourth.drops).toEqual([expect.objectContaining({ dropId: 99, isPrivate: true })]);
+    expect(fifth.drops).toEqual(fourth.drops);
+    expect(fourth.unavailableDropIds).toEqual([]);
+    expect(fifth.unavailableDropIds).toEqual([]);
     expect(fifth.nextCursor).toBeNull();
     for (const exportedPage of [firstPage, second, third, fourth, fifth]) {
       expectStrictDropPartition(exportedPage);
     }
+  });
+
+  it("does not expose held private metadata through global Drop endpoints", async () => {
+    const [detail, batch, owner] = await Promise.all([
+      SELF.fetch("https://poap.in/api/drops/99"),
+      SELF.fetch("https://poap.in/api/drops/export/batch?ids=99"),
+      SELF.fetch(`https://poap.in/api/owners/${PRIVATE_HOLDER}?limit=5`),
+    ]);
+    expect(detail.status).toBe(404);
+    await expect(batch.json()).resolves.toMatchObject({
+      drops: [],
+      unavailableDropIds: [99],
+    });
+    await expect(owner.json()).resolves.toMatchObject({
+      items: expect.arrayContaining([
+        expect.objectContaining({
+          dropId: 99,
+          title: "Private address-bound fixture",
+          isPrivate: true,
+        }),
+      ]),
+    });
+  });
+
+  it("includes holder-bound private metadata in the capped JSON and CSV exports", async () => {
+    const [jsonResponse, csvResponse] = await Promise.all([
+      SELF.fetch(`https://poap.in/api/owners/${PRIVATE_HOLDER}/export.json`),
+      SELF.fetch(`https://poap.in/api/owners/${PRIVATE_HOLDER}/export.csv`),
+    ]);
+    const json = await jsonResponse.json<{
+      schema_version: string;
+      tokens: Array<{ drop_id: number; title: string; is_private: boolean }>;
+    }>();
+    const csv = await csvResponse.text();
+
+    expect(json.schema_version).toBe("poapin-address-export-v2");
+    expect(json.tokens).toContainEqual(
+      expect.objectContaining({
+        drop_id: 99,
+        title: "Private address-bound fixture",
+        is_private: true,
+      }),
+    );
+    expect(JSON.stringify(json)).not.toContain("private catalog secret");
+    expect(csv.split("\n")[0]).toContain(",is_private");
+    expect(csv).toContain('"Private address-bound fixture"');
+    expect(csv).toContain('"true"');
+    expect(csv).not.toContain("private catalog secret");
+  });
+
+  it("fails address-bound Drop enrichment closed on a Collections snapshot mismatch", async () => {
+    const response = await app.request(
+      `https://poap.in/api/owners/${PRIVATE_HOLDER}/export/holdings?limit=5`,
+      undefined,
+      { ...bindings, COLLECTIONS_SNAPSHOT_ID: "wrong-collections-snapshot" },
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    await expect(response.json()).resolves.toMatchObject({ code: "archive_unavailable" });
   });
 });
 
@@ -430,6 +502,73 @@ async function seedExportBoundaryRows(): Promise<void> {
         '2026-01-01T00:00:00.000Z',
         1,
         1
+      )
+    `,
+  ).run();
+  await bindings.COLLECTIONS_DB.prepare(
+    `
+      INSERT INTO collection_drop_cards (
+        drop_id,
+        fancy_id,
+        title,
+        description,
+        start_date,
+        end_date,
+        expiry_date,
+        year,
+        city,
+        country,
+        event_url,
+        image_url,
+        animation_url,
+        image_object_key,
+        is_virtual,
+        private_value,
+        is_hidden,
+        channel,
+        platform,
+        location_type,
+        timezone,
+        integrator_id,
+        created_date,
+        token_count,
+        transfer_count,
+        email_claims_minted,
+        email_claims_reserved,
+        email_claims_total,
+        featured_on,
+        moments_uploaded
+      ) VALUES (
+        99,
+        'private-address-bound-fixture',
+        'Private address-bound fixture',
+        'Private metadata preserved in the Collections snapshot.',
+        '2026-01-01T00:00:00.000Z',
+        '2026-01-02T00:00:00.000Z',
+        NULL,
+        2026,
+        'Holder City',
+        'Holder Country',
+        'https://private-holder.example.invalid/event',
+        'https://untrusted-private-source.example.invalid/99.png',
+        NULL,
+        NULL,
+        0,
+        'true',
+        0,
+        'holder-channel',
+        'holder-platform',
+        'in-person',
+        'UTC',
+        'fixture',
+        '2026-01-01T00:00:00.000Z',
+        2,
+        3,
+        8,
+        1,
+        9,
+        NULL,
+        0
       )
     `,
   ).run();

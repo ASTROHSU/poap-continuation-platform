@@ -159,6 +159,7 @@ export interface PortableSiteManifest {
   counts: {
     holdings: number;
     uniqueDrops: number;
+    privateHeldDrops: number;
     unavailableDropReferences: number;
     collectionProfiles: number;
     heldDropMemberships: number;
