@@ -80,7 +80,7 @@ beforeAll(async () => {
           '2026-04-01T00:00:00Z', 'https://assets.poap.xyz/private.png', NULL, 1, 0),
         (2002, 'graph-hidden', 'Graph Hidden Drop', 'Must not be exposed',
           '2026-05-03T00:00:00Z', '2026-05-04T00:00:00Z', NULL, NULL, NULL,
-          NULL, 2026, 1, 1, 1, NULL, NULL, 'virtual', 'UTC', NULL,
+          NULL, 2026, 1, 0, 1, NULL, NULL, 'virtual', 'UTC', NULL,
           '2026-04-02T00:00:00Z', NULL, NULL, 1, 0)
     `,
   ).run();
@@ -88,10 +88,11 @@ beforeAll(async () => {
     `
       INSERT INTO tokens (
         source_uid, poap_id, drop_id, minted_on, owner_address_norm, network, transfer_count
-      ) VALUES (
-        'graph-private-token', 7587009, 2001, 1777593600,
-        '0x5555555555555555555555555555555555555555', 'xdai', 0
-      )
+      ) VALUES
+        ('graph-private-token', 7587009, 2001, 1777593600,
+          '0x5555555555555555555555555555555555555555', 'xdai', 0),
+        ('graph-hidden-token', 7587008, 2002, 1777593500,
+          '0x5555555555555555555555555555555555555555', 'xdai', 0)
     `,
   ).run();
   await bindings.HOLDINGS_DB.prepare(
@@ -99,7 +100,7 @@ beforeAll(async () => {
       INSERT INTO owner_stats (
         owner_address_norm, token_count, unique_drop_count, first_minted_on, last_minted_on
       ) VALUES (
-        '0x5555555555555555555555555555555555555555', 1, 1, 1777593600, 1777593600
+        '0x5555555555555555555555555555555555555555', 2, 2, 1777593500, 1777593600
       )
     `,
   ).run();
@@ -193,7 +194,7 @@ describe("archive API", () => {
     const response = await SELF.fetch("https://poap.in/api/drops/2");
     expect(response.status).toBe(200);
     expect(response.headers.get("x-archive-api-version")).toBe(
-      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v3`,
+      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v5`,
     );
     expect(await response.json()).toMatchObject({
       dropId: 2,
@@ -204,7 +205,7 @@ describe("archive API", () => {
     });
   });
 
-  it("uses bounded Holdings metadata for exact and holder-proven missing Drops", async () => {
+  it("uses bounded Holdings metadata for exact and holder-proven private or hidden Drops", async () => {
     const exact = await SELF.fetch("https://poap.in/api/drops/2001");
     expect(exact.status).toBe(200);
     await expect(exact.json()).resolves.toMatchObject({
@@ -218,27 +219,38 @@ describe("archive API", () => {
     });
 
     const hidden = await SELF.fetch("https://poap.in/api/drops/2002");
-    expect(hidden.status).toBe(404);
+    expect(hidden.status).toBe(200);
+    await expect(hidden.json()).resolves.toMatchObject({
+      dropId: 2002,
+      title: "Graph Hidden Drop",
+      isHidden: true,
+    });
 
     const owner = await SELF.fetch(
       "https://poap.in/api/owners/0x5555555555555555555555555555555555555555?limit=48",
     );
     expect(owner.status).toBe(200);
     await expect(owner.json()).resolves.toMatchObject({
-      total: 1,
-      uniqueDrops: 1,
-      items: [
-        {
+      total: 2,
+      uniqueDrops: 2,
+      items: expect.arrayContaining([
+        expect.objectContaining({
           poapId: 7587009,
           dropId: 2001,
           title: "Graph Private Drop",
           isPrivate: true,
-        },
-      ],
+        }),
+        expect.objectContaining({
+          poapId: 7587008,
+          dropId: 2002,
+          title: "Graph Hidden Drop",
+          isHidden: true,
+        }),
+      ]),
     });
   });
 
-  it("returns a private, non-hidden Drop only when its exact ID is requested", async () => {
+  it("returns private or hidden Drops only when an exact ID is requested", async () => {
     const response = await SELF.fetch("https://poap.in/api/drops/1002");
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -264,14 +276,17 @@ describe("archive API", () => {
     await expect(browse.json()).resolves.toMatchObject({ items: [] });
 
     const hidden = await SELF.fetch("https://poap.in/api/drops/1004");
-    expect(hidden.status).toBe(404);
+    expect(hidden.status).toBe(200);
+    await expect(hidden.json()).resolves.toMatchObject({ dropId: 1004, isHidden: true });
+    const hiddenBrowse = await SELF.fetch("https://poap.in/api/drops?q=Hidden");
+    await expect(hiddenBrowse.json()).resolves.toMatchObject({ items: [] });
   });
 
   it("lists every archived collector record for an exact Drop with an indexed keyset", async () => {
     const first = await SELF.fetch("https://poap.in/api/drops/2/collectors?limit=1");
     expect(first.status).toBe(200);
     expect(first.headers.get("x-archive-api-version")).toBe(
-      `v1.drop-collectors-v1.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
+      `v1.drop-collectors-v2.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
     );
     const firstPage = await first.json<{
       snapshotId: string;
@@ -348,7 +363,7 @@ describe("archive API", () => {
     expect(details).not.toContain("USE TEMP B-TREE");
   });
 
-  it("fails closed for hidden Drops and rejects collector scan amplification", async () => {
+  it("serves exact hidden Drop collectors and rejects collector scan amplification", async () => {
     const [hidden, privateDrop, badLimit, unknown, badCursor] = await Promise.all([
       SELF.fetch("https://poap.in/api/drops/1004/collectors?limit=48"),
       SELF.fetch("https://poap.in/api/drops/1002/collectors?limit=48"),
@@ -356,11 +371,12 @@ describe("archive API", () => {
       SELF.fetch("https://poap.in/api/drops/2/collectors?offset=1"),
       SELF.fetch("https://poap.in/api/drops/2/collectors?cursor=not-a-cursor"),
     ]);
-    expect(hidden.status).toBe(404);
+    expect(hidden.status).toBe(200);
+    await expect(hidden.json()).resolves.toMatchObject({ dropId: 1004, items: [] });
     expect(privateDrop.status).toBe(200);
     await expect(privateDrop.json()).resolves.toMatchObject({ dropId: 1002, items: [] });
     expect([badLimit.status, unknown.status, badCursor.status]).toEqual([400, 400, 400]);
-    for (const response of [hidden, badLimit, unknown, badCursor]) {
+    for (const response of [badLimit, unknown, badCursor]) {
       expect(response.headers.get("cache-control")).toBe("private, no-store");
     }
   });
@@ -369,7 +385,7 @@ describe("archive API", () => {
     const first = await SELF.fetch(`https://poap.in/api/owners/${ADDRESS}?limit=1`);
     expect(first.status).toBe(200);
     expect(first.headers.get("x-archive-api-version")).toBe(
-      `v1.owner-v3.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
+      `v1.owner-v4.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
     );
     const page = await first.json<{
       address: string;
@@ -402,7 +418,7 @@ describe("archive API", () => {
       count: number;
       tokens: Array<{ source_uid: string; artwork_url: string }>;
     }>();
-    expect(body.schema_version).toBe("poapin-address-export-v2");
+    expect(body.schema_version).toBe("poapin-address-export-v3");
     expect(body.queried_address).toBe(ADDRESS);
     expect(body.count).toBe(2);
     expect(body.tokens).toHaveLength(2);

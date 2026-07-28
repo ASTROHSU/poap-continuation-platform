@@ -313,6 +313,7 @@ describe("portable personal site generator", () => {
       'metric("Unavailable Drop details", counts.unavailableDropReferences)',
     );
     expect(javascript).toContain('metric("Private held Drops", counts.privateHeldDrops)');
+    expect(javascript).toContain('metric("Hidden held Drops", counts.hiddenHeldDrops)');
     expect(javascript).toContain('momentAssociationCard(item, "Authored")');
     expect(javascript).toContain('momentAssociationCard(item, "Tagged")');
     for (const prompt of [
@@ -347,22 +348,25 @@ describe("portable personal site generator", () => {
     expect(html).toMatch(/<\/footer>\s*<\/div>\s*<\/body>/);
   });
 
-  it("preserves and labels address-bound private Drop metadata", async () => {
+  it("preserves and labels address-bound private and hidden Drop metadata", async () => {
     const input = fixture();
-    input.drops[0] = { ...input.drops[0]!, isPrivate: true };
+    input.drops[0] = { ...input.drops[0]!, isPrivate: true, isHidden: true };
 
     const build = await buildPortableSiteBundle(input);
     const dropData = dataJson(build, "data/drops-0001.data.js") as {
-      items: Array<{ dropId: number; isPrivate?: true; title: string }>;
+      items: Array<{ dropId: number; isPrivate?: true; isHidden?: true; title: string }>;
     };
 
     expect(build.manifest.counts.privateHeldDrops).toBe(1);
+    expect(build.manifest.counts.hiddenHeldDrops).toBe(1);
     expect(dropData.items[0]).toMatchObject({
       dropId: 42,
       title: "Portable POAP 1001",
       isPrivate: true,
+      isHidden: true,
     });
     expect(file(build, "assets/site.js")).toContain('drop?.isPrivate ? "Private Drop"');
+    expect(file(build, "assets/site.js")).toContain('drop?.isHidden ? "Hidden Drop"');
     expect(file(build, "README.md")).toContain(
       "private Drop records included because this exact address held a matching token",
     );

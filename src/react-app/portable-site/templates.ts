@@ -641,6 +641,7 @@ export function buildSiteJs(): string {
       grid([
         metric("Related collection profiles", counts.collectionProfiles),
         metric("Private held Drops", counts.privateHeldDrops),
+        metric("Hidden held Drops", counts.hiddenHeldDrops),
         metric("Unavailable Drop details", counts.unavailableDropReferences),
       ], "summary-grid summary-grid--secondary"),
     );
@@ -942,6 +943,7 @@ export function buildSiteJs(): string {
       "Token " + item.poapId,
       "Drop " + item.dropId,
       item.network || "",
+      drop?.isHidden ? "Hidden Drop" : "",
       drop?.isPrivate ? "Private Drop" : "",
       formatMintedDate(item.mintedOn),
       item.transferCount !== undefined ? item.transferCount + " transfers" : "",
@@ -1028,6 +1030,7 @@ export function buildSiteJs(): string {
       item.year ? String(item.year) : "",
       item.city || item.country || "",
       item.dropId !== undefined ? "Drop " + item.dropId : "",
+      item.isHidden ? "Hidden Drop" : "",
       item.isPrivate ? "Private Drop" : "",
     ]));
     if (item.hasArtwork !== false && item.imageUrl) {
@@ -1512,7 +1515,8 @@ Address: \`${manifest.address}\`
 
 - ${manifest.counts.holdings} token-level POAP holdings and ${manifest.counts.uniqueDrops} preserved Drop records
 - ${manifest.counts.privateHeldDrops} private Drop records included because this exact address held a matching token
-- ${manifest.counts.unavailableDropReferences} referenced Drop IDs without preserved details (missing and hidden records remain unavailable)
+- ${manifest.counts.hiddenHeldDrops} hidden Drop records included because this exact address held a matching token
+- ${manifest.counts.unavailableDropReferences} genuinely unavailable referenced Drop IDs without preserved details
 - ${manifest.counts.collectionProfiles} related collection profiles
 - ${manifest.counts.heldDropMemberships} formal held-Drop → Collection memberships
 - ${manifest.counts.authoredMomentAssociations} authored-Moment → Collection associations

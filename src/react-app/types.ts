@@ -67,6 +67,8 @@ export interface Drop {
   momentsUploaded?: number | null;
   /** Included for exact-ID and exact-address responses, never browse results. */
   isPrivate?: true;
+  /** Included for exact-ID and exact-address responses, never browse results. */
+  isHidden?: true;
 }
 
 export interface Holding extends Drop {

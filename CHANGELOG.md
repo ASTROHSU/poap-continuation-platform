@@ -10,6 +10,9 @@ stable public contract exists.
 
 ### Added
 
+- Address-bound, exact-ID, personal-site, ZIP, JSON, CSV, and image exports now
+  retain preserved hidden Drop metadata and its explicit `isHidden` state,
+  while public Drop browsing and search continue to exclude hidden records.
 - A resumable full Holdings capture from POAP Compass, preserving cross-chain
   `(id, chain)` identities in a source-compatible SQLite, deterministic D1 SQL
   shards, local reconstruction checks, and content-addressed private R2 backup
@@ -26,11 +29,10 @@ stable public contract exists.
 - Exact Drop collector lists with public address links, preserved token facts,
   clustered D1 keyset pagination, resumable snapshot backfill, and
   snapshot-versioned edge caching.
-- Exact-ID detail for private, non-hidden Drops, with private records still
-  excluded from browse, search, batch export, collector payloads, and Collection
-  projections.
-- Address-bound private Drop enrichment for exact holder lookups, personal-site
-  ZIPs, and CSV/JSON exports.
+- Exact-ID detail for private and hidden Drops, with both categories still
+  excluded from browse, search, batch export, and Collection projections.
+- Address-bound private and hidden Drop enrichment for exact holder lookups,
+  personal-site ZIPs, image ZIPs, and CSV/JSON exports.
 - Public archive browser at [poap.in](https://poap.in) for the fixed
   `2026-07-02-v1` snapshot.
 - Indexed D1 catalog and holdings queries, exact-address CSV/JSON exports, and

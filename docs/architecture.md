@@ -105,10 +105,10 @@ The single-record `GET /api/drops/:id` route is intentionally different from
 browse and batch APIs. It first performs one primary-key Catalog lookup. A
 public Catalog result returns immediately; a private or missing result performs
 one primary-key lookup in the newer `collection_drop_cards` projection. Exact
-lookup may return a private, non-hidden card with `isPrivate: true`, but hidden
-records remain unavailable. Cache identity includes the Collections release.
-No private Drop metadata is added to browse, search, batch export, collector
-responses, or Collection projections.
+lookup may return a private or hidden card with explicit `isPrivate` and
+`isHidden` flags. Cache identity includes the Collections release. No private
+or hidden Drop metadata is added to browse, search, batch export, or Collection
+projections.
 
 `GET /api/drops/:id/collectors` is a bounded exact-ID view over the historical
 Holdings snapshot. It first applies the same exact Drop availability gate, then
@@ -129,19 +129,19 @@ into the collector payload. Snapshot-versioned pages are edge-cached for seven
 days.
 
 This endpoint is not cross-Drop address discovery and does not represent live
-ownership. A known private, non-hidden Drop may use the same collector view,
-while hidden or missing exact IDs remain unavailable.
+ownership. A known private or hidden Drop may use the same collector view,
+while genuinely missing exact IDs remain unavailable.
 
 The personal Holdings endpoint reads up to 480 tokens with an indexed keyset
 query, then looks up complete public Drop details in `CATALOG_DB` in fixed
-96-ID statements. Catalog misses are checked against the private,
-non-hidden `collection_drop_cards` projection only for IDs already returned by
-that exact address's Holdings page. Cursors are bound to the normalized
-address, page size, snapshot, and personal-export scope; cache identity also
-includes the Collections release. Each page strictly partitions its unique
-token Drop references between complete available `drops` and ID-only
-`unavailableDropIds`. A holder-proven private row carries `isPrivate: true`;
-missing and hidden records retain the same opaque unavailable form.
+96-ID statements. Catalog misses are checked against the private-or-hidden
+`collection_drop_cards` projection only for IDs already returned by that exact
+address's Holdings page. Cursors are bound to the normalized address, page
+size, snapshot, and personal-export scope; cache identity also includes the
+Collections release. Each page strictly partitions its unique token Drop
+references between complete available `drops` and ID-only
+`unavailableDropIds`. Holder-proven private and hidden rows carry explicit
+flags; genuinely missing records retain the opaque unavailable form.
 
 After Moments and owned-Collection segments are collected, the browser resolves
 their additional Drop references through `/api/drops/export/batch` in batches
@@ -325,10 +325,10 @@ reads:
    Moments, and historically owner-matched public Capsules are collected by
    keyset cursor.
 3. Each Holdings page is verified as an exact partition of preserved and
-   unavailable Drop references. Holder-proven private cards may be enriched,
-   while missing and hidden cards remain opaque. All held Drop IDs are resolved
-   to formal Collection membership in 96-ID batches; relevant Collection
-   profiles are loaded in 16-ID batches.
+   unavailable Drop references. Holder-proven private and hidden cards may be
+   enriched, while genuinely missing cards remain opaque. All held Drop IDs are
+   resolved to formal Collection membership in 96-ID batches; relevant
+   Collection profiles are loaded in 16-ID batches.
 4. Each owned Collection's export manifest is followed segment by segment until
    every `nextPath` is `null`.
 5. Additional Drop IDs referenced by authored/tagged Moments and

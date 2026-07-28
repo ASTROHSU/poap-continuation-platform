@@ -75,9 +75,10 @@ node tools/compass-holdings/cli.mjs referenced-drops \
 ```
 
 This bounded second pass preserves public, private, and hidden upstream
-objects. It does not add them to public Drop browsing: non-hidden metadata is
-available only when an address proves it holds the Drop or when somebody asks
-for that exact Drop ID. Hidden metadata remains unavailable through the API.
+objects. It does not add private or hidden records to public Drop browsing:
+their metadata is available only when an address proves it holds the Drop or
+when somebody asks for that exact Drop ID. Personal exports retain the explicit
+visibility state.
 The companion capture is resumable with `--resume`.
 
 ## SQLite layout

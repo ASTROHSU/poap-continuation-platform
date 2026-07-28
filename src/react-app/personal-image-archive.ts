@@ -201,9 +201,11 @@ export function buildMediaArchivePlan(snapshot: PersonalArchiveSnapshot): Person
       drop.imageUrl,
       "poaps",
       { kind: "drop-artwork", ownerId: String(drop.dropId) },
-      (value) => validateDropArtworkUrl(value, snapshots.holdings, drop.dropId),
+      (value) =>
+        validateDropArtworkUrl(value, snapshots.holdings, drop.dropId) ??
+        validateCollectionDropUrl(value, snapshots.holdings, snapshots.collections, drop.dropId),
       null,
-      "image/webp",
+      null,
     );
   }
 

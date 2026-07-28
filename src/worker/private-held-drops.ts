@@ -51,12 +51,12 @@ type PrivateDropRow = Omit<CollectionItemRow, "item_id" | "created_on"> & {
 };
 
 export type ExactCollectionDropLookup =
-  { state: "available"; drop: DropDetail } | { state: "hidden" } | { state: "missing" };
+  { state: "available"; drop: DropDetail } | { state: "missing" };
 
 /**
  * Resolves one explicitly requested Drop ID from the newer Collections
- * snapshot. Exact lookup may return a private, non-hidden record, but it never
- * turns that record into a browseable list or exposes hidden metadata.
+ * snapshot. Exact lookup may return private or hidden metadata, but it never
+ * turns either category into a browseable list.
  */
 export async function fetchExactCollectionDropDetail(
   db: D1ReadClient,
@@ -85,7 +85,6 @@ export async function fetchExactCollectionDropDetail(
 
   const row = detail.results[0] as PrivateDropRow | undefined;
   if (!row) return { state: "missing" };
-  if (numberValue(row.is_hidden) === 1) return { state: "hidden" };
   return {
     state: "available",
     drop: toCollectionDropDetail(row, mediaBaseUrl, archiveSnapshotId, collectionsSnapshotId),
@@ -123,8 +122,7 @@ export async function fetchPrivateHeldDropDetails(
             SELECT ${DROP_DETAIL_COLUMNS}
             FROM collection_drop_cards
             WHERE drop_id IN (${placeholders})
-              AND is_private = 1
-              AND is_hidden = 0
+              AND (is_private = 1 OR is_hidden = 1)
             ORDER BY drop_id ASC`,
         )
         .bind(...chunk),
@@ -192,6 +190,7 @@ function toCollectionDropDetail(
     featuredOn: row.drop_featured_on,
     momentsUploaded: row.moments_uploaded === null ? null : numberValue(row.moments_uploaded),
     ...(row.private_value === "false" ? {} : { isPrivate: true as const }),
+    ...(numberValue(row.is_hidden) === 1 ? { isHidden: true as const } : {}),
   };
 }
 
