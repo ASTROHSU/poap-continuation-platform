@@ -24,6 +24,7 @@ import {
 
 const ADDRESS = "0x1111111111111111111111111111111111111111";
 const HOLDING_ARTWORK_SHA = `ab${"c".repeat(62)}`;
+const CATALOG_FALLBACK_ARTWORK_SHA = `de${"f".repeat(62)}`;
 interface TestBindings extends Bindings {
   TEST_CATALOG_FIXTURE: string;
   TEST_CATALOG_MIGRATIONS: D1Migration[];
@@ -69,6 +70,11 @@ beforeAll(async () => {
         is_hidden, channel, platform, location_type, timezone, integrator_id,
         created_at, image_url, animation_url, token_count, transfer_count
       ) VALUES
+        (3, 'updated-drop-3', 'Updated Drop Three', 'Holdings artwork fallback',
+          '2015-11-09T00:00:00Z', '2015-11-13T00:00:00Z', NULL, 'London',
+          'United Kingdom', NULL, 2015, 0, 0, 0, NULL, NULL,
+          'in-person', 'UTC', NULL, '2015-11-01T00:00:00Z',
+          'https://assets.poap.xyz/drop-3.png', NULL, 1, 0),
         (2, 'updated-drop-2', 'Updated Drop Two', 'Newer Graph metadata',
           '2018-10-29T00:00:00Z', '2018-10-30T00:00:00Z', NULL, 'Prague',
           'Czechia', 'javascript:alert(1)', 2018, 0, 0, 0, NULL, NULL,
@@ -99,6 +105,23 @@ beforeAll(async () => {
       1234,
       "image/png",
       "https://assets.poap.xyz/hidden.png",
+      "2026-07-28T00:00:00.000Z",
+    )
+    .run();
+  await bindings.HOLDINGS_DB.prepare(
+    `
+      INSERT INTO holding_drop_artwork (
+        drop_id, object_key, sha256, byte_length, content_type, source_url, archived_at
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+    `,
+  )
+    .bind(
+      3,
+      `snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/de/${CATALOG_FALLBACK_ARTWORK_SHA}.png`,
+      CATALOG_FALLBACK_ARTWORK_SHA,
+      2345,
+      "image/png",
+      "https://assets.poap.xyz/drop-3.png",
       "2026-07-28T00:00:00.000Z",
     )
     .run();
@@ -267,6 +290,23 @@ describe("archive API", () => {
           isHidden: true,
         }),
       ]),
+    });
+  });
+
+  it("fills missing catalog artwork from the holder-bound Holdings archive", async () => {
+    const owner = await SELF.fetch(
+      "https://poap.in/api/owners/0x3333333333333333333333333333333333333333?limit=48",
+    );
+    expect(owner.status).toBe(200);
+    await expect(owner.json()).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({
+          dropId: 3,
+          title: "DevCon1",
+          hasArtwork: true,
+          imageUrl: `https://media.poap.in/snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/de/${CATALOG_FALLBACK_ARTWORK_SHA}.png`,
+        }),
+      ],
     });
   });
 
