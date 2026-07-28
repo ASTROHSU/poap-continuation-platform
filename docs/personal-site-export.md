@@ -104,13 +104,14 @@ The Worker first reads a keyset page from `HOLDINGS_DB`, then loads the
 corresponding unique public Drop details from `CATALOG_DB` in fixed 96-ID
 lookups. IDs absent from that public projection are then checked against
 `COLLECTIONS_DB` in the same bounded page, but only because the Holdings result
-has already proven that the queried address references them. A private,
-non-hidden card may therefore appear in `drops` with `isPrivate: true`.
-Multiple tokens from the same Drop do not repeat its metadata. Missing and
-hidden records stay ID-only in `unavailableDropIds`, with no reason field or
-placeholder metadata. Separately, `GET /api/drops/:id` can return a private,
-non-hidden record when its exact ID is known; this single-record route is not
-used to expand or enumerate the personal export.
+has already proven that the queried address references them. A private or
+hidden card may therefore appear in `drops` with `isPrivate: true`,
+`isHidden: true`, or both. Multiple tokens from the same Drop do not repeat its
+metadata. Only genuinely missing records stay ID-only in
+`unavailableDropIds`, with no reason field or placeholder metadata. Separately,
+`GET /api/drops/:id` can return a private or hidden record when its exact ID is
+known; this single-record route is not used to expand or enumerate the personal
+export.
 
 For each page, the unique `dropId` set referenced by `items` must equal the
 disjoint union of `drops[].dropId` and `unavailableDropIds`. An ID can never
@@ -286,13 +287,14 @@ paths are relative, and the page uses hash navigation, so the same folder works
 when opened directly through `file://`, at an HTTP origin, an IPFS root, or an
 asset canister without server rewrites.
 
-Preserved public and holder-proven private details remain in the `drops`
-dataset. Every referenced ID without holder-safe detail appears once in the
-`unavailable-drop-references` dataset with only its Drop ID and the generic
+Preserved public and holder-proven private or hidden details remain in the
+`drops` dataset. Every referenced ID without holder-safe detail appears once in
+the `unavailable-drop-references` dataset with only its Drop ID and the generic
 `not-public-or-not-found` classification. The manifest's `counts.uniqueDrops`
 counts preserved Drop records, `counts.privateHeldDrops` identifies the private
-subset, and `counts.unavailableDropReferences` counts opaque missing or hidden
-references. These availability sets are disjoint.
+subset, `counts.hiddenHeldDrops` identifies the hidden subset, and
+`counts.unavailableDropReferences` counts genuinely unavailable references.
+These availability sets are disjoint.
 
 Decoded JSON chunks are strictly smaller than 3.5 MiB. Their unpadded Base64URL
 transport wrappers, the runtime index, and every other extracted file are each

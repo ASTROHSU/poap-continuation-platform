@@ -47,7 +47,7 @@ export function DropPage({ dropId }: { dropId: number }) {
   }, [dropId, retry]);
 
   useEffect(() => {
-    if (!drop?.isPrivate) return;
+    if (!drop?.isPrivate && !drop?.isHidden) return;
     const existing = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
     const robots = existing ?? document.createElement("meta");
     const previousContent = existing?.content;
@@ -60,7 +60,7 @@ export function DropPage({ dropId }: { dropId: number }) {
       if (existing) robots.content = previousContent ?? "";
       else robots.remove();
     };
-  }, [drop?.isPrivate]);
+  }, [drop?.isHidden, drop?.isPrivate]);
 
   const eventUrl = useMemo(() => safeExternalUrl(drop?.eventUrl), [drop?.eventUrl]);
   const artworkUrl = useMemo(() => safeHttpUrl(drop?.imageUrl), [drop?.imageUrl]);
@@ -143,7 +143,13 @@ export function DropPage({ dropId }: { dropId: number }) {
 
         <div className="drop-detail__content glass-panel">
           <div className="detail-kicker">
-            <span>{drop.isPrivate ? "Private POAP Drop" : "POAP Drop"}</span>
+            <span>
+              {drop.isHidden
+                ? "Hidden POAP Drop"
+                : drop.isPrivate
+                  ? "Private POAP Drop"
+                  : "POAP Drop"}
+            </span>
             <button type="button" onClick={copyDropId} aria-live="polite">
               #{drop.dropId} ·{" "}
               {copyStatus === "copied"
@@ -241,9 +247,11 @@ export function DropPage({ dropId }: { dropId: number }) {
             </Link>
           </div>
           <p className="snapshot-note">
-            {drop.isPrivate
-              ? "This private record is available by exact Drop ID and remains excluded from archive browsing."
-              : "This record reflects a preserved snapshot and may not match current ownership or event metadata."}
+            {drop.isHidden
+              ? "This hidden record is available by exact Drop ID and to addresses that hold it. It remains excluded from archive browsing."
+              : drop.isPrivate
+                ? "This private record is available by exact Drop ID and remains excluded from archive browsing."
+                : "This record reflects a preserved snapshot and may not match current ownership or event metadata."}
           </p>
         </div>
       </article>

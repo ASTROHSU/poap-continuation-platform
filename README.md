@@ -197,15 +197,15 @@ APIs and build a pure-static ZIP in the browser. Each dataset is held to one
 unchanged release identity during collection; Holdings, Collections, and
 Moments remain three independent snapshots rather than one shared capture time.
 The package contains normalized Holdings; public Catalog details; preserved
-private Drop metadata only where that exact address's Holdings snapshot proves
-the relation; opaque Drop-ID references for missing or hidden records; three
-distinct Collection relationship views; complete public exports for
-historically owned Collections; separate public authored and tagged Moment
-views; and public Capsules whose archived owner is the address. A private,
-non-hidden Drop can also be opened when its exact ID is known. Drop browse,
-search, batch export, collector responses, and Collection projections continue
-to redact private Drop metadata; an exact Drop page may separately list the
-public holder addresses preserved in Holdings.
+private or hidden Drop metadata where that exact address's Holdings snapshot
+proves the relation; opaque Drop-ID references only for genuinely unavailable
+records; three distinct Collection relationship views; complete public exports
+for historically owned Collections; separate public authored and tagged Moment
+views; and public Capsules whose archived owner is the address. A private or
+hidden Drop can also be opened when its exact ID is known. Drop browse, search,
+batch export, and Collection projections continue to exclude private and hidden
+Drop metadata; an exact Drop page may separately list the public holder
+addresses preserved in Holdings.
 
 The deployable ZIP remains metadata-focused: its generated page mounts an image,
 video, or audio source only after a visitor explicitly asks to load it. A

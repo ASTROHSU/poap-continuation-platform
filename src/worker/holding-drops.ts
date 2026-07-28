@@ -36,11 +36,12 @@ type SnapshotIdRow = {
 };
 
 export type ExactHoldingDropLookup =
-  { state: "available"; drop: DropDetail } | { state: "hidden" } | { state: "missing" };
+  { state: "available"; drop: DropDetail } | { state: "missing" };
 
 /**
- * Resolves one explicitly requested ID. Private metadata is available because
- * the caller already supplied the exact Drop ID; hidden metadata stays closed.
+ * Resolves one explicitly requested ID. Private and hidden metadata is
+ * available because the caller already supplied the exact Drop ID. Neither
+ * category is added to public browse enumeration.
  */
 export async function fetchExactHoldingDropDetail(
   db: D1ReadClient,
@@ -64,7 +65,6 @@ export async function fetchExactHoldingDropDetail(
   assertSnapshot(snapshot.results[0] as SnapshotIdRow | undefined, snapshotId);
   const row = detail.results[0] as HoldingDropRow | undefined;
   if (!row) return { state: "missing" };
-  if (numberValue(row.is_hidden) === 1) return { state: "hidden" };
   return { state: "available", drop: toHoldingDropDetail(row) };
 }
 
@@ -94,7 +94,6 @@ export async function fetchHeldDropDetails(
           `SELECT ${DROP_COLUMNS}
            FROM holding_drops
            WHERE drop_id IN (${placeholders})
-             AND is_hidden = 0
            ORDER BY drop_id`,
         )
         .bind(...chunk),
@@ -147,6 +146,7 @@ function toHoldingDropDetail(row: HoldingDropRow): DropDetail {
     featuredOn: null,
     momentsUploaded: null,
     ...(numberValue(row.is_private) === 1 ? { isPrivate: true as const } : {}),
+    ...(numberValue(row.is_hidden) === 1 ? { isHidden: true as const } : {}),
   };
 }
 

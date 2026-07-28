@@ -478,6 +478,7 @@ function normalizeDropRecord(
     reservationsMinted: drop.reservationsMinted ?? 0,
     reservationsUnminted: drop.reservationsUnminted ?? 0,
     ...(drop.isPrivate === true ? { isPrivate: true as const } : {}),
+    ...(drop.isHidden === true ? { isHidden: true as const } : {}),
   };
 }
 
@@ -699,6 +700,7 @@ function buildManifest(
       holdings: snapshot.holdings.length,
       uniqueDrops: snapshot.drops.length,
       privateHeldDrops: snapshot.drops.filter((drop) => drop.isPrivate === true).length,
+      hiddenHeldDrops: snapshot.drops.filter((drop) => drop.isHidden === true).length,
       unavailableDropReferences: snapshot.unavailableDropIds.length,
       collectionProfiles: snapshot.collectionProfiles.length,
       heldDropMemberships: snapshot.heldDropMemberships.length,

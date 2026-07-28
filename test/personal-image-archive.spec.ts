@@ -116,6 +116,28 @@ describe("personal image archive planning", () => {
     );
   });
 
+  it("includes address-bound hidden artwork stored in the Collections snapshot", () => {
+    const hiddenArtwork = collectionUrl("drop-artwork", hash("9"), "png");
+    const snapshot = personalSnapshot({
+      drops: [
+        {
+          ...drop(228228, hiddenArtwork),
+          isHidden: true,
+        },
+      ],
+    });
+
+    const plan = buildMediaArchivePlan(snapshot);
+
+    expect(plan.count).toBe(1);
+    expect(plan.breakdown.poaps).toBe(1);
+    expect(plan.entries[0]).toMatchObject({
+      url: hiddenArtwork,
+      category: "poaps",
+      references: [expect.objectContaining({ kind: "drop-artwork", ownerId: "228228" })],
+    });
+  });
+
   it("excludes external, mutable, wrong-snapshot, query-bearing, video, and unpublished media", () => {
     const badProfile = collectionProfile("https://images.example/logo.webp");
     badProfile.collection.bannerUrl = `${collectionUrl("media", hash("a"), "webp")}?size=2`;

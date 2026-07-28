@@ -74,11 +74,11 @@ export const app = new Hono<AppEnv>();
 const COLLECTIONS_CACHE_SCHEMA = "collections-v3";
 const MOMENTS_CACHE_SCHEMA = "moments-v2";
 const MOMENTS_META_CACHE_SCHEMA = "public-meta-v2";
-const OWNER_CACHE_SCHEMA = "owner-v3";
-const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v2";
-const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v3";
+const OWNER_CACHE_SCHEMA = "owner-v4";
+const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v3";
+const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v5";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
-const DROP_COLLECTORS_CACHE_SCHEMA = "drop-collectors-v1";
+const DROP_COLLECTORS_CACHE_SCHEMA = "drop-collectors-v2";
 
 export function collectionsApiVersion(
   bindings: Pick<Bindings, "API_CACHE_VERSION" | "COLLECTIONS_RELEASE_ID">,
@@ -1337,9 +1337,6 @@ async function resolveExactDrop(bindings: Bindings, dropId: number): Promise<Dro
       bindings.SNAPSHOT_ID,
       bindings.COLLECTIONS_SNAPSHOT_ID,
     );
-    if (supplemental.state === "hidden") {
-      throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
-    }
     if (supplemental.state === "available") presentationDrop = supplemental.drop;
   }
 
@@ -1349,9 +1346,6 @@ async function resolveExactDrop(bindings: Bindings, dropId: number): Promise<Dro
     dropId,
     bindings.HOLDINGS_SNAPSHOT_ID,
   );
-  if (holdingDrop.state === "hidden") {
-    throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
-  }
   const drop =
     holdingDrop.state === "available"
       ? mergeHoldingDrop(holdingDrop.drop, presentationDrop)

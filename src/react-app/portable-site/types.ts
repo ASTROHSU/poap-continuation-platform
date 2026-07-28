@@ -160,6 +160,7 @@ export interface PortableSiteManifest {
     holdings: number;
     uniqueDrops: number;
     privateHeldDrops: number;
+    hiddenHeldDrops: number;
     unavailableDropReferences: number;
     collectionProfiles: number;
     heldDropMemberships: number;

@@ -17,7 +17,13 @@ export function DropCard({ drop, priority = false, tokenLabel }: DropCardProps) 
   const artworkUrl = safeHttpUrl(drop.imageUrl);
   const title = clean(drop.title) || `POAP drop #${drop.dropId}`;
   const canShowArtwork = drop.hasArtwork !== false && artworkUrl !== null && !imageFailed;
-  const badge = drop.isPrivate ? "Private Drop" : drop.isVirtual ? "Virtual" : null;
+  const badge = drop.isHidden
+    ? "Hidden Drop"
+    : drop.isPrivate
+      ? "Private Drop"
+      : drop.isVirtual
+        ? "Virtual"
+        : null;
   const content = (
     <>
       <div className="drop-card__artwork">
@@ -65,7 +71,13 @@ export function DropCard({ drop, priority = false, tokenLabel }: DropCardProps) 
       <Link
         className="drop-card__link"
         href={`/drop/${drop.dropId}`}
-        aria-label={drop.isPrivate ? `View private Drop ${title}` : `View ${title}`}
+        aria-label={
+          drop.isHidden
+            ? `View hidden Drop ${title}`
+            : drop.isPrivate
+              ? `View private Drop ${title}`
+              : `View ${title}`
+        }
       >
         {content}
       </Link>

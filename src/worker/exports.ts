@@ -45,6 +45,7 @@ const CSV_HEADER = [
   "transfer_count",
   "artwork_url",
   "is_private",
+  "is_hidden",
 ].join(",");
 
 export function createExportResponse(options: ExportOptions): Response {
@@ -82,7 +83,7 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
           controller.enqueue(encoder.encode(`\uFEFF${CSV_HEADER}\r\n`));
         } else {
           const envelope = JSON.stringify({
-            schema_version: "poapin-address-export-v2",
+            schema_version: "poapin-address-export-v3",
             snapshot_id: options.snapshotId,
             catalog_snapshot_id: options.catalogSnapshotId,
             snapshot_at: options.snapshotAt,
@@ -194,6 +195,7 @@ function toExportRecord(
         ? artworkUrl(options.mediaBaseUrl, options.catalogSnapshotId, holding.drop_id)
         : null),
     is_private: privateDrop?.isPrivate === true,
+    is_hidden: privateDrop?.isHidden === true,
   };
 }
 
@@ -217,6 +219,7 @@ function toCsvRow(record: ExportRecord): string {
       record.transfer_count,
       record.artwork_url,
       record.is_private,
+      record.is_hidden,
     ]
       .map(csvCell)
       .join(",") + "\r\n"

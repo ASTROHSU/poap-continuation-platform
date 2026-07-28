@@ -38,7 +38,7 @@ describe("personal export manifest", () => {
       `https://poap.in/api/owners/0x${ADDRESS.slice(2).toUpperCase()}/export/manifest`,
     );
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-archive-api-version")).toContain("personal-export-v2");
+    expect(response.headers.get("x-archive-api-version")).toContain("personal-export-v3");
     expect(response.headers.get("cache-control")).toContain("max-age=0");
     await expect(response.json()).resolves.toEqual({
       schemaVersion: "poapin-personal-export-v1",
@@ -202,6 +202,7 @@ describe("paginated personal holdings", () => {
         description: "Private metadata preserved in the Collections snapshot.",
         eventUrl: "https://private-holder.example.invalid/event",
         isPrivate: true,
+        isHidden: true,
       }),
     ]);
     expect(page.unavailableDropIds).toEqual([404]);
@@ -229,7 +230,9 @@ describe("paginated personal holdings", () => {
     expect(third.unavailableDropIds).toEqual([404]);
     expect(fourth.items).toEqual([expect.objectContaining({ dropId: 99, poapId: 100 })]);
     expect(fifth.items).toEqual([expect.objectContaining({ dropId: 99, poapId: 99 })]);
-    expect(fourth.drops).toEqual([expect.objectContaining({ dropId: 99, isPrivate: true })]);
+    expect(fourth.drops).toEqual([
+      expect.objectContaining({ dropId: 99, isPrivate: true, isHidden: true }),
+    ]);
     expect(fifth.drops).toEqual(fourth.drops);
     expect(fourth.unavailableDropIds).toEqual([]);
     expect(fifth.unavailableDropIds).toEqual([]);
@@ -252,6 +255,7 @@ describe("paginated personal holdings", () => {
       description: "Private metadata preserved in the Collections snapshot.",
       eventUrl: "https://private-holder.example.invalid/event",
       isPrivate: true,
+      isHidden: true,
     });
     await expect(batch.json()).resolves.toMatchObject({
       drops: [],
@@ -263,32 +267,39 @@ describe("paginated personal holdings", () => {
           dropId: 99,
           title: "Private address-bound fixture",
           isPrivate: true,
+          isHidden: true,
         }),
       ]),
     });
   });
 
-  it("includes holder-bound private metadata in the capped JSON and CSV exports", async () => {
+  it("includes holder-bound private and hidden metadata in capped JSON and CSV exports", async () => {
     const [jsonResponse, csvResponse] = await Promise.all([
       SELF.fetch(`https://poap.in/api/owners/${PRIVATE_HOLDER}/export.json`),
       SELF.fetch(`https://poap.in/api/owners/${PRIVATE_HOLDER}/export.csv`),
     ]);
     const json = await jsonResponse.json<{
       schema_version: string;
-      tokens: Array<{ drop_id: number; title: string; is_private: boolean }>;
+      tokens: Array<{
+        drop_id: number;
+        title: string;
+        is_private: boolean;
+        is_hidden: boolean;
+      }>;
     }>();
     const csv = await csvResponse.text();
 
-    expect(json.schema_version).toBe("poapin-address-export-v2");
+    expect(json.schema_version).toBe("poapin-address-export-v3");
     expect(json.tokens).toContainEqual(
       expect.objectContaining({
         drop_id: 99,
         title: "Private address-bound fixture",
         is_private: true,
+        is_hidden: true,
       }),
     );
     expect(JSON.stringify(json)).not.toContain("private catalog secret");
-    expect(csv.split("\n")[0]).toContain(",is_private");
+    expect(csv.split("\n")[0]).toContain(",is_private,is_hidden");
     expect(csv).toContain('"Private address-bound fixture"');
     expect(csv).toContain('"true"');
     expect(csv).not.toContain("private catalog secret");
@@ -566,7 +577,7 @@ async function seedExportBoundaryRows(): Promise<void> {
         NULL,
         0,
         'true',
-        0,
+        1,
         'holder-channel',
         'holder-platform',
         'in-person',

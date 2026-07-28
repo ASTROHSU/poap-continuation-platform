@@ -308,6 +308,11 @@ export interface DropSummary {
    * holdings lookup. Private Drops are never added to browse results.
    */
   isPrivate?: true;
+  /**
+   * Present when a hidden Drop is returned by an exact ID or exact-address
+   * holdings lookup. Hidden Drops are never added to browse results.
+   */
+  isHidden?: true;
 }
 
 export interface DropDetail extends DropSummary {
@@ -388,6 +393,7 @@ export interface ExportRecord {
   transfer_count: number;
   artwork_url: string | null;
   is_private: boolean;
+  is_hidden: boolean;
 }
 
 export interface CollectionSummaryRow {
