@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "poapin-holdings-artwork-release-v1",
+  "snapshotId": "compass-holdings-2026-07-28-v1",
+  "releaseId": "compass-holdings-2026-07-28-v1-artwork-0001",
+  "archivedAt": "2026-07-28T09:10:00.000Z",
+  "verification": {
+    "method": "remote R2 read-back with exact SHA-256, byte length, and MIME comparison",
+    "objectCount": 10,
+    "byteLength": 16736734
+  },
+  "objects": [
+    {
+      "dropId": 182303,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/73/73920d0e618f0d0f68232d5418718f0322f9226d579a55e68a1d414291b27684.gif",
+      "sha256": "73920d0e618f0d0f68232d5418718f0322f9226d579a55e68a1d414291b27684",
+      "byteLength": 3407879,
+      "contentType": "image/gif",
+      "sourceUrl": "https://assets.poap.xyz/poap-studio-social-media-1-2024-logo-1732723108987.gif"
+    },
+    {
+      "dropId": 182304,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/98/98423e6c8c222395641dc7fb4945b16db00a0d18c793ab871d374567eb233040.gif",
+      "sha256": "98423e6c8c222395641dc7fb4945b16db00a0d18c793ab871d374567eb233040",
+      "byteLength": 3148005,
+      "contentType": "image/gif",
+      "sourceUrl": "https://assets.poap.xyz/poap-studio-social-media-2-2024-logo-1732723124472.gif"
+    },
+    {
+      "dropId": 182305,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/52/528280e99d3841146465dea45a2fb2f5f7127b8796bae4b0afa8b50ba2fbf2ee.gif",
+      "sha256": "528280e99d3841146465dea45a2fb2f5f7127b8796bae4b0afa8b50ba2fbf2ee",
+      "byteLength": 3170693,
+      "contentType": "image/gif",
+      "sourceUrl": "https://assets.poap.xyz/poap-studio-social-media-3-2024-logo-1732723139578.gif"
+    },
+    {
+      "dropId": 182947,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/c6/c60684e3ffe922bcb4c40f32d92cb02a61d0635d7bc02620412cd99d9bea75dc.jpg",
+      "sha256": "c60684e3ffe922bcb4c40f32d92cb02a61d0635d7bc02620412cd99d9bea75dc",
+      "byteLength": 2905652,
+      "contentType": "image/jpeg",
+      "sourceUrl": "https://assets.poap.xyz/eadad57c-67c9-4bff-a405-023aea07b3c5.jpeg"
+    },
+    {
+      "dropId": 226810,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/77/772f23f11ed7ef39e23958fd7bc5e7128171f41b88c149783689b5c0c332b93d.png",
+      "sha256": "772f23f11ed7ef39e23958fd7bc5e7128171f41b88c149783689b5c0c332b93d",
+      "byteLength": 682021,
+      "contentType": "image/png",
+      "sourceUrl": "https://assets.poap.xyz/42ee8627-f752-49db-baa5-1c65039a8b5f.png"
+    },
+    {
+      "dropId": 228225,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/d6/d6e5f5c977dbe8ffa6d438728c59337efaf07825c7b35780a2d12eb9a057ffd2.png",
+      "sha256": "d6e5f5c977dbe8ffa6d438728c59337efaf07825c7b35780a2d12eb9a057ffd2",
+      "byteLength": 681711,
+      "contentType": "image/png",
+      "sourceUrl": "https://assets.poap.xyz/7d647bc6-81db-44ab-8abc-8ac9436e5a37.png"
+    },
+    {
+      "dropId": 228226,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/c6/c660a4f110c1becf024a6f5caab1eebf2b632ba20435fdac02f2fc75770e7cfd.png",
+      "sha256": "c660a4f110c1becf024a6f5caab1eebf2b632ba20435fdac02f2fc75770e7cfd",
+      "byteLength": 696135,
+      "contentType": "image/png",
+      "sourceUrl": "https://assets.poap.xyz/e2374ed1-a3dc-4691-b87f-9fcc88983fa1.png"
+    },
+    {
+      "dropId": 228228,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/bd/bd70f98952b2827d4258b016fbaceb7ce2ba8cc5cb8ed7d89b4d3d4997947828.png",
+      "sha256": "bd70f98952b2827d4258b016fbaceb7ce2ba8cc5cb8ed7d89b4d3d4997947828",
+      "byteLength": 681390,
+      "contentType": "image/png",
+      "sourceUrl": "https://assets.poap.xyz/0fdfccb5-a663-474b-920d-63c9e45033dd.png"
+    },
+    {
+      "dropId": 228230,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/13/133d5b04760f18e836ebf74e67847b0ac5ba591f50ca5935736225ff2ae70d2a.png",
+      "sha256": "133d5b04760f18e836ebf74e67847b0ac5ba591f50ca5935736225ff2ae70d2a",
+      "byteLength": 681524,
+      "contentType": "image/png",
+      "sourceUrl": "https://assets.poap.xyz/6a2d5b93-b6ec-4747-8aa4-b5ae0e9d4473.png"
+    },
+    {
+      "dropId": 228231,
+      "objectKey": "snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/8d/8d17c7af30f102c6f42d34674306537fa9f81badea4fcb2a12b10b81c4027048.png",
+      "sha256": "8d17c7af30f102c6f42d34674306537fa9f81badea4fcb2a12b10b81c4027048",
+      "byteLength": 681724,
+      "contentType": "image/png",
+      "sourceUrl": "https://assets.poap.xyz/dab1894e-fdde-4def-b872-07cf33201965.png"
+    }
+  ]
+}

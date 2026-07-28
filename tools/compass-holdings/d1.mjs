@@ -66,6 +66,7 @@ const MIGRATIONS = [
   ["prepare/000002_import_shards.sql", "migrations/holdings/0002_import_shards.sql"],
   ["prepare/000003_drop_collectors.sql", "migrations/holdings/0003_drop_collectors.sql"],
   ["prepare/000004_referenced_drops.sql", "migrations/holdings/0004_referenced_drops.sql"],
+  ["prepare/000005_artwork.sql", "migrations/holdings/0005_artwork.sql"],
 ];
 
 export async function buildCompassHoldingsD1(options = {}) {

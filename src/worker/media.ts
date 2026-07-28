@@ -78,11 +78,50 @@ function isContentAddressedKey(
   snapshotId: string,
   family: "media" | "drop-artwork",
 ): boolean {
+  return isNamespacedContentAddressedKey(segments, snapshotId, "collections", family);
+}
+
+/** Maps holder-only artwork from the active Holdings media release. */
+export function holdingDropArtworkUrl(
+  mediaBaseUrl: string,
+  objectKey: string | null,
+  archiveSnapshotId: string,
+  holdingsSnapshotId: string,
+  collectionsSnapshotId: string,
+  dropId: number,
+): string | null {
+  if (
+    !isSnapshotId(archiveSnapshotId) ||
+    !isSnapshotId(holdingsSnapshotId) ||
+    !isSnapshotId(collectionsSnapshotId) ||
+    !Number.isSafeInteger(dropId) ||
+    dropId <= 0 ||
+    !objectKey
+  ) {
+    return null;
+  }
+  const segments = objectKey.split("/");
+  if (
+    !isArchiveArtworkKey(segments, archiveSnapshotId, dropId) &&
+    !isContentAddressedKey(segments, collectionsSnapshotId, "drop-artwork") &&
+    !isNamespacedContentAddressedKey(segments, holdingsSnapshotId, "holdings", "drop-artwork")
+  ) {
+    return null;
+  }
+  return publicMediaUrl(mediaBaseUrl, segments);
+}
+
+function isNamespacedContentAddressedKey(
+  segments: string[],
+  snapshotId: string,
+  namespace: "collections" | "holdings",
+  family: "media" | "drop-artwork",
+): boolean {
   if (
     segments.length !== 7 ||
     segments[0] !== "snapshots" ||
     segments[1] !== snapshotId ||
-    segments[2] !== "collections" ||
+    segments[2] !== namespace ||
     segments[3] !== family ||
     segments[4] !== "sha256" ||
     !/^[0-9a-f]{2}$/.test(segments[5] ?? "")

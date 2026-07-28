@@ -1,5 +1,5 @@
 import { artworkUrl } from "./media";
-import { fetchHeldDropDetails } from "./holding-drops";
+import { fetchHeldDropDetails, withFallbackArtwork } from "./holding-drops";
 import { fetchPrivateHeldDropDetails } from "./private-held-drops";
 import type {
   ArchiveMeta,
@@ -411,16 +411,27 @@ export async function fetchOwner(
           collectionsSnapshotId,
         )
       : new Map<number, DropDetail>();
-  const holdingCandidateIds = privateCandidateIds.filter((dropId) => !privateDrops.has(dropId));
+  const holdingCandidateIds = privateCandidateIds.filter(
+    (dropId) => privateDrops.get(dropId)?.hasArtwork !== true,
+  );
   const holdingDrops =
     holdingCandidateIds.length > 0
-      ? await fetchHeldDropDetails(holdingsDb, holdingCandidateIds, holdingsSnapshotId)
+      ? await fetchHeldDropDetails(
+          holdingsDb,
+          holdingCandidateIds,
+          holdingsSnapshotId,
+          mediaBaseUrl,
+          catalogSnapshotId,
+          collectionsSnapshotId,
+        )
       : new Map<number, DropDetail>();
   const items = rows.map((row) => {
+    const privateDrop = privateDrops.get(row.drop_id);
     const drop =
       catalog.get(row.drop_id) ??
-      privateDrops.get(row.drop_id) ??
-      holdingDrops.get(row.drop_id) ??
+      (privateDrop
+        ? withFallbackArtwork(privateDrop, holdingDrops.get(row.drop_id))
+        : holdingDrops.get(row.drop_id)) ??
       fallbackDrop(row, mediaBaseUrl, catalogSnapshotId);
     return {
       ...drop,
@@ -548,10 +559,19 @@ export async function fetchPersonalHoldingsPage(
           collectionsSnapshotId,
         )
       : new Map<number, DropDetail>();
-  const holdingCandidateIds = privateCandidateIds.filter((dropId) => !privateDrops.has(dropId));
+  const holdingCandidateIds = privateCandidateIds.filter(
+    (dropId) => privateDrops.get(dropId)?.hasArtwork !== true,
+  );
   const holdingDrops =
     holdingCandidateIds.length > 0
-      ? await fetchHeldDropDetails(holdingsDb, holdingCandidateIds, holdingsSnapshotId)
+      ? await fetchHeldDropDetails(
+          holdingsDb,
+          holdingCandidateIds,
+          holdingsSnapshotId,
+          mediaBaseUrl,
+          catalogSnapshotId,
+          collectionsSnapshotId,
+        )
       : new Map<number, DropDetail>();
   const items = rows.map((row): PersonalHoldingReference => {
     const dropId = numeric(row.drop_id);
@@ -569,7 +589,12 @@ export async function fetchPersonalHoldingsPage(
     (left, right) => left - right,
   );
   const drops = referencedDropIds.flatMap((dropId) => {
-    const drop = catalog.get(dropId) ?? privateDrops.get(dropId) ?? holdingDrops.get(dropId);
+    const privateDrop = privateDrops.get(dropId);
+    const drop =
+      catalog.get(dropId) ??
+      (privateDrop
+        ? withFallbackArtwork(privateDrop, holdingDrops.get(dropId))
+        : holdingDrops.get(dropId));
     return drop ? [drop] : [];
   });
   const unavailableDropIds = referencedDropIds.filter(

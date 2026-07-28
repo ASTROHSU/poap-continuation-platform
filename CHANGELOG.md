@@ -10,6 +10,9 @@ stable public contract exists.
 
 ### Added
 
+- Snapshot-scoped, content-addressed Holdings artwork mappings, allowing newer
+  preserved Drops to reuse verified Collection objects or attach independently
+  verified R2 originals without ever returning mutable upstream media URLs.
 - Address-bound, exact-ID, personal-site, ZIP, JSON, CSV, and image exports now
   retain preserved hidden Drop metadata and its explicit `isHidden` state,
   while public Drop browsing and search continue to exclude hidden records.

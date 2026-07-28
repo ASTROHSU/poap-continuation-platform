@@ -6,6 +6,7 @@ import type { Bindings, PersonalHoldingsPage } from "../src/worker/types";
 const ADDRESS = "0x1111111111111111111111111111111111111111";
 const COLLECTION_OWNER = "0x2222222222222222222222222222222222222222";
 const PRIVATE_HOLDER = "0x4444444444444444444444444444444444444444";
+const PRIVATE_ARTWORK_SHA = `cd${"e".repeat(62)}`;
 
 interface TestBindings extends Bindings {
   TEST_CATALOG_FIXTURE: string;
@@ -38,7 +39,7 @@ describe("personal export manifest", () => {
       `https://poap.in/api/owners/0x${ADDRESS.slice(2).toUpperCase()}/export/manifest`,
     );
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-archive-api-version")).toContain("personal-export-v3");
+    expect(response.headers.get("x-archive-api-version")).toContain("personal-export-v4");
     expect(response.headers.get("cache-control")).toContain("max-age=0");
     await expect(response.json()).resolves.toEqual({
       schemaVersion: "poapin-personal-export-v1",
@@ -201,6 +202,8 @@ describe("paginated personal holdings", () => {
         title: "Private address-bound fixture",
         description: "Private metadata preserved in the Collections snapshot.",
         eventUrl: "https://private-holder.example.invalid/event",
+        imageUrl: `https://media.poap.in/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+        hasArtwork: true,
         isPrivate: true,
         isHidden: true,
       }),
@@ -210,6 +213,7 @@ describe("paginated personal holdings", () => {
     expect(JSON.stringify(page)).not.toContain("private catalog secret");
     expect(JSON.stringify(page)).not.toContain("private.example.invalid");
     expect(JSON.stringify(page)).not.toContain("/artwork/99.webp");
+    expect(JSON.stringify(page)).not.toContain("untrusted-private-source");
     expect(JSON.stringify(page)).not.toContain("unavailableReason");
 
     const first = await SELF.fetch(
@@ -254,6 +258,8 @@ describe("paginated personal holdings", () => {
       title: "Private address-bound fixture",
       description: "Private metadata preserved in the Collections snapshot.",
       eventUrl: "https://private-holder.example.invalid/event",
+      imageUrl: `https://media.poap.in/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+      hasArtwork: true,
       isPrivate: true,
       isHidden: true,
     });
@@ -285,6 +291,7 @@ describe("paginated personal holdings", () => {
         title: string;
         is_private: boolean;
         is_hidden: boolean;
+        artwork_url: string | null;
       }>;
     }>();
     const csv = await csvResponse.text();
@@ -294,6 +301,7 @@ describe("paginated personal holdings", () => {
       expect.objectContaining({
         drop_id: 99,
         title: "Private address-bound fixture",
+        artwork_url: `https://media.poap.in/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
         is_private: true,
         is_hidden: true,
       }),
@@ -527,6 +535,84 @@ async function seedExportBoundaryRows(): Promise<void> {
       )
     `,
   ).run();
+  await bindings.HOLDINGS_DB.prepare(
+    `
+      INSERT INTO holding_drops (
+        drop_id,
+        fancy_id,
+        title,
+        description,
+        start_date,
+        end_date,
+        expiry_date,
+        city,
+        country,
+        event_url,
+        year,
+        is_virtual,
+        is_private,
+        is_hidden,
+        channel,
+        platform,
+        location_type,
+        timezone,
+        integrator_id,
+        created_at,
+        image_url,
+        animation_url,
+        token_count,
+        transfer_count
+      ) VALUES (
+        99,
+        'holdings-private-fixture',
+        'Private address-bound fixture',
+        'Private metadata preserved in the Collections snapshot.',
+        '2026-01-01T00:00:00.000Z',
+        '2026-01-02T00:00:00.000Z',
+        NULL,
+        'Holder City',
+        'Holder Country',
+        'https://private-holder.example.invalid/event',
+        2026,
+        0,
+        1,
+        1,
+        NULL,
+        NULL,
+        NULL,
+        'UTC',
+        NULL,
+        '2026-01-01T00:00:00.000Z',
+        'https://untrusted-holdings-source.example.invalid/99.png',
+        NULL,
+        2,
+        3
+      )
+    `,
+  ).run();
+  await bindings.HOLDINGS_DB.prepare(
+    `
+      INSERT INTO holding_drop_artwork (
+        drop_id,
+        object_key,
+        sha256,
+        byte_length,
+        content_type,
+        source_url,
+        archived_at
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+    `,
+  )
+    .bind(
+      99,
+      `snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+      PRIVATE_ARTWORK_SHA,
+      2048,
+      "image/png",
+      "https://untrusted-holdings-source.example.invalid/99.png",
+      "2026-07-28T00:00:00.000Z",
+    )
+    .run();
   await bindings.COLLECTIONS_DB.prepare(
     `
       INSERT INTO collection_drop_cards (

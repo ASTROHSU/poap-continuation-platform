@@ -74,9 +74,9 @@ export const app = new Hono<AppEnv>();
 const COLLECTIONS_CACHE_SCHEMA = "collections-v3";
 const MOMENTS_CACHE_SCHEMA = "moments-v2";
 const MOMENTS_META_CACHE_SCHEMA = "public-meta-v2";
-const OWNER_CACHE_SCHEMA = "owner-v4";
-const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v3";
-const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v5";
+const OWNER_CACHE_SCHEMA = "owner-v5";
+const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v4";
+const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v6";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
 const DROP_COLLECTORS_CACHE_SCHEMA = "drop-collectors-v2";
 
@@ -1345,6 +1345,9 @@ async function resolveExactDrop(bindings: Bindings, dropId: number): Promise<Dro
     holdingsDb,
     dropId,
     bindings.HOLDINGS_SNAPSHOT_ID,
+    bindings.MEDIA_BASE_URL,
+    bindings.SNAPSHOT_ID,
+    bindings.COLLECTIONS_SNAPSHOT_ID,
   );
   const drop =
     holdingDrop.state === "available"
@@ -1356,11 +1359,12 @@ async function resolveExactDrop(bindings: Bindings, dropId: number): Promise<Dro
 
 function mergeHoldingDrop(holding: DropDetail, presentation: DropDetail | null): DropDetail {
   if (!presentation) return holding;
+  const artwork = presentation.hasArtwork ? presentation : holding;
   return {
     ...presentation,
     ...holding,
-    imageUrl: presentation.imageUrl,
-    hasArtwork: presentation.hasArtwork,
+    imageUrl: artwork.imageUrl,
+    hasArtwork: artwork.hasArtwork,
     reservationsTotal: presentation.reservationsTotal,
     reservationsMinted: presentation.reservationsMinted,
     reservationsUnminted: presentation.reservationsUnminted,

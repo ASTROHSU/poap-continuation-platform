@@ -343,6 +343,11 @@ the ZIP, with the relationship metadata retained in the image manifest. Video,
 audio, unverified media, arbitrary external URLs, and redacted or unavailable
 Drop artwork are excluded.
 
+Eligible Drop originals may come from the active fixed Archive artwork
+namespace or a content-addressed object in the active Collections or Holdings
+snapshot. The planner rejects inactive snapshots, malformed paths, and every
+mutable upstream source URL.
+
 Preparing the list does not request image bytes. A second explicit visitor
 action starts the download; no image archive runs on page load and no media is
 autoplayed. The browser reads approved immutable objects directly from
