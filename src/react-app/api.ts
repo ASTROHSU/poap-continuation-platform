@@ -41,9 +41,14 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+async function requestJson<T>(
+  path: string,
+  signal?: AbortSignal,
+  cache: RequestCache = "default",
+): Promise<T> {
   const response = await fetch(path, {
     signal,
+    cache,
     headers: { Accept: "application/json" },
   });
 
@@ -132,6 +137,7 @@ export function getOwner(address: string, cursor?: string | null, signal?: Abort
   return requestJson<OwnerPageResponse>(
     `/api/owners/${encodeURIComponent(address)}?${params}`,
     signal,
+    "no-store",
   );
 }
 
