@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -13,6 +13,7 @@ import { verifyCompassHoldingsD1Locally } from "../local-verify.mjs";
 import { captureReferencedDrops } from "../referenced-drops.mjs";
 import { captureCompassHoldingsSnapshot, snapshotInternals } from "../snapshot.mjs";
 import { buildUploadPlan } from "../upload-backup.mjs";
+import { describeFile } from "../../archive-import/lib/util.mjs";
 
 const ROWS = [
   {
@@ -405,6 +406,73 @@ test("capture writes a resumable, source-compatible SQLite with frozen counts", 
       !uploadPlan.some((object) => object.key.endsWith(".sqlite")),
       "SQLite databases are stored inside bounded package parts, not as oversized R2 objects",
     );
+
+    const artworkRoot = join(root, "artwork-archive");
+    const artworkD1Root = join(artworkRoot, "d1-artwork");
+    const artworkReleasePath = join(artworkRoot, "compass-holdings-test-v1-artwork-full.json");
+    const artworkShardPath = join(artworkD1Root, "0001.sql");
+    await mkdir(artworkD1Root, { recursive: true });
+    await writeFile(
+      artworkReleasePath,
+      `${JSON.stringify({
+        schemaVersion: "poapin-holdings-artwork-coverage-v1",
+        snapshotId: "compass-holdings-test-v1",
+        releaseId: "compass-holdings-test-v1-artwork-full",
+        objects: [
+          {
+            dropId: 10,
+            sha256: "a".repeat(64),
+            byteLength: 123,
+            r2Key:
+              "snapshots/compass-holdings-test-v1/holdings/drop-artwork/sha256/aa/" +
+              `${"a".repeat(64)}.png`,
+          },
+        ],
+      })}\n`,
+    );
+    await writeFile(artworkShardPath, "INSERT OR IGNORE INTO holding_drop_artwork VALUES (1);\n");
+    const artworkReleaseMeta = await describeFile(artworkReleasePath);
+    const artworkShardMeta = await describeFile(artworkShardPath);
+    const artworkD1Report = {
+      schemaVersion: "poapin-holdings-artwork-d1-v1",
+      snapshotId: "compass-holdings-test-v1",
+      releaseId: "compass-holdings-test-v1-artwork-full",
+      expectedRows: 1,
+      release: {
+        path: artworkReleasePath,
+        ...artworkReleaseMeta,
+      },
+      shards: [
+        {
+          path: "d1-artwork/0001.sql",
+          ...artworkShardMeta,
+        },
+      ],
+    };
+    await writeFile(join(artworkD1Root, "report.json"), `${JSON.stringify(artworkD1Report)}\n`);
+    await writeFile(
+      join(artworkD1Root, "remote-report.json"),
+      `${JSON.stringify({
+        schemaVersion: "poapin-holdings-artwork-d1-remote-v1",
+        snapshotId: "compass-holdings-test-v1",
+        releaseId: "compass-holdings-test-v1-artwork-full",
+        rows: 1,
+        releaseSha256: artworkReleaseMeta.sha256,
+      })}\n`,
+    );
+
+    const artworkUploadPlan = await buildUploadPlan(packaged.reportPath, packaged.report);
+    for (const suffix of [
+      "/artwork/coverage-release.json",
+      "/artwork/d1/report.json",
+      "/artwork/d1/remote-report.json",
+      "/artwork/d1/0001.sql",
+    ]) {
+      assert(
+        artworkUploadPlan.some((object) => object.key.endsWith(suffix)),
+        `Artwork upload plan must include ${suffix}.`,
+      );
+    }
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(root, { recursive: true, force: true });

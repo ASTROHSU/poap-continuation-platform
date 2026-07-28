@@ -39,7 +39,7 @@ describe("personal export manifest", () => {
       `https://poap.in/api/owners/0x${ADDRESS.slice(2).toUpperCase()}/export/manifest`,
     );
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-archive-api-version")).toContain("personal-export-v4");
+    expect(response.headers.get("x-archive-api-version")).toContain("personal-export-v5");
     expect(response.headers.get("cache-control")).toContain("max-age=0");
     await expect(response.json()).resolves.toEqual({
       schemaVersion: "poapin-personal-export-v1",

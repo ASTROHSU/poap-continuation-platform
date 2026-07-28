@@ -1,0 +1,25 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "poapin-holdings-artwork-ingest-20260728-v1",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-07-28",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "vars": {
+    "BUCKET_NAME": "poapin-archive",
+    "SNAPSHOT_ID": "compass-holdings-2026-07-28-v1",
+    "ARCHIVE_SNAPSHOT_ID": "2026-07-02-v1",
+    "OBJECT_PREFIX": "snapshots/",
+    "CACHE_CONTROL": "public, max-age=31536000, immutable",
+    "MAX_OBJECT_BYTES": "99614720",
+    "MAX_MULTIPART_OBJECT_BYTES": "5000000000",
+    "MAX_MULTIPART_PART_BYTES": "16777216",
+  },
+  "r2_buckets": [
+    {
+      "binding": "ARTWORK_BUCKET",
+      "bucket_name": "poapin-archive",
+    },
+  ],
+}
