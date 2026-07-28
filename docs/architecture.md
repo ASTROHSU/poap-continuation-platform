@@ -101,6 +101,15 @@ rewriting catalog routes.
 API responses may join the two datasets in application code only with bounded
 ID lists. Never implement an unbounded request fan-out.
 
+The single-record `GET /api/drops/:id` route is intentionally different from
+browse and batch APIs. It first performs one primary-key Catalog lookup. A
+public Catalog result returns immediately; a private or missing result performs
+one primary-key lookup in the newer `collection_drop_cards` projection. Exact
+lookup may return a private, non-hidden card with `isPrivate: true`, but hidden
+records remain unavailable. Cache identity includes the Collections release.
+No private row is added to browse, search, batch export, holder lists, or
+Collection projections.
+
 The personal Holdings endpoint reads up to 480 tokens with an indexed keyset
 query, then looks up complete public Drop details in `CATALOG_DB` in fixed
 96-ID statements. Catalog misses are checked against the private,
@@ -316,9 +325,10 @@ static HTTP origin and does not need the POAPin API after generation.
 
 The old CSV/JSON endpoints remain single-response exports capped at 5,000
 holdings. Their v2 rows apply the same holder-bound private enrichment and add
-`is_private`; they still do not expose a private-ID lookup. The personal-site
-flow is the complete path for larger addresses: there is no unbounded
-replacement endpoint, only a manifest plus bounded pages.
+`is_private`. Exact private Drop lookup remains a separate single-record route;
+it does not make these exports enumerable. The personal-site flow is the
+complete path for larger addresses: there is no unbounded replacement endpoint,
+only a manifest plus bounded pages.
 See [Portable personal-site export](personal-site-export.md) for response and
 package details.
 

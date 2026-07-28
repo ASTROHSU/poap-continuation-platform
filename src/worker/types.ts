@@ -176,6 +176,7 @@ export interface CatalogSummaryRow {
 }
 
 export interface CatalogDetailRow extends CatalogSummaryRow {
+  is_private?: number | null;
   description: string | null;
   end_date: string;
   event_url: string | null;
@@ -234,8 +235,8 @@ export interface DropSummary {
   hasArtwork: boolean;
   tokenCount: number;
   /**
-   * Present only when an exact-address holdings lookup proves that the
-   * queried address references a preserved private Drop.
+   * Present when a private Drop is returned by an exact ID or exact-address
+   * holdings lookup. Private Drops are never added to browse results.
    */
   isPrivate?: true;
 }
@@ -243,15 +244,20 @@ export interface DropSummary {
 export interface DropDetail extends DropSummary {
   description: string | null;
   endDate: string;
+  expiryDate?: string | null;
   eventUrl: string | null;
   channel: string | null;
   platform: string | null;
   locationType: string | null;
   timezone: string | null;
+  integratorId?: string | null;
   createdAt: string;
+  dropTransferCount?: number;
   reservationsTotal: number;
   reservationsMinted: number;
   reservationsUnminted: number;
+  featuredOn?: string | null;
+  momentsUploaded?: number | null;
 }
 
 export interface DropDetailBatch {

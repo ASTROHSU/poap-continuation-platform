@@ -235,13 +235,20 @@ describe("paginated personal holdings", () => {
     }
   });
 
-  it("does not expose held private metadata through global Drop endpoints", async () => {
+  it("opens a private Drop by exact ID without adding it to batch enumeration", async () => {
     const [detail, batch, owner] = await Promise.all([
       SELF.fetch("https://poap.in/api/drops/99"),
       SELF.fetch("https://poap.in/api/drops/export/batch?ids=99"),
       SELF.fetch(`https://poap.in/api/owners/${PRIVATE_HOLDER}?limit=5`),
     ]);
-    expect(detail.status).toBe(404);
+    expect(detail.status).toBe(200);
+    await expect(detail.json()).resolves.toMatchObject({
+      dropId: 99,
+      title: "Private address-bound fixture",
+      description: "Private metadata preserved in the Collections snapshot.",
+      eventUrl: "https://private-holder.example.invalid/event",
+      isPrivate: true,
+    });
     await expect(batch.json()).resolves.toMatchObject({
       drops: [],
       unavailableDropIds: [99],

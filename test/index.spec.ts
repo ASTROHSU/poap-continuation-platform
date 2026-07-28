@@ -130,12 +130,44 @@ describe("archive API", () => {
   it("returns details and removes unsafe event URLs", async () => {
     const response = await SELF.fetch("https://poap.in/api/drops/2");
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-archive-api-version")).toBe(
+      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v2`,
+    );
     expect(await response.json()).toMatchObject({
       dropId: 2,
       eventUrl: null,
       reservationsTotal: 2,
       reservationsMinted: 1,
     });
+  });
+
+  it("returns a private, non-hidden Drop only when its exact ID is requested", async () => {
+    const response = await SELF.fetch("https://poap.in/api/drops/1002");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      dropId: 1002,
+      fancyId: "synthetic-stream",
+      title: "Synthetic Livestream",
+      eventUrl: "https://events.example.invalid/stream",
+      tokenCount: 12,
+      reservationsTotal: 12,
+      reservationsMinted: 8,
+      reservationsUnminted: 4,
+      expiryDate: "2025-04-02T10:30:00.000",
+      integratorId: "fixture",
+      dropTransferCount: 91,
+      featuredOn: "2026-07-11T00:00:00.000Z",
+      momentsUploaded: 7,
+      imageUrl: "",
+      hasArtwork: false,
+      isPrivate: true,
+    });
+
+    const browse = await SELF.fetch("https://poap.in/api/drops?q=Synthetic%20Livestream");
+    await expect(browse.json()).resolves.toMatchObject({ items: [] });
+
+    const hidden = await SELF.fetch("https://poap.in/api/drops/1004");
+    expect(hidden.status).toBe(404);
   });
 
   it("paginates exact owner lookups without exposing address discovery", async () => {

@@ -38,6 +38,7 @@ import {
   fetchOwnerTotal,
   fetchSnapshotAt,
 } from "./repository";
+import { fetchExactCollectionDropDetail } from "./private-held-drops";
 import type { AppEnv, Bindings } from "./types";
 import {
   ApiError,
@@ -71,6 +72,7 @@ const MOMENTS_CACHE_SCHEMA = "moments-v2";
 const MOMENTS_META_CACHE_SCHEMA = "public-meta-v2";
 const OWNER_CACHE_SCHEMA = "owner-v3";
 const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v2";
+const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v2";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
 
 export function collectionsApiVersion(
@@ -546,14 +548,33 @@ app.get("/api/drops/:id", async (context) => {
       requestUrl: context.req.url,
       canonicalPath: `/api/drops/${dropId}`,
       snapshotId: context.env.SNAPSHOT_ID,
-      apiVersion: context.env.API_CACHE_VERSION,
+      apiVersion: `${collectionsApiVersion(context.env)}.${DROP_DETAIL_CACHE_SCHEMA}`,
       edgeTtlSeconds: 2_592_000,
       browserTtlSeconds: 300,
       executionCtx: context.executionCtx,
     },
     async () => {
-      const db = context.env.CATALOG_DB.withSession("first-primary");
-      const drop = await fetchDrop(db, dropId, context.env.MEDIA_BASE_URL, context.env.SNAPSHOT_ID);
+      const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
+      const catalogDrop = await fetchDrop(
+        catalogDb,
+        dropId,
+        context.env.MEDIA_BASE_URL,
+        context.env.SNAPSHOT_ID,
+      );
+      if (catalogDrop && !catalogDrop.isPrivate) return context.json(catalogDrop);
+
+      const collectionsDb = context.env.COLLECTIONS_DB.withSession("first-primary");
+      const supplemental = await fetchExactCollectionDropDetail(
+        collectionsDb,
+        dropId,
+        context.env.MEDIA_BASE_URL,
+        context.env.SNAPSHOT_ID,
+        context.env.COLLECTIONS_SNAPSHOT_ID,
+      );
+      if (supplemental.state === "hidden") {
+        throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
+      }
+      const drop = supplemental.state === "available" ? supplemental.drop : catalogDrop;
       if (!drop) throw new ApiError(404, "Drop was not found in this snapshot.", "drop_not_found");
       return context.json(drop);
     },

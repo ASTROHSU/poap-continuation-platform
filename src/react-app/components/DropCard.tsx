@@ -62,22 +62,13 @@ export function DropCard({ drop, priority = false, tokenLabel }: DropCardProps) 
 
   return (
     <article className="drop-card">
-      {drop.isPrivate ? (
-        <div
-          className="drop-card__link drop-card__link--static"
-          aria-label={`${title}, private Drop held by this address`}
-        >
-          {content}
-        </div>
-      ) : (
-        <Link
-          className="drop-card__link"
-          href={`/drop/${drop.dropId}`}
-          aria-label={`View ${title}`}
-        >
-          {content}
-        </Link>
-      )}
+      <Link
+        className="drop-card__link"
+        href={`/drop/${drop.dropId}`}
+        aria-label={drop.isPrivate ? `View private Drop ${title}` : `View ${title}`}
+      >
+        {content}
+      </Link>
     </article>
   );
 }

@@ -42,6 +42,7 @@ export interface Drop {
   description?: string | null;
   startDate: string;
   endDate?: string | null;
+  expiryDate?: string | null;
   city?: string | null;
   country?: string | null;
   year: number;
@@ -51,6 +52,7 @@ export interface Drop {
   platform?: string | null;
   locationType?: string | null;
   timezone?: string | null;
+  integratorId?: string | null;
   createdAt?: string | null;
   imageUrl: string;
   hasArtwork?: boolean;
@@ -58,7 +60,10 @@ export interface Drop {
   reservationsTotal?: number;
   reservationsMinted?: number;
   reservationsUnminted?: number;
-  /** Included only in an exact-address export or holdings response. */
+  dropTransferCount?: number;
+  featuredOn?: string | null;
+  momentsUploaded?: number | null;
+  /** Included for exact-ID and exact-address responses, never browse results. */
   isPrivate?: true;
 }
 

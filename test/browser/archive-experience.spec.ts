@@ -279,9 +279,7 @@ test("address page leads with the collection, exact relationships, and month gro
   await expect(page.locator(".drop-card__id")).toHaveCount(0);
 });
 
-test("address pages label held private Drops without linking to the global catalog", async ({
-  page,
-}) => {
+test("address pages label held private Drops and link to exact-ID detail", async ({ page }) => {
   await mockOwnerPage(page, {
     items: [holding(99, 1_773_705_600, true)],
     nextCursor: null,
@@ -291,13 +289,37 @@ test("address pages label held private Drops without linking to the global catal
 
   const card = page.locator(".drop-card").filter({ hasText: "Collected Drop 99" });
   await expect(card.getByText("Private Drop", { exact: true })).toBeVisible();
-  await expect(card.locator(".drop-card__link--static")).toHaveCount(1);
-  await expect(card.locator('a[href="/drop/99"]')).toHaveCount(0);
+  await expect(card.locator('a[href="/drop/99"]')).toHaveCount(1);
   await expect(
     page.getByText("private Drop metadata appears only when this exact address", {
       exact: false,
     }),
   ).toBeVisible();
+});
+
+test("exact private Drop detail is labeled and excluded from indexing", async ({ page }) => {
+  await page.route("**/api/drops/99", (route) =>
+    route.fulfill({
+      json: {
+        ...drop(99, "Private archive record"),
+        description: "Preserved metadata available by exact Drop ID.",
+        endDate: "2026-01-01T01:00:00.000Z",
+        eventUrl: "https://events.example.invalid/private",
+        isPrivate: true,
+      },
+    }),
+  );
+
+  await page.goto("/drop/99");
+
+  await expect(page.getByText("Private POAP Drop", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Private archive record" })).toBeVisible();
+  await expect(
+    page.getByText("available by exact Drop ID and remains excluded from archive browsing", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex,nofollow");
 });
 
 test("personal site exporter uses compact hierarchy and recognizable deployment cards", async ({
