@@ -74,9 +74,9 @@ export const app = new Hono<AppEnv>();
 const COLLECTIONS_CACHE_SCHEMA = "collections-v3";
 const MOMENTS_CACHE_SCHEMA = "moments-v2";
 const MOMENTS_META_CACHE_SCHEMA = "public-meta-v2";
-const OWNER_CACHE_SCHEMA = "owner-v5";
-const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v4";
-const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v6";
+const OWNER_CACHE_SCHEMA = "owner-v6";
+const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v5";
+const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v7";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
 const DROP_COLLECTORS_CACHE_SCHEMA = "drop-collectors-v2";
 

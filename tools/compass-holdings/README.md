@@ -116,6 +116,102 @@ back with the same digest before the row is activated. Checked-in release
 manifests under `artwork-releases/` make these incremental batches auditable;
 they do not change the identity or contents of either source SQLite database.
 
+## Archive every referenced original
+
+The artwork workflow covers every Drop referenced by the Holdings snapshot
+without duplicating media that has already been preserved:
+
+1. freeze the active fixed-Archive artwork IDs from Catalog D1;
+2. bind verified Collections publication proofs and checked-in Holdings seed
+   releases;
+3. download only the remaining canonical `assets.poap.xyz` originals into
+   bounded temporary files, trying `drop_image.gateways[type=ORIGINAL]` from
+   the bound raw metadata and the exact legacy
+   `storage.googleapis.com/poapmedia/` object before the current `image_url`;
+4. sniff the bytes independently of the filename, hash them, and conditionally
+   upload a content-addressed R2 object through a temporary HMAC Worker, using
+   authenticated 16 MiB multipart requests when an original exceeds the
+   single-request ceiling;
+5. require an authenticated exact R2 `HEAD` after every upload before recording
+   success; and
+6. generate an immutable coverage release plus bounded, idempotent D1 shards.
+
+Capture is append-only and resumable. A completed temporary file is removed
+after its remote proof is durable, so local disk usage is bounded by
+concurrency rather than total archive size. An empty response, unsupported
+bytes, policy response, or missing source remains an explicit failed record;
+each attempted canonical source and failure reason remains in the checkpoint,
+and finalization refuses to activate a partial release.
+
+After retrying all failures, `review-unavailable` can bind only deterministic
+empty, unsupported, access-denied, missing, or gone responses to the exact
+checkpoint. Transient source, local-integrity, bridge, and R2 failures are
+rejected and remain resumable work. The final coverage release counts these
+source objects separately; it never describes an unavailable original as
+archived.
+
+Create the fixed Archive index and the immutable plan:
+
+```sh
+npm run holdings:artwork -- catalog-index \
+  --output data/compass-holdings/compass-holdings-2026-07-28-v1/artwork-archive/archive-artwork-index.json \
+  --snapshot-id 2026-07-02-v1
+
+npm run holdings:artwork -- plan \
+  --input data/compass-holdings/compass-holdings-2026-07-28-v1 \
+  --archive-index data/compass-holdings/compass-holdings-2026-07-28-v1/artwork-archive/archive-artwork-index.json \
+  --collections data/collections/2026-07-22-v1
+```
+
+Deploy `artwork-bridge/wrangler.example.jsonc` under a temporary Worker name
+and set `COLLECTIONS_R2_BRIDGE_SECRET` to an unpadded base64url-encoded 32-byte
+secret both on that Worker and in the local capture process. The bridge has no
+read-body, list, overwrite, or delete route and accepts only the active
+Holdings content-addressed artwork prefix.
+
+The same bridge accepts bounded multipart create, part, complete, and abort
+operations for originals up to 5 GB. Every part body is covered by its own
+HMAC-bound SHA-256, the client re-hashes the full sequence before completion,
+and the bridge exposes no object-body read, list, overwrite, or delete route.
+
+```sh
+COLLECTIONS_R2_BRIDGE_SECRET=<operator-secret> \
+  npm run holdings:artwork -- capture \
+  --input data/compass-holdings/compass-holdings-2026-07-28-v1/artwork-archive \
+  --bridge-url https://<temporary-worker>.workers.dev \
+  --bucket poapin-archive \
+  --archive-snapshot-id 2026-07-02-v1 \
+  --concurrency 4
+```
+
+If and only if the final retry contains source objects that no approved origin
+can return, preserve the exact terminal evidence:
+
+```sh
+npm run holdings:artwork -- review-unavailable \
+  --input data/compass-holdings/compass-holdings-2026-07-28-v1/artwork-archive
+```
+
+After `capture-report.json` is complete, build the release and D1 shards, load
+them, and delete the temporary bridge:
+
+```sh
+npm run holdings:artwork -- finalize \
+  --input data/compass-holdings/compass-holdings-2026-07-28-v1/artwork-archive \
+  --release-id compass-holdings-2026-07-28-v1-artwork-full
+
+npm run holdings:artwork -- load-d1 \
+  --input data/compass-holdings/compass-holdings-2026-07-28-v1/artwork-archive/d1-artwork
+```
+
+The loader re-reads every remote `holding_drop_artwork` row in bounded keyset
+pages and compares every field to the immutable coverage release. A conflicting
+pre-existing row is never overwritten and makes the final comparison fail.
+Once that readback writes `d1-artwork/remote-report.json`, rerunning the
+snapshot's private `upload-backup` command also stores the artwork coverage
+release, D1 report, remote proof, and every SQL shard under the existing
+content-addressed package prefix.
+
 The private R2 backup stores both SQLite databases inside bounded, hashed
 package parts so it remains compatible with Wrangler's 300 MiB per-object
 upload limit. Every D1 SQL artifact is also stored as an individual object for

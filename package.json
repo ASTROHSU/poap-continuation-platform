@@ -43,6 +43,7 @@
     "holdings:load-d1": "node tools/compass-holdings/d1-loader.mjs",
     "holdings:package": "node tools/compass-holdings/cli.mjs package",
     "holdings:upload-backup": "node tools/compass-holdings/cli.mjs upload-backup",
+    "holdings:artwork": "node tools/compass-holdings/artwork-cli.mjs",
     "moments:snapshot": "node tools/moments-backup/cli.mjs snapshot",
     "moments:compare": "node tools/moments-backup/cli.mjs compare",
     "moments:verify": "node tools/moments-backup/cli.mjs verify",

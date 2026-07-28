@@ -235,7 +235,7 @@ describe("archive API", () => {
     const response = await SELF.fetch("https://poap.in/api/drops/2");
     expect(response.status).toBe(200);
     expect(response.headers.get("x-archive-api-version")).toBe(
-      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v6`,
+      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v7`,
     );
     expect(await response.json()).toMatchObject({
       dropId: 2,
@@ -445,7 +445,7 @@ describe("archive API", () => {
     const first = await SELF.fetch(`https://poap.in/api/owners/${ADDRESS}?limit=1`);
     expect(first.status).toBe(200);
     expect(first.headers.get("x-archive-api-version")).toBe(
-      `v1.owner-v5.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
+      `v1.owner-v6.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
     );
     const page = await first.json<{
       address: string;

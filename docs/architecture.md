@@ -105,6 +105,23 @@ the observed digest, byte length, MIME type, source URL, and archive time.
 Responses expose only the immutable R2 path; the mutable source URL remains
 preservation evidence in D1.
 
+The full-original pipeline first partitions every Holdings-referenced Drop
+against the active Archive artwork index and the verified Collections media
+release. Only the uncovered remainder is downloaded and uploaded. Its
+temporary HMAC bridge permits authenticated `HEAD` and conditional
+`PUT-if-absent` only for the active Holdings content-addressed prefix. Durable
+checkpoint records are written only after exact remote size, SHA-256, MIME, and
+metadata verification; D1 activation is generated only from a complete
+coverage release. Oversized originals use the same prefix through bounded,
+individually hashed and authenticated multipart requests; the full local byte
+sequence is re-hashed before completion. Source recovery is also
+snapshot-bound: the pipeline tries
+canonical `drop_image.gateways[type=ORIGINAL]` URLs preserved in the raw Drop
+metadata and the path-equivalent legacy POAP Media Google Storage object before
+the current `image_url`, records every failed attempt, and never follows a
+source outside the exact `assets.poap.xyz` or
+`storage.googleapis.com/poapmedia/` origins.
+
 API responses may join the two datasets in application code only with bounded
 ID lists. Never implement an unbounded request fan-out.
 

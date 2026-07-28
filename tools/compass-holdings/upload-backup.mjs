@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve, sep } from "node:path";
@@ -170,6 +170,57 @@ export async function buildUploadPlan(reportPath, report) {
       byteLength: artifact.byteLength,
     });
   }
+  const artworkRoot = resolve(captureRoot, "artwork-archive");
+  const artworkD1ReportPath = resolve(artworkRoot, "d1-artwork/report.json");
+  if (await fileExists(artworkD1ReportPath)) {
+    const artworkD1Report = JSON.parse(await readFile(artworkD1ReportPath, "utf8"));
+    const artworkRemoteReportPath = resolve(artworkRoot, "d1-artwork/remote-report.json");
+    const artworkRemoteReport = JSON.parse(await readFile(artworkRemoteReportPath, "utf8"));
+    const artworkReleasePath = await safeResolveExisting(
+      captureRoot,
+      artworkD1Report.release?.path ?? "",
+    );
+    const artworkRelease = JSON.parse(await readFile(artworkReleasePath, "utf8"));
+    const artworkReleaseMeta = await describeFile(artworkReleasePath);
+    invariant(
+      artworkD1Report.schemaVersion === "poapin-holdings-artwork-d1-v1" &&
+        artworkD1Report.snapshotId === report.snapshotId &&
+        artworkRelease.schemaVersion === "poapin-holdings-artwork-coverage-v1" &&
+        artworkRelease.snapshotId === report.snapshotId &&
+        artworkRelease.releaseId === artworkD1Report.releaseId &&
+        artworkRelease.objects?.length === artworkD1Report.expectedRows &&
+        artworkReleaseMeta.sha256 === artworkD1Report.release.sha256 &&
+        artworkReleaseMeta.byteLength === artworkD1Report.release.byteLength &&
+        artworkRemoteReport.schemaVersion === "poapin-holdings-artwork-d1-remote-v1" &&
+        artworkRemoteReport.snapshotId === report.snapshotId &&
+        artworkRemoteReport.releaseId === artworkD1Report.releaseId &&
+        artworkRemoteReport.rows === artworkD1Report.expectedRows &&
+        artworkRemoteReport.releaseSha256 === artworkD1Report.release.sha256,
+      "Artwork D1 backup does not have a complete remote proof.",
+    );
+    for (const [name, absolutePath] of [
+      ["artwork/coverage-release.json", artworkReleasePath],
+      ["artwork/d1/report.json", artworkD1ReportPath],
+      ["artwork/d1/remote-report.json", artworkRemoteReportPath],
+    ]) {
+      objects.push({
+        key: `${prefix}/${name}`,
+        absolutePath,
+        contentType: "application/json",
+        ...(await describeFile(absolutePath)),
+      });
+    }
+    for (const shard of artworkD1Report.shards ?? []) {
+      const absolutePath = safeResolve(artworkRoot, shard.path);
+      objects.push({
+        key: `${prefix}/artwork/d1/${basename(shard.path)}`,
+        absolutePath,
+        contentType: "application/sql",
+        sha256: shard.sha256,
+        byteLength: shard.byteLength,
+      });
+    }
+  }
   const keys = new Set();
   for (const object of objects) {
     invariant(!keys.has(object.key), `R2 upload plan repeats ${object.key}.`);
@@ -181,6 +232,15 @@ export async function buildUploadPlan(reportPath, report) {
     );
   }
   return objects;
+}
+
+async function fileExists(path) {
+  try {
+    return (await stat(path)).isFile();
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 function validateBackupReport(report) {
@@ -299,6 +359,16 @@ function safeResolve(root, path) {
     throw new Error(`Backup path escapes its root: ${path}.`);
   }
   return absolute;
+}
+
+async function safeResolveExisting(root, path) {
+  const canonicalRoot = await realpath(root);
+  const canonicalPath = await realpath(resolve(root, path));
+  const local = relative(canonicalRoot, canonicalPath);
+  if (local === ".." || local.startsWith(`..${sep}`)) {
+    throw new Error(`Backup path escapes its root: ${path}.`);
+  }
+  return canonicalPath;
 }
 
 function normalizeOptions(options) {
