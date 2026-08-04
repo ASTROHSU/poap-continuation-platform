@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-POAPin Archive is currently pre-release. Security fixes are applied to the
+POAP 留存計畫 is currently pre-release. Security fixes are applied to the
 latest code on `main` and deployed to the public site. Historical commits,
 forks, local imports, and unofficial deployments are not supported by this
 policy.
@@ -10,8 +10,8 @@ policy.
 ## Report a vulnerability
 
 Please do not open a public issue for a suspected vulnerability. Email
-[kira@glorylab.xyz](mailto:kira@glorylab.xyz) with the subject
-`[POAPin Archive Security]` and include:
+[poap@stevechoice.org](mailto:poap@stevechoice.org) with the subject
+`[POAP Continuation Security]` and include:
 
 - the affected route, component, or commit;
 - a clear description of the impact;

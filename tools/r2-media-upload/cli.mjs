@@ -39,6 +39,8 @@ Required:
 
 Input and safety:
   --source <path|url>       ZIP source (default: official POAP Archive URL).
+  --media-base-url <url>    Public HTTPS origin used by the reviewed manifest
+                            (default: https://media.poap.in).
   --allow-unverified-source
                             Disable the pinned byte/hash/count checks. Development only.
   --limit <count>           Process only this many new artworks (partial smoke test).
@@ -81,6 +83,7 @@ export function parseCliOptions(argv) {
       "snapshot-id": { type: "string" },
       manifest: { type: "string" },
       source: { type: "string", default: DEFAULT_SOURCE_URL },
+      "media-base-url": { type: "string", default: "https://media.poap.in" },
       "allow-unverified-source": { type: "boolean", default: false },
       limit: { type: "string" },
       "max-entry-mib": { type: "string", default: String(DEFAULT_MAX_ENTRY_BYTES / 1024 / 1024) },
@@ -117,6 +120,7 @@ export function parseCliOptions(argv) {
   const limit =
     values.limit === undefined ? null : boundedInteger(values.limit, "--limit", 1, 1_000_000);
   const verifyKnownSource = !values["allow-unverified-source"];
+  const mediaBaseUrl = parseMediaBaseUrl(values["media-base-url"]);
   if (values["bridge-url"] && (values.endpoint || values["account-id"])) {
     throw optionError("--bridge-url cannot be combined with --endpoint or --account-id.");
   }
@@ -126,6 +130,7 @@ export function parseCliOptions(argv) {
     snapshotId,
     manifestPath: values.manifest,
     sourceValue: values.source,
+    mediaBaseUrl,
     accountId: values["account-id"],
     endpointValue: values.endpoint,
     bridgeUrlValue: values["bridge-url"],
@@ -145,6 +150,26 @@ export function parseCliOptions(argv) {
     expectedSourceSha256: verifyKnownSource ? DEFAULT_SOURCE_SHA256 : null,
     expectedArtworkCount: verifyKnownSource ? DEFAULT_ARTWORK_COUNT : null,
   };
+}
+
+function parseMediaBaseUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw optionError("--media-base-url must be a valid HTTPS origin.");
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    (url.pathname !== "/" && url.pathname !== "")
+  ) {
+    throw optionError("--media-base-url must be a valid HTTPS origin without a path.");
+  }
+  return url.origin;
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -180,6 +205,7 @@ export async function main(argv = process.argv.slice(2)) {
     const manifest = await loadArtworkManifest(config.manifestPath, {
       snapshotId: config.snapshotId,
       cacheControl: config.cacheControl,
+      mediaBaseUrl: config.mediaBaseUrl,
     });
     let uploader = null;
     let bucket = null;

@@ -10,6 +10,7 @@ import { deflateRawSync } from "node:zlib";
 import { parseCliOptions } from "../cli.mjs";
 import { JsonlCheckpoint, createMemoryCheckpoint } from "../lib/checkpoint.mjs";
 import { createMemoryManifest, loadArtworkManifest } from "../lib/manifest.mjs";
+import { openArchiveSource } from "../lib/source.mjs";
 import { uploadArtworkArchive } from "../lib/pipeline.mjs";
 import {
   createR2Target,
@@ -362,6 +363,81 @@ test("manifest loading preserves the reviewed object key and rejects an old unsc
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("manifest loading accepts an explicitly reviewed custom media origin", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "poapin-media-custom-origin-"));
+  try {
+    const manifestPath = join(directory, "artwork-manifest.ndjson");
+    const key = `snapshots/${SNAPSHOT_ID}/artwork/42.webp`;
+    const row = {
+      snapshotId: SNAPSHOT_ID,
+      dropId: 42,
+      object: {
+        key,
+        contentType: "image/webp",
+        cacheControl: CACHE_CONTROL,
+        publicUrl: `https://archive-media.stevechoice.org/${key}`,
+      },
+      source: { kind: "zip", path: "artwork/42.webp", byteLength: 19, crc32: "deadbeef" },
+      eligibleForPublish: true,
+    };
+    await writeFile(manifestPath, `${JSON.stringify(row)}\n`);
+    const manifest = await loadArtworkManifest(manifestPath, {
+      snapshotId: SNAPSHOT_ID,
+      cacheControl: CACHE_CONTROL,
+      mediaBaseUrl: "https://archive-media.stevechoice.org",
+    });
+    assert.equal(manifest.get("artwork/42.webp").publicUrl, row.object.publicUrl);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("remote archive source resumes an interrupted response at the exact byte offset", async () => {
+  const expected = Buffer.from("0123456789abcdef");
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    calls.push(options.headers);
+    if (calls.length === 1) {
+      let pullCount = 0;
+      const body = new ReadableStream({
+        pull(controller) {
+          pullCount += 1;
+          if (pullCount === 1) controller.enqueue(expected.subarray(0, 6));
+          else controller.error(new TypeError("terminated"));
+        },
+      });
+      const response = new Response(body, {
+        status: 200,
+        headers: {
+          "content-length": String(expected.byteLength),
+          etag: '"stable-archive"',
+        },
+      });
+      Object.defineProperty(response, "url", { value: "https://example.com/archive.zip" });
+      return response;
+    }
+    assert.equal(options.headers.Range, "bytes=6-");
+    assert.equal(options.headers["If-Range"], '"stable-archive"');
+    const response = new Response(expected.subarray(6), {
+      status: 206,
+      headers: {
+        "content-length": String(expected.byteLength - 6),
+        "content-range": `bytes 6-${expected.byteLength - 1}/${expected.byteLength}`,
+      },
+    });
+    Object.defineProperty(response, "url", { value: "https://example.com/archive.zip" });
+    return response;
+  };
+  const source = await openArchiveSource("https://example.com/archive.zip", {
+    fetchImpl,
+    retryDelayMs: 0,
+  });
+  const chunks = [];
+  for await (const chunk of source.stream) chunks.push(chunk);
+  assert.deepEqual(Buffer.concat(chunks), expected);
+  assert.equal(calls.length, 2);
 });
 
 test("checkpoint repair keeps completed keys after a truncated final write", async () => {

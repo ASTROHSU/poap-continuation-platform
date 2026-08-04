@@ -1,4 +1,4 @@
-# Contributing to POAPin Archive
+# Contributing to POAP 留存計畫
 
 Thank you for helping keep public memories accessible. Contributions should
 make the archive easier to understand, safer to operate, or cheaper to keep
@@ -34,6 +34,15 @@ npm test
 npx playwright install chromium
 npm run test:browser
 npm run build
+
+cd frontend-astro
+npm ci
+npm run build
+
+cd ../contracts
+npm ci
+npm run build
+npm run test:node
 ```
 
 Use `npm run check` when changing Worker bindings, routing, or build behavior; it

@@ -1,6 +1,10 @@
 # Dependencies and build output
 node_modules/
+node_modules.icloud-backup-*/
 dist/
+build/events/
+build/secrets/
+build/backups/
 coverage/
 playwright-report/
 test-results/
@@ -13,8 +17,13 @@ test-results/
 tools/collections-backup/bridge/wrangler.local.jsonc
 tools/moments-media/bridge/wrangler.local.jsonc
 wrangler.*.local.jsonc
+wrangler.pilot.jsonc
 .env*
 !.env.example
+
+# Deployment-specific event definitions stay local. Commit only *.example.json.
+events/pilot.json
+events/*.local.json
 
 # Imported archive material never belongs in Git
 archive.zip
@@ -35,3 +44,6 @@ firepit-log.txt
 .eslintcache
 .stylelintcache
 *.tgz
+*.icloud-placeholder
+**/.astro/
+**/.vercel/

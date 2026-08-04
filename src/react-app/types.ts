@@ -5,6 +5,29 @@ export interface ArchiveCounts {
   artworks: number;
 }
 
+export interface AppConfig {
+  mode: "combined" | "live-only";
+  walletProvisioning: WalletProvisioningConfig;
+}
+
+export interface WalletProvisioningConfig {
+  mode: "disabled" | "magic-pregen";
+  enabled: boolean;
+  publishableKey: string | null;
+}
+
+export interface EmailWallet {
+  provider: "magic-pregen";
+  status: "provisioning" | "ready" | "failed";
+  address: `0x${string}` | null;
+  updatedAt: string;
+}
+
+export interface EmailWalletResponse {
+  config: WalletProvisioningConfig;
+  wallet: EmailWallet | null;
+}
+
 export interface ArchiveMeta {
   snapshotId: string;
   snapshotAt: string;
@@ -35,6 +58,112 @@ export interface MomentsMeta {
 export interface AddressResolution {
   name: string;
   address: string;
+}
+
+export interface LiveEvent {
+  eventId: string;
+  slug: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  eventUrl: string | null;
+  startsAt: string;
+  claimOpensAt: string;
+  claimClosesAt: string;
+  chainId: number;
+  contractAddress: string | null;
+  tokenId: string | null;
+  maxSupply: number;
+  claimedCount: number;
+  mintedCount: number;
+  claimMode: "unique" | "shared";
+  status: "draft" | "published" | "closed";
+}
+
+export interface LiveHolding extends LiveEvent {
+  claimedAt: string;
+  mintStatus: "reserved" | "minted";
+  mintedTxHash: string | null;
+  mintedAt: string | null;
+  ownershipSource: "claim-record" | "chain-index";
+  chainSyncedAt: string | null;
+  chainFinalizedBlock: number | null;
+}
+
+export interface LiveHoldingsResponse {
+  address: string;
+  items: LiveHolding[];
+}
+
+export interface LiveClaimResponse {
+  eventId: string;
+  slug: string;
+  address: string;
+  claimedAt: string;
+  mintStatus: "reserved" | "ready" | "minted";
+  mintedTxHash: string | null;
+  mintAuthorization: MintAuthorization | null;
+}
+
+export interface MintAuthorization {
+  chainId: number;
+  contractAddress: `0x${string}`;
+  tokenId: string;
+  account: `0x${string}`;
+  deadline: number;
+  nonce: `0x${string}`;
+  signature: `0x${string}`;
+}
+
+export interface LiveMintResponse {
+  eventId: string;
+  slug: string;
+  address: string;
+  mintStatus: "minted";
+  mintedAt: string;
+  transactionHash: `0x${string}`;
+  explorerUrl: string;
+}
+
+export interface LiveRelayResponse {
+  eventId: string;
+  slug: string;
+  address: string;
+  transactionHash: `0x${string}`;
+  explorerUrl: string;
+}
+
+export interface EmailReservation {
+  reservationId: string;
+  reservedAt: string;
+  boundAddress: `0x${string}` | null;
+  claimedAt: string | null;
+  mintStatus: "reserved" | "ready" | "minted";
+  mintedTxHash: `0x${string}` | null;
+  mintedAt: string | null;
+  event: LiveEvent;
+}
+
+export interface EmailReservationsResponse {
+  items: EmailReservation[];
+  walletConfig: WalletProvisioningConfig;
+  wallet: EmailWallet | null;
+}
+
+export interface EmailChallengeResponse {
+  status: "verification_sent";
+  debugMagicLink?: string;
+}
+
+export interface EmailVerificationResponse {
+  purpose: "reserve" | "login";
+  reservation: EmailReservation | null;
+  wallet: EmailWallet | null;
+  redirectTo: string;
+}
+
+export interface EmailBindResponse extends EmailReservation {
+  mintAuthorization: MintAuthorization | null;
 }
 
 export interface Drop {

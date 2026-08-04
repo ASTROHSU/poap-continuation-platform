@@ -23,6 +23,7 @@ import {
 } from "../src/worker/validation";
 
 const ADDRESS = "0x1111111111111111111111111111111111111111";
+const APP_MEDIA_BASE_URL = "https://media.example.invalid";
 const HOLDING_ARTWORK_SHA = `ab${"c".repeat(62)}`;
 const CATALOG_FALLBACK_ARTWORK_SHA = `de${"f".repeat(62)}`;
 interface TestBindings extends Bindings {
@@ -200,7 +201,7 @@ describe("archive API", () => {
     }>();
     expect(firstPage.items[0]).toMatchObject({
       dropId: 2,
-      imageUrl: "https://media.poap.in/snapshots/2026-07-02-v1/artwork/2.webp",
+      imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/artwork/2.webp`,
     });
 
     const params = new URLSearchParams({ limit: "1", cursor: firstPage.nextCursor });
@@ -266,7 +267,7 @@ describe("archive API", () => {
       title: "Graph Hidden Drop",
       isHidden: true,
       hasArtwork: true,
-      imageUrl: `https://media.poap.in/snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/ab/${HOLDING_ARTWORK_SHA}.png`,
+      imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/ab/${HOLDING_ARTWORK_SHA}.png`,
     });
 
     const owner = await SELF.fetch(
@@ -304,7 +305,7 @@ describe("archive API", () => {
           dropId: 3,
           title: "DevCon1",
           hasArtwork: true,
-          imageUrl: `https://media.poap.in/snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/de/${CATALOG_FALLBACK_ARTWORK_SHA}.png`,
+          imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/de/${CATALOG_FALLBACK_ARTWORK_SHA}.png`,
         }),
       ],
     });
@@ -468,6 +469,54 @@ describe("archive API", () => {
     expect(nextPage.nextCursor).toBeNull();
   });
 
+  it("serves core ZIP holdings without requiring Collections or Moments", async () => {
+    const response = await SELF.fetch(`https://poap.in/api/archive/owners/${ADDRESS}?limit=1`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-archive-api-version")).toBe("v1.archive-core.owner-v6");
+    await expect(response.json()).resolves.toMatchObject({
+      address: ADDRESS,
+      total: 2,
+      uniqueDrops: 2,
+      items: [
+        expect.objectContaining({
+          poapId: 2,
+          dropId: 2,
+          imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/artwork/2.webp`,
+        }),
+      ],
+    });
+  });
+
+  it("serves core ZIP Drop metadata for the collection detail view", async () => {
+    const response = await SELF.fetch("https://poap.in/api/archive/drops/2");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-archive-api-version")).toBe("v1.archive-core.drop-detail-v1");
+    await expect(response.json()).resolves.toMatchObject({
+      dropId: 2,
+      title: "#DeFi Summit",
+      description: expect.any(String),
+      tokenCount: 1,
+      imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/artwork/2.webp`,
+    });
+  });
+
+  it("serves only current-snapshot archive artwork from the dedicated bucket", async () => {
+    const key = "snapshots/2026-07-02-v1/artwork/2.webp";
+    await bindings.ARCHIVE_MEDIA_BUCKET.put(key, new Uint8Array([82, 73, 70, 70]), {
+      httpMetadata: { contentType: "image/webp" },
+    });
+    const response = await SELF.fetch(`https://poap.in/media/archive/${key}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([82, 73, 70, 70]));
+
+    const wrongSnapshot = await SELF.fetch(
+      "https://poap.in/media/archive/snapshots/other/artwork/2.webp",
+    );
+    expect(wrongSnapshot.status).toBe(404);
+  });
+
   it("streams a versioned JSON owner export", async () => {
     const response = await SELF.fetch(`https://poap.in/api/owners/${ADDRESS}/export.json`);
     expect(response.status).toBe(200);
@@ -483,7 +532,7 @@ describe("archive API", () => {
     expect(body.count).toBe(2);
     expect(body.tokens).toHaveLength(2);
     expect(body.tokens[0]?.artwork_url).toBe(
-      "https://media.poap.in/snapshots/2026-07-02-v1/artwork/2.webp",
+      `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/artwork/2.webp`,
     );
   });
 
@@ -635,7 +684,7 @@ describe("collections API", () => {
       const archivePage = await (
         await SELF.fetch("https://poap.in/api/collections/101/items?limit=1")
       ).json<{ items: Array<{ drop: { imageUrl: string | null } | null }> }>();
-      expect(archivePage.items[0]?.drop?.imageUrl).toBe(`https://media.poap.in/${archiveKey}`);
+      expect(archivePage.items[0]?.drop?.imageUrl).toBe(`${APP_MEDIA_BASE_URL}/${archiveKey}`);
 
       const sha256 = `34${"d".repeat(62)}`;
       const collectionKey =
@@ -646,7 +695,7 @@ describe("collections API", () => {
         await SELF.fetch("https://poap.in/api/collections/101/items?limit=2")
       ).json<{ items: Array<{ drop: { imageUrl: string | null } | null }> }>();
       expect(collectionPage.items[0]?.drop?.imageUrl).toBe(
-        `https://media.poap.in/${collectionKey}`,
+        `${APP_MEDIA_BASE_URL}/${collectionKey}`,
       );
     } finally {
       await setObjectKey(original?.image_object_key ?? null);
@@ -684,10 +733,8 @@ describe("collections API", () => {
     expect(detail.snapshotId).toBe("collections-2026-07-22-v1");
     expect(detail.collection).toMatchObject({
       collectionId: 101,
-      logoUrl:
-        "https://media.poap.in/snapshots/collections-2026-07-22-v1/collections/media/sha256/11/1111111111111111111111111111111111111111111111111111111111111111.png",
-      bannerUrl:
-        "https://media.poap.in/snapshots/collections-2026-07-22-v1/collections/media/sha256/22/2222222222222222222222222222222222222222222222222222222222222222.jpg",
+      logoUrl: `${APP_MEDIA_BASE_URL}/snapshots/collections-2026-07-22-v1/collections/media/sha256/11/1111111111111111111111111111111111111111111111111111111111111111.png`,
+      bannerUrl: `${APP_MEDIA_BASE_URL}/snapshots/collections-2026-07-22-v1/collections/media/sha256/22/2222222222222222222222222222222222222222222222222222222222222222.jpg`,
       externalUrl: "https://artist.example.invalid/",
     });
     expect(detail.collection).not.toHaveProperty("createdBy");

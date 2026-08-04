@@ -1,4 +1,5 @@
 import type {
+  AppConfig,
   ArchiveMeta,
   CollectionExportPage,
   CollectionDetailResponse,
@@ -15,6 +16,16 @@ import type {
   DropSort,
   EventType,
   HeldDropCollectionMembershipsResponse,
+  LiveClaimResponse,
+  LiveEvent,
+  LiveHoldingsResponse,
+  LiveMintResponse,
+  LiveRelayResponse,
+  EmailBindResponse,
+  EmailChallengeResponse,
+  EmailReservationsResponse,
+  EmailVerificationResponse,
+  EmailWalletResponse,
   MomentAuthorExportPage,
   MomentTaggedExportPage,
   MomentDetail,
@@ -28,6 +39,21 @@ import type {
   PersonalHoldingsPage,
   AddressResolution,
 } from "./types";
+import {
+  demoBindReservation,
+  demoClaim,
+  demoConfirmMint,
+  demoConfirmReservationMint,
+  demoGetEmailReservations,
+  demoGetEvent,
+  demoGetHoldings,
+  demoLogout,
+  demoRelayMint,
+  demoRequestEmailLogin,
+  demoReserveByEmail,
+  demoVerifyEmail,
+  isDemoMode,
+} from "./demo-api";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -81,6 +107,226 @@ function parseRetryAfter(value: string | null): number | null {
 
 export function getMeta(signal?: AbortSignal) {
   return requestJson<ArchiveMeta>("/api/meta", signal);
+}
+
+export function getAppConfig(signal?: AbortSignal) {
+  if (isDemoMode()) {
+    return Promise.resolve({
+      mode: "live-only",
+      walletProvisioning: {
+        mode: "disabled",
+        enabled: false,
+        publishableKey: null,
+      },
+    } as const);
+  }
+  return requestJson<AppConfig>("/api/app-config", signal, "no-store");
+}
+
+export function getLiveEvent(slug: string, signal?: AbortSignal) {
+  if (isDemoMode()) return Promise.resolve(demoGetEvent());
+  return requestJson<LiveEvent>(`/api/live/events/${encodeURIComponent(slug)}`, signal, "no-store");
+}
+
+export async function claimLiveEvent(
+  slug: string,
+  input: { code: string; address: string },
+  signal?: AbortSignal,
+) {
+  if (isDemoMode()) return demoClaim(input.address);
+  const response = await fetch(`/api/live/events/${encodeURIComponent(slug)}/claims`, {
+    method: "POST",
+    signal,
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { error?: unknown };
+      if (typeof body.error === "string" && body.error) message = body.error;
+    } catch {
+      // Keep the status-based fallback.
+    }
+    throw new ApiError(
+      response.status,
+      message,
+      parseRetryAfter(response.headers.get("Retry-After")),
+    );
+  }
+  return (await response.json()) as LiveClaimResponse;
+}
+
+export async function confirmLiveMint(
+  slug: string,
+  input: { code: string; address: string; transactionHash: `0x${string}` },
+  signal?: AbortSignal,
+) {
+  if (isDemoMode()) return demoConfirmMint(input.address);
+  const response = await fetch(`/api/live/events/${encodeURIComponent(slug)}/mints`, {
+    method: "POST",
+    signal,
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { error?: unknown };
+      if (typeof body.error === "string" && body.error) message = body.error;
+    } catch {
+      // Keep the status-based fallback.
+    }
+    throw new ApiError(
+      response.status,
+      message,
+      parseRetryAfter(response.headers.get("Retry-After")),
+    );
+  }
+  return (await response.json()) as LiveMintResponse;
+}
+
+export function relayLiveEventMint(
+  slug: string,
+  input: { code: string; address: string },
+  signal?: AbortSignal,
+) {
+  if (isDemoMode()) return Promise.resolve(demoRelayMint(input.address));
+  return requestMutation<LiveRelayResponse>(
+    `/api/live/events/${encodeURIComponent(slug)}/relay`,
+    input,
+    signal,
+  );
+}
+
+export function getLiveHoldings(address: string, signal?: AbortSignal) {
+  if (isDemoMode()) return Promise.resolve(demoGetHoldings(address));
+  return requestJson<LiveHoldingsResponse>(
+    `/api/live/owners/${encodeURIComponent(address)}`,
+    signal,
+    "no-store",
+  );
+}
+
+export function reserveLiveEventByEmail(
+  slug: string,
+  input: { code: string; email: string },
+  signal?: AbortSignal,
+) {
+  if (isDemoMode()) return Promise.resolve(demoReserveByEmail(input.email));
+  return requestMutation<EmailChallengeResponse>(
+    `/api/live/events/${encodeURIComponent(slug)}/email-reservations`,
+    input,
+    signal,
+  );
+}
+
+export function requestEmailLogin(email: string, signal?: AbortSignal) {
+  if (isDemoMode()) return Promise.resolve(demoRequestEmailLogin(email));
+  return requestMutation<EmailChallengeResponse>("/api/live/email/login", { email }, signal);
+}
+
+export function verifyEmailMagicLink(token: string, signal?: AbortSignal) {
+  if (isDemoMode()) return Promise.resolve(demoVerifyEmail(token));
+  return requestMutation<EmailVerificationResponse>("/api/live/email/verify", { token }, signal);
+}
+
+export function getEmailReservations(signal?: AbortSignal) {
+  if (isDemoMode()) {
+    const result = demoGetEmailReservations();
+    return result
+      ? Promise.resolve(result)
+      : Promise.reject(new ApiError(401, "請先用 Email 登入展示收藏。"));
+  }
+  return requestJson<EmailReservationsResponse>("/api/live/email/reservations", signal, "no-store");
+}
+
+export function getEmailWallet(signal?: AbortSignal) {
+  return requestJson<EmailWalletResponse>("/api/live/email/wallet", signal, "no-store");
+}
+
+export function provisionEmailWallet(email: string, signal?: AbortSignal) {
+  return requestMutation<EmailWalletResponse>("/api/live/email/wallet", { email }, signal);
+}
+
+export function bindEmailReservation(reservationId: string, address: string, signal?: AbortSignal) {
+  if (isDemoMode()) return Promise.resolve(demoBindReservation(address));
+  return requestMutation<EmailBindResponse>(
+    `/api/live/email/reservations/${encodeURIComponent(reservationId)}/bind`,
+    { address },
+    signal,
+  );
+}
+
+export function confirmEmailReservationMint(
+  reservationId: string,
+  input: { address: string; transactionHash: `0x${string}` },
+  signal?: AbortSignal,
+) {
+  if (isDemoMode()) return Promise.resolve(demoConfirmReservationMint(input.address));
+  return requestMutation<LiveMintResponse>(
+    `/api/live/email/reservations/${encodeURIComponent(reservationId)}/mints`,
+    input,
+    signal,
+  );
+}
+
+export function relayEmailReservationMint(
+  reservationId: string,
+  address: string,
+  signal?: AbortSignal,
+) {
+  if (isDemoMode()) return Promise.resolve(demoRelayMint(address));
+  return requestMutation<LiveRelayResponse>(
+    `/api/live/email/reservations/${encodeURIComponent(reservationId)}/relay`,
+    { address },
+    signal,
+  );
+}
+
+export function logoutEmailSession(signal?: AbortSignal) {
+  if (isDemoMode()) {
+    demoLogout();
+    return Promise.resolve({ status: "signed_out" } as const);
+  }
+  return requestMutation<{ status: "signed_out" }>("/api/live/email/logout", {}, signal);
+}
+
+async function requestMutation<T>(path: string, input: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    signal,
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { error?: unknown };
+      if (typeof body.error === "string" && body.error) message = body.error;
+    } catch {
+      // Keep the status-based fallback.
+    }
+    throw new ApiError(
+      response.status,
+      message,
+      parseRetryAfter(response.headers.get("Retry-After")),
+    );
+  }
+  return (await response.json()) as T;
 }
 
 export function getCollectionsMeta(signal?: AbortSignal) {

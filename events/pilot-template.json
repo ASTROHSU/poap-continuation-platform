@@ -1,0 +1,17 @@
+{
+  "eventId": "event-example-pilot",
+  "slug": "example-pilot",
+  "title": "範例活動數位紀念",
+  "description": "用來驗證 QR 領取、Magic Email 錢包、Gas 代付與收藏查詢的範例活動。",
+  "imageUrl": "/brand/logo_poap.svg",
+  "imageFile": "../public/brand/logo_poap.svg",
+  "eventUrl": null,
+  "startsAt": "2027-01-15T06:00:00.000Z",
+  "claimOpensAt": "2027-01-14T00:00:00.000Z",
+  "claimClosesAt": "2027-02-15T15:59:59.999Z",
+  "maxSupply": 20,
+  "claimCount": 20,
+  "claimMode": "shared",
+  "chainId": 84532,
+  "publicBaseUrl": "https://badge.example.org"
+}

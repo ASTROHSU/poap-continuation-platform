@@ -1,4 +1,84 @@
-# POAPin Archive
+# POAP 留存計畫
+
+這是一套自管的數位活動紀念平台。專案以 Glory Lab 的
+[POAPin Archive](https://github.com/glorylab/poapin-archive) 為基礎，保留固定 POAP
+歷史快照的瀏覽能力，並加入可持續運作的新發行流程。
+
+公開站：[poap.blocktrend.today](https://poap.blocktrend.today)
+
+> [!IMPORTANT]
+> 本專案不是 POAP 官方服務。歷史 POAP 與新活動紀念分別來自不同智慧合約；系統只在同一個
+> 收藏介面中整合呈現，不會把新憑證宣稱為官方 POAP。
+
+## 現有功能
+
+- 查詢歷史 POAP Archive 與目前鏈上持有人。
+- 以共用或單次 QR／領取連結發放活動紀念。
+- Email 使用者透過 Magic OTP 取得 Embedded Wallet，驗證後自動完成領取。
+- ENS 或 Ethereum 地址可直接作為收件地址。
+- 由發行方 relayer 代付 Base 鑄造 Gas。
+- 以 Cloudflare Workers、D1 與 R2 提供 API、索引與媒體。
+- 以 Astro、React islands 與 Tailwind CSS 提供公開前端。
+
+## 專案結構
+
+| 路徑                    | 用途                                                 |
+| ----------------------- | ---------------------------------------------------- |
+| `frontend-astro/`       | 目前公開使用的 Astro 前端                            |
+| `src/worker/`           | Cloudflare Worker API、領取、Email、Magic 與鏈上索引 |
+| `contracts/`            | ERC-1155 活動紀念智慧合約                            |
+| `tools/live-event/`     | 建立活動、QR、匯入、稽核與備份工具                   |
+| `tools/archive-import/` | 歷史 Archive 的 D1／R2 匯入工具                      |
+| `migrations/`           | D1 schema 與 migrations                              |
+
+## 本機開發
+
+需要 Node.js 22 與 npm：
+
+```bash
+npm ci
+cp .dev.vars.example .dev.vars
+npm run db:setup:local
+npm run dev
+```
+
+Astro 前端：
+
+```bash
+cd frontend-astro
+npm ci
+npm run dev
+```
+
+部署前請複製 `wrangler.pilot.example.jsonc`，建立自己的 Cloudflare D1、R2 與 Worker
+設定。不要提交實際的 `wrangler.pilot.jsonc`、`.dev.vars`、活動 access code、私鑰或部署輸出。
+
+## 文件
+
+- [明早只需要完成的四步](docs/MORNING-4-STEPS.zh-TW.md)
+- [POAP 流程對照與設計稽核](docs/POAP-FLOW-AUDIT.zh-TW.md)
+- [Pilot 上線閘門](docs/PILOT-LAUNCH-GATE.zh-TW.md)
+- [MVP 產品規格](docs/MVP-PRD.zh-TW.md)
+- [Phase 0–6 Roadmap](docs/ROADMAP.zh-TW.md)
+- [MVP 技術架構](docs/MVP-ARCHITECTURE.zh-TW.md)
+- [本機操作手冊](docs/MVP-RUNBOOK.zh-TW.md)
+- [Phase 2.5 Email 預約手冊](docs/PHASE-2.5-EMAIL-RESERVATION.zh-TW.md)
+- [Phase 3 Base 鏈上索引手冊](docs/PHASE-3-CHAIN-INDEXER.zh-TW.md)
+- [Phase 4 Pilot 操作與復原手冊](docs/PHASE-4-PILOT-RUNBOOK.zh-TW.md)
+- [錢包建立與 Gas 代付決策](docs/WALLET-AND-GAS-DECISION.zh-TW.md)
+- [Magic PreGen 接入準備與啟用手冊](docs/MAGIC-PREGEN-READINESS.zh-TW.md)
+- [開源發布檢查表](docs/OPEN-SOURCE-RELEASE-CHECKLIST.zh-TW.md)
+
+目前正式流程使用 Magic Embedded Wallet OTP；Magic Pre-generated Wallet 仍保留為可選整合，
+預設不啟用。鑄造操作見
+[Phase 2 Base Sepolia 手冊](docs/PHASE-2-BASE-SEPOLIA.zh-TW.md)。
+
+---
+
+# 上游 POAPin Archive 參考說明
+
+以下保留上游 Archive 的架構與操作背景，方便追溯設計來源。內容中出現的 `poap.in`、
+Glory Lab 資源與部署方式屬於上游專案，不是本 fork 的可直接使用設定。
 
 > **POAP is dead. Long live POAP!**
 
@@ -226,9 +306,10 @@ flow follows keyset pages and does not inherit that whole-response limit.
 
 ## Deployment
 
-`wrangler.jsonc` names the Glory Lab production D1 databases, R2 bucket, and
-`poap.in` custom domain. Forks must create their own resources and replace the
-checked-in database IDs and domain configuration before deploying.
+Self-hosted deployments must create their own D1 databases, R2 buckets, Worker,
+domain, Magic application, Email provider, RPC endpoints, and signing keys. Use
+`wrangler.pilot.example.jsonc` as a public template; the deployment-specific
+`wrangler.pilot.jsonc` is intentionally excluded from Git.
 
 Do not deploy by guessing those values. Follow the one-time provisioning,
 migration, validation, and deployment checklist in
@@ -250,9 +331,10 @@ to their respective rights and source terms. See
 [Notices](NOTICE.md) and [Data and licensing](docs/data-and-licensing.md) before mirroring or
 redistributing a snapshot.
 
-POAPin Archive is an independent preservation project and is not endorsed by or
-affiliated with POAP or the operators of POAP Archive.
+This fork and POAPin Archive are independent preservation projects. Neither is
+endorsed by or affiliated with POAP or the operators of POAP Archive.
 
 ---
 
-Created and maintained by [Kira](mailto:kira@glorylab.xyz).
+The Archive browser was originally created by Kira and Glory Lab. This fork preserves
+their MIT notice and documents its additional work in [NOTICE.md](NOTICE.md).

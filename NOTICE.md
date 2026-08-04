@@ -1,10 +1,15 @@
 # Notices
 
-## Project identity
+## Project identity and upstream attribution
 
-POAPin Archive is an independent preservation project maintained by Kira and
-Glory Lab. It is not endorsed by or affiliated with POAP, POAP Archive, or the
-issuers represented in an archive snapshot.
+POAP 留存計畫 is a derivative of
+[POAPin Archive](https://github.com/glorylab/poapin-archive), originally created by
+Kira and Glory Lab. The fork adds a new ERC-1155 issuance system, sponsored minting,
+Magic Email wallets, multi-chain live ownership queries, and an Astro frontend.
+
+Both projects are independent preservation efforts. This fork is not endorsed by or
+affiliated with POAP, POAP Archive, Glory Lab, or the issuers represented in an archive
+snapshot.
 
 ## Interface assets
 
@@ -19,6 +24,10 @@ Their inclusion does not place POAP, POAPin, or third-party names, logos, and
 trademarks under the repository's MIT License. Those rights remain with their
 respective holders. Reusers should replace these files when they do not have an
 independent right to use them.
+
+The current deployment also contains issuer-provided event artwork under
+`frontend-astro/public/images/`. Those images are deployment content, are not covered by
+the MIT License, and must be replaced or separately licensed by downstream operators.
 
 ## Archive material
 

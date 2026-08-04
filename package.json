@@ -1,33 +1,47 @@
 {
-  "name": "poapin-archive",
+  "name": "poap-continuation-platform",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A public, low-CPU POAP archive browser for Cloudflare Workers.",
-  "author": {
-    "name": "Kira",
-    "email": "kira@glorylab.xyz"
-  },
+  "description": "A self-managed historical POAP archive and community event credential platform.",
   "license": "MIT",
-  "homepage": "https://poap.in",
+  "homepage": "https://poap.blocktrend.today",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/glorylab/poapin-archive.git"
+    "url": "git+https://github.com/ASTROHSU/poap-continuation-platform.git"
   },
   "bugs": {
-    "url": "https://github.com/glorylab/poapin-archive/issues"
+    "url": "https://github.com/ASTROHSU/poap-continuation-platform/issues"
   },
   "scripts": {
     "build": "tsc -b && vite build",
+    "build:pilot": "tsc -b && CLOUDFLARE_WRANGLER_CONFIG=wrangler.pilot.jsonc vite build",
+    "build:demo": "tsc -b && VITE_DEMO_MODE=true CLOUDFLARE_WRANGLER_CONFIG=wrangler.pilot.jsonc vite build && node tools/vercel-demo-release.mjs",
     "check": "tsc -b && vite build && wrangler deploy --dry-run",
+    "check:pilot": "npm run build:pilot && wrangler deploy --dry-run --config wrangler.pilot.jsonc",
     "cf-typegen": "wrangler types && node tools/normalize-worker-types.mjs",
-    "db:migrate:local": "wrangler d1 migrations apply CATALOG_DB --local && wrangler d1 migrations apply HOLDINGS_DB --local && wrangler d1 migrations apply COLLECTIONS_DB --local && wrangler d1 migrations apply MOMENTS_DB --local",
-    "db:seed:local": "wrangler d1 execute CATALOG_DB --local --file fixtures/catalog.sql && wrangler d1 execute HOLDINGS_DB --local --file fixtures/holdings.sql && wrangler d1 execute COLLECTIONS_DB --local --file fixtures/collections.sql && wrangler d1 execute MOMENTS_DB --local --file fixtures/moments.sql",
+    "db:migrate:local": "wrangler d1 migrations apply CATALOG_DB --local && wrangler d1 migrations apply HOLDINGS_DB --local && wrangler d1 migrations apply COLLECTIONS_DB --local && wrangler d1 migrations apply MOMENTS_DB --local && wrangler d1 migrations apply LIVE_DB --local",
+    "db:seed:local": "wrangler d1 execute CATALOG_DB --local --file fixtures/catalog.sql && wrangler d1 execute HOLDINGS_DB --local --file fixtures/holdings.sql && wrangler d1 execute COLLECTIONS_DB --local --file fixtures/collections.sql && wrangler d1 execute MOMENTS_DB --local --file fixtures/moments.sql && wrangler d1 execute LIVE_DB --local --file fixtures/live.sql",
     "db:setup:local": "npm run db:migrate:local && npm run db:seed:local",
     "deploy": "npm run build && wrangler deploy",
+    "deploy:pilot": "npm run build:pilot && wrangler deploy --config wrangler.pilot.jsonc",
+    "pilot:db:migrate": "wrangler d1 migrations apply LIVE_DB --remote --config wrangler.pilot.jsonc",
+    "pilot:secrets:upload": "wrangler secret bulk build/secrets/worker-secrets.production.json --config wrangler.pilot.jsonc",
     "dev": "vite",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "event:prepare": "node tools/live-event/cli.mjs",
+    "event:load": "node tools/live-event/admin.mjs load",
+    "event:chain": "node tools/live-event/admin.mjs chain",
+    "event:media": "node tools/live-event/media.mjs",
+    "event:status": "node tools/live-event/admin.mjs status",
+    "event:stats": "node tools/live-event/admin.mjs stats",
+    "event:audit": "node tools/live-event/admin.mjs audit",
+    "live-db:backup": "node tools/live-event/backup.mjs",
+    "signer:generate": "node tools/live-event/signer.mjs",
+    "secrets:prepare": "node tools/launch-readiness/secrets.mjs",
+    "secrets:upgrade": "node tools/launch-readiness/upgrade-secrets.mjs",
+    "launch:preflight": "node tools/launch-readiness/cli.mjs",
     "media:upload": "node tools/r2-media-upload/cli.mjs",
     "collections:snapshot": "node tools/collections-backup/cli.mjs snapshot",
     "collections:media": "node tools/collections-backup/cli.mjs media",
@@ -57,13 +71,18 @@
     "test:media-upload": "node --test tools/r2-media-upload/test/*.test.mjs",
     "test:tools": "node --test tools/*/test/*.test.mjs",
     "test:worker": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.mts",
+    "test:wallet-provider": "vitest run --config vitest.unit.config.mts",
     "test:watch": "vitest",
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@magic-sdk/admin": "^2.8.2",
     "@noble/hashes": "1.8.0",
     "fflate": "0.8.3",
-    "hono": "^4.11.1",
+    "hono": "^4.13.0",
+    "magic-sdk": "33.10.0",
+    "qrcode": "1.5.4",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "viem": "2.55.4"

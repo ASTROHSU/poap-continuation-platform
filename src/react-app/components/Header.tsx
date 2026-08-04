@@ -3,10 +3,44 @@ import { Link, useLocation } from "../router";
 
 interface HeaderProps {
   meta: ArchiveMeta | null;
+  mode?: "combined" | "live-only";
 }
 
-export function Header({ meta }: HeaderProps) {
+export function Header({ meta, mode = "combined" }: HeaderProps) {
   const { pathname } = useLocation();
+  if (mode === "live-only") {
+    return (
+      <header className="site-header">
+        <div className="site-header__inner shell">
+          <Link className="brand" href="/" aria-label="兆量富足教育協會數位紀念章首頁">
+            <img src="/brand/logo_poap.svg" alt="" width="34" height="44" />
+            <span className="brand__archive">數位紀念章</span>
+          </Link>
+          <nav className="nav" aria-label="主要導覽">
+            <Link className={pathname === "/" ? "nav__link is-active" : "nav__link"} href="/">
+              首頁
+            </Link>
+            <Link
+              className={pathname.startsWith("/email/") ? "nav__link is-active" : "nav__link"}
+              href="/email/collection"
+            >
+              Email 收藏
+            </Link>
+            <Link
+              className={pathname === "/help" ? "nav__link is-active" : "nav__link"}
+              href="/help"
+            >
+              支援
+            </Link>
+          </nav>
+          <div className="snapshot-pill" title="Base 鏈上數位紀念章">
+            <span className="snapshot-pill__dot" aria-hidden="true" />
+            <span>Base</span>
+          </div>
+        </div>
+      </header>
+    );
+  }
   const onMomentsRoute =
     pathname.startsWith("/moments") || /^\/owners\/[^/]+\/moments\/?$/.test(pathname);
   const active = onMomentsRoute

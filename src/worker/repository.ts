@@ -356,7 +356,7 @@ export async function fetchDropDetailBatch(
 export async function fetchOwner(
   holdingsDb: D1ReadClient,
   catalogDb: D1ReadClient,
-  collectionsDb: D1ReadClient,
+  collectionsDb: D1ReadClient | null,
   query: OwnerQuery,
   holdingsSnapshotId: string,
   catalogSnapshotId: string,
@@ -402,7 +402,7 @@ export async function fetchOwner(
     .map((row) => row.drop_id)
     .filter((dropId) => !catalog.has(dropId));
   const privateDrops =
-    privateCandidateIds.length > 0
+    collectionsDb && privateCandidateIds.length > 0
       ? await fetchPrivateHeldDropDetails(
           collectionsDb,
           privateCandidateIds,

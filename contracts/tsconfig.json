@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "esModuleInterop": true,
+    "module": "node20",
+    "moduleResolution": "node16",
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "target": "ES2023",
+    "types": ["node"]
+  },
+  "include": ["hardhat.config.ts", "scripts/**/*.ts", "test/**/*.ts"],
+  "exclude": ["artifacts", "cache"]
+}

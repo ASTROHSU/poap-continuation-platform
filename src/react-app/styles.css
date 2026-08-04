@@ -4989,6 +4989,113 @@ main[tabindex="-1"]:focus,
   }
 }
 
+/* Association continuation MVP */
+.claim-page {
+  padding-block: 64px 96px;
+}
+
+.claim-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+  gap: clamp(28px, 5vw, 72px);
+  align-items: center;
+  padding: clamp(22px, 4vw, 56px);
+}
+
+.claim-panel > img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+}
+
+.claim-panel h1 {
+  margin: 8px 0 16px;
+}
+
+.claim-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin: 24px 0;
+}
+
+.claim-facts div {
+  display: grid;
+  gap: 3px;
+}
+
+.claim-facts dt {
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.claim-facts dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.claim-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.claim-form label {
+  font-weight: 700;
+}
+
+.claim-form input {
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: inherit;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  font: inherit;
+}
+
+.claim-form .button {
+  width: fit-content;
+}
+
+.live-holdings {
+  border-top: 1px solid var(--line);
+}
+
+.live-holding-card .drop-card__artwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.live-holding-card .drop-card__body p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+@media (max-width: 760px) {
+  .claim-page {
+    padding-block: 24px 64px;
+  }
+  .claim-panel {
+    grid-template-columns: 1fr;
+  }
+  .claim-panel > img {
+    max-width: 280px;
+    justify-self: center;
+  }
+  .claim-form .button {
+    width: 100%;
+  }
+}
+
 @media (max-width: 410px) {
   .personal-site-hero {
     margin-top: 12px;
@@ -5080,5 +5187,82 @@ main[tabindex="-1"]:focus,
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+.claim-options {
+  display: grid;
+  gap: 1rem;
+}
+
+.claim-options .claim-form {
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.claim-options h2 {
+  margin-top: 0;
+  font-size: 1.05rem;
+}
+
+.email-collection {
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.email-reservation-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.email-reservation-card {
+  display: grid;
+  grid-template-columns: minmax(5rem, 8rem) 1fr;
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.email-reservation-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.demo-banner {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 20px;
+  color: #523307;
+  background: #f8dc9a;
+  border-bottom: 1px solid rgba(82, 51, 7, 0.2);
+  text-align: center;
+}
+
+.demo-banner strong {
+  white-space: nowrap;
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .demo-banner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
   }
 }

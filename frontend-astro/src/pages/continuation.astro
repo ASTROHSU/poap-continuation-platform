@@ -1,0 +1,345 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="POAP 如何延續｜POAP 留存計畫"
+  description="說明原 POAP 與協會新出席憑證如何透過不同智慧合約發行，並在同一個收藏頁呈現。"
+  robots="noindex,nofollow"
+>
+  <article class="continuation-page">
+    <section class="explain-hero">
+      <div class="explain-orb explain-orb-pink" aria-hidden="true"></div>
+      <div class="explain-orb explain-orb-blue" aria-hidden="true"></div>
+      <div class="explain-shell explain-hero-grid">
+        <div>
+          <p class="explain-kicker"><span></span>公開說明</p>
+          <h1>記錄沒有消失，<br /><em>發行方式改變了。</em></h1>
+          <p class="explain-lead">
+            原 POAP 平台服務停止後，過去的鏈上收藏仍然存在；但建立 Drop、發放、管理與收藏展示的服務不再繼續。我因此建立新的發行系統，讓未來的活動紀念可以接著被收藏。
+          </p>
+          <div class="explain-summary" aria-label="一句話說明">
+            <strong>對收藏者來說</strong>
+            <span>同一個收藏頁，看到過去與未來。</span>
+          </div>
+        </div>
+        <div class="contract-stack" aria-label="兩套合約，一個收藏介面">
+          <div class="contract-card contract-card-old">
+            <small>HISTORY · 唯讀保存</small>
+            <strong>原 POAP</strong>
+            <p>官方 POAP 智慧合約</p>
+            <div class="chain-pills"><span>Gnosis</span><span>Base</span><span>Arbitrum</span><span>Ethereum</span></div>
+          </div>
+          <div class="contract-link" aria-hidden="true"><i></i><b>＋</b><i></i></div>
+          <div class="contract-card contract-card-new">
+            <small>CONTINUE · 持續發行</small>
+            <strong>協會新憑證</strong>
+            <p>協會 ERC-1155 智慧合約</p>
+            <div class="chain-pills"><span>Base</span><span>協會管理</span><span>代付 Gas</span></div>
+          </div>
+          <div class="contract-output">
+            <span class="mini-badge" aria-hidden="true">P</span>
+            <div><small>UNIFIED VIEW</small><strong>同一個收藏頁</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="explain-section explain-flow-section">
+      <div class="explain-shell">
+        <p class="explain-kicker"><span></span>背後原理</p>
+        <h2>前端看起來相同，<br />後端其實是兩條軌道。</h2>
+        <p class="section-intro">
+          我沒有改寫原本的 POAP，也沒有把新憑證假裝成官方 POAP。系統分別讀取兩套資料，再轉換成一致的收藏格式。
+        </p>
+
+        <div class="system-map">
+          <section class="system-lane lane-history">
+            <header><span>01</span><div><small>過去</small><strong>歷史 POAP 軌道</strong></div></header>
+            <ol>
+              <li><b>官方智慧合約</b><span>保存 Token 與持有人</span></li>
+              <li><b>Archive 歷史資料</b><span>補上活動名稱、圖片與說明</span></li>
+              <li><b>多鏈即時查詢</b><span>確認目前真正持有的收藏</span></li>
+            </ol>
+          </section>
+
+          <div class="merge-column" aria-label="資料合併">
+            <span>歷史資料</span><i></i><b>合併</b><i></i><span>新資料</span>
+          </div>
+
+          <section class="system-lane lane-future">
+            <header><span>02</span><div><small>未來</small><strong>協會發行軌道</strong></div></header>
+            <ol>
+              <li><b>活動領取頁</b><span>QR Code、Email、ENS 或地址</span></li>
+              <li><b>協會智慧合約</b><span>簽發新的鏈上出席憑證</span></li>
+              <li><b>協會代付 Gas</b><span>收藏者不需要準備鏈上費用</span></li>
+            </ol>
+          </section>
+
+          <section class="unified-view">
+            <div class="unified-title"><small>FRONTEND</small><strong>POAP 留存計畫</strong></div>
+            <div class="artwork-row" aria-hidden="true">
+              <span class="artwork artwork-one">舊</span>
+              <span class="artwork artwork-two">舊</span>
+              <span class="artwork artwork-three">新</span>
+              <span class="artwork artwork-four">新</span>
+            </div>
+            <p>使用者輸入同一個地址，就能在同一頁查看兩種來源的收藏。</p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="explain-section tool-section">
+      <div class="explain-shell">
+        <div class="section-heading-grid">
+          <div>
+            <p class="explain-kicker"><span></span>為什麼外部 App 看不到？</p>
+            <h2>工具看到什麼，取決於它認得哪些合約。</h2>
+          </div>
+          <p>
+            區塊鏈上的憑證不是放進所有 App 就會自動出現。每個工具都要先決定要追蹤哪些鏈、哪些合約，以及如何讀取 metadata。
+          </p>
+        </div>
+
+        <div class="tool-compare">
+          <section class="tool-card tool-limited">
+            <div class="tool-card-top"><span class="tool-window" aria-hidden="true">•••</span><small>只索引官方 POAP 合約的工具</small></div>
+            <div class="tool-source"><span>官方 POAP 合約</span><i>→</i><strong>看得到舊 POAP</strong></div>
+            <div class="tool-source muted"><span>協會新合約</span><i>×</i><strong>不會自動出現</strong></div>
+            <p>原 POAP App、POAP Home 或其他綁定官方規格的工具，如果沒有主動整合協會合約，就只會顯示過去的收藏。</p>
+          </section>
+          <section class="tool-card tool-complete">
+            <div class="tool-card-top"><span class="tool-window" aria-hidden="true">•••</span><small>POAP 留存計畫</small></div>
+            <div class="tool-source"><span>官方 POAP 合約</span><i>→</i><strong>歷史收藏</strong></div>
+            <div class="tool-source"><span>協會新合約</span><i>→</i><strong>新活動紀念</strong></div>
+            <p>我同時整合兩個來源，因此能把不同合約的結果轉換成相同的收藏卡片與活動頁。</p>
+          </section>
+        </div>
+
+        <aside class="fact-note">
+          <strong>這不是資料遺失。</strong>
+          <p>新的憑證仍在鏈上，只是外部工具沒有把協會合約列入自己的索引範圍。</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="explain-section permission-section">
+      <div class="explain-shell permission-grid">
+        <div>
+          <p class="explain-kicker"><span></span>為什麼不直接沿用官方合約？</p>
+          <h2>服務停止，不等於發行權限變成公開資源。</h2>
+        </div>
+        <div class="permission-list">
+          <article><span>1</span><div><strong>原合約有自己的權限</strong><p>建立 Drop、簽發資格與管理活動，原本都由 POAP 的系統與審核流程控制。</p></div></article>
+          <article><span>2</span><div><strong>第三方不能自行接管</strong><p>官方服務停止後，我並不會因此取得原合約的管理權，也不能代表官方繼續發行。</p></div></article>
+          <article><span>3</span><div><strong>新合約保留清楚界線</strong><p>我使用新的合約承接未來活動，既不修改歷史紀錄，也不把新憑證宣稱為官方 POAP。</p></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="explain-section experience-section">
+      <div class="explain-shell">
+        <p class="explain-kicker"><span></span>使用者會感受到什麼？</p>
+        <h2>核心體驗延續，外部相容性有所不同。</h2>
+        <div class="experience-grid">
+          <section>
+            <header><span>✓</span><strong>維持不變</strong></header>
+            <ul>
+              <li>掃描活動 QR Code 或開啟領取連結</li>
+              <li>使用 Email、ENS 或錢包地址領取</li>
+              <li>由協會代付 Gas</li>
+              <li>用同一個地址查看完整收藏</li>
+              <li>看到 artwork、活動日期與說明</li>
+            </ul>
+          </section>
+          <section>
+            <header><span>!</span><strong>需要知道</strong></header>
+            <ul>
+              <li>新憑證不是由 POAP 官方合約發行</li>
+              <li>只支援官方 POAP 的 App 看不到新憑證</li>
+              <li>一般錢包是否顯示，取決於其鏈與 ERC-1155 支援</li>
+              <li>歷史 Archive 是保存資料，不是新的發行權限</li>
+              <li>目前新發行系統仍處於 MVP 測試階段</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="explain-section faq-section">
+      <div class="explain-shell faq-grid">
+        <div>
+          <p class="explain-kicker"><span></span>常見問題</p>
+          <h2>簡單說，就是把消失的服務層補回來。</h2>
+          <a class="explain-cta" href="/#collection-search-section">查看我的收藏 <span>→</span></a>
+        </div>
+        <div class="faq-list">
+          <details open>
+            <summary>過去的 POAP 消失了嗎？<span>＋</span></summary>
+            <p>沒有。鏈上 Token 仍然存在，我也保存 Archive 的活動資料與 artwork，並透過多鏈查詢確認目前持有人。</p>
+          </details>
+          <details>
+            <summary>新的活動紀念算官方 POAP 嗎？<span>＋</span></summary>
+            <p>不算。它是兆量富足教育協會透過自有智慧合約發行的鏈上出席憑證，會在本服務中與歷史 POAP 統一呈現。</p>
+          </details>
+          <details>
+            <summary>收藏者需要理解兩套合約嗎？<span>＋</span></summary>
+            <p>一般使用不需要。兩套來源的差異由後端處理；只有使用外部工具或查看鏈上技術資料時，才會看到合約不同。</p>
+          </details>
+          <details>
+            <summary>未來可以讓其他工具支援新憑證嗎？<span>＋</span></summary>
+            <p>技術上可以，但需要對方主動支援協會使用的鏈、ERC-1155 合約與 metadata。這不是部署新合約後就會自動發生。</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </article>
+</BaseLayout>
+
+<style>
+  :global(body) { background: #f5f3ff; }
+  .continuation-page { overflow: hidden; color: #302a4d; }
+  .explain-shell { width: min(1180px, calc(100% - 40px)); margin-inline: auto; }
+  .explain-hero { position: relative; padding: clamp(72px, 9vw, 128px) 0 96px; background: linear-gradient(135deg, #f6ecff 0%, #f3f2ff 52%, #e9f7ff 100%); }
+  .explain-orb { position: absolute; border-radius: 999px; pointer-events: none; }
+  .explain-orb-pink { width: 380px; height: 380px; right: -150px; top: -130px; background: #ffc6d9; opacity: .8; }
+  .explain-orb-blue { width: 280px; height: 280px; left: -150px; bottom: -130px; background: #cfeefa; opacity: .8; }
+  .explain-hero-grid { position: relative; display: grid; grid-template-columns: 1.03fr .97fr; gap: clamp(56px, 8vw, 108px); align-items: center; }
+  .explain-kicker { display: flex; align-items: center; gap: 12px; margin: 0 0 22px; color: #6659a7; font-size: 13px; font-weight: 900; letter-spacing: .16em; }
+  .explain-kicker span { display: block; width: 42px; height: 2px; background: #6659a7; }
+  .explain-hero h1, .explain-section h2 { margin: 0; font-family: var(--font-display, "Noto Sans TC"), sans-serif; font-weight: 900; letter-spacing: -.055em; line-height: 1.05; }
+  .explain-hero h1 { font-size: clamp(48px, 6.6vw, 88px); }
+  .explain-hero h1 em { color: #7c70e3; font-style: normal; text-shadow: 7px 8px 0 #dcd7ff; }
+  .explain-lead { max-width: 650px; margin: 36px 0 0; color: #645f77; font-size: clamp(17px, 1.5vw, 20px); line-height: 1.9; }
+  .explain-summary { display: inline-flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 30px; padding: 14px 20px; border: 2px solid #35304e; border-radius: 999px; background: #fff; box-shadow: 5px 6px 0 #d8d3ff; font-size: 14px; }
+  .explain-summary strong { color: #695dc1; }
+  .contract-stack { position: relative; padding-bottom: 56px; }
+  .contract-card { position: relative; padding: 25px 26px; border: 3px solid #35304e; border-radius: 28px; background: #fff; box-shadow: 9px 10px 0 #cfc8ff; }
+  .contract-card-old { transform: rotate(-2deg); }
+  .contract-card-new { transform: rotate(2deg); }
+  .contract-card small, .contract-output small { display: block; color: #7669d8; font-size: 10px; font-weight: 900; letter-spacing: .15em; }
+  .contract-card > strong { display: block; margin-top: 8px; font-size: 26px; font-weight: 900; }
+  .contract-card p { margin: 3px 0 0; color: #898397; font-size: 14px; }
+  .chain-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px; }
+  .chain-pills span { padding: 6px 10px; border-radius: 999px; background: #f0edff; color: #5d529a; font-size: 11px; font-weight: 800; }
+  .contract-card-new .chain-pills span { background: #e4f6d9; color: #487243; }
+  .contract-link { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; width: 80%; margin: 18px auto; }
+  .contract-link i { height: 2px; background: #bcb5e9; }
+  .contract-link b { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: #ffd89e; }
+  .contract-output { position: absolute; right: -18px; bottom: 0; display: flex; align-items: center; gap: 12px; min-width: 240px; padding: 14px 18px; border: 3px solid #35304e; border-radius: 20px; background: #fff; box-shadow: 7px 8px 0 #bce6b0; transform: rotate(-1deg); }
+  .contract-output strong { display: block; margin-top: 2px; font-size: 17px; }
+  .mini-badge { display: grid; width: 44px; height: 44px; place-items: center; border: 2px dashed #9c91ed; border-radius: 50%; color: #7c70e3; font-size: 19px; font-weight: 900; }
+  .explain-section { padding: clamp(80px, 9vw, 128px) 0; }
+  .explain-section h2 { max-width: 820px; font-size: clamp(38px, 5.1vw, 66px); }
+  .section-intro { max-width: 740px; margin: 28px 0 0; color: #777185; font-size: 18px; line-height: 1.8; }
+  .explain-flow-section { background: #fff; }
+  .system-map { display: grid; grid-template-columns: 1fr 100px 1fr; gap: 24px; margin-top: 58px; align-items: stretch; }
+  .system-lane { padding: 30px; border: 2px solid #38314f; border-radius: 32px; box-shadow: 8px 9px 0 #e2ddff; }
+  .lane-history { background: #f2efff; }
+  .lane-future { background: #eff9e9; box-shadow-color: #d3edc9; }
+  .system-lane header { display: flex; align-items: center; gap: 14px; padding-bottom: 23px; border-bottom: 1px solid #cec8ed; }
+  .system-lane header > span { display: grid; width: 44px; height: 44px; place-items: center; border: 2px solid #4f4670; border-radius: 50%; font-weight: 900; }
+  .system-lane header small { display: block; color: #8379bb; font-size: 10px; font-weight: 900; letter-spacing: .14em; }
+  .system-lane header strong { display: block; margin-top: 2px; font-size: 20px; }
+  .system-lane ol { display: grid; gap: 22px; margin: 26px 0 0; padding: 0; list-style: none; }
+  .system-lane li { position: relative; padding-left: 22px; }
+  .system-lane li::before { content: ""; position: absolute; left: 0; top: 7px; width: 9px; height: 9px; border-radius: 50%; background: #8073dd; box-shadow: 0 0 0 5px #ded8ff; }
+  .lane-future li::before { background: #68a65f; box-shadow: 0 0 0 5px #d5edcd; }
+  .system-lane li b, .system-lane li span { display: block; }
+  .system-lane li b { font-size: 15px; }
+  .system-lane li span { margin-top: 4px; color: #777185; font-size: 13px; line-height: 1.55; }
+  .merge-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #8a82a7; font-size: 10px; font-weight: 900; letter-spacing: .08em; text-align: center; }
+  .merge-column i { width: 2px; height: 52px; background: repeating-linear-gradient(to bottom, #9c91d5 0 5px, transparent 5px 9px); }
+  .merge-column b { display: grid; width: 62px; height: 62px; place-items: center; border: 3px solid #35304e; border-radius: 50%; background: #ffd69b; color: #35304e; font-size: 14px; box-shadow: 4px 5px 0 #e5c184; }
+  .unified-view { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr minmax(220px, .75fr); gap: 30px; align-items: center; margin-top: 16px; padding: 25px 28px; border: 3px solid #35304e; border-radius: 30px; background: #fff; box-shadow: 9px 10px 0 #cfc8ff; }
+  .unified-title small { display: block; color: #7669d8; font-size: 10px; font-weight: 900; letter-spacing: .15em; }
+  .unified-title strong { display: block; margin-top: 4px; font-size: 22px; }
+  .artwork-row { display: flex; align-items: center; }
+  .artwork { display: grid; width: 62px; height: 62px; place-items: center; margin-left: -8px; border: 3px solid #fff; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 900; box-shadow: 0 0 0 2px #a89cff; }
+  .artwork:first-child { margin-left: 0; }
+  .artwork-one { background: #655ac0; }
+  .artwork-two { background: #ed8ca7; }
+  .artwork-three { background: #5896ba; }
+  .artwork-four { background: #70a663; }
+  .unified-view p { margin: 0; color: #777185; font-size: 14px; line-height: 1.65; }
+  .tool-section { background: linear-gradient(135deg, #f4e8ff, #e9f6ff); }
+  .section-heading-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 70px; align-items: end; }
+  .section-heading-grid > p { margin: 0; color: #706a7d; font-size: 17px; line-height: 1.8; }
+  .tool-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 58px; }
+  .tool-card { padding: 30px; border: 3px solid #35304e; border-radius: 30px; background: #fff; }
+  .tool-limited { box-shadow: 9px 10px 0 #ffc5d6; }
+  .tool-complete { box-shadow: 9px 10px 0 #c9edbc; }
+  .tool-card-top { display: flex; align-items: center; gap: 12px; padding-bottom: 22px; border-bottom: 1px solid #e2def5; }
+  .tool-window { color: #968da8; letter-spacing: .2em; }
+  .tool-card-top small { font-weight: 900; }
+  .tool-source { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-top: 22px; padding: 14px; border-radius: 16px; background: #f0edff; font-size: 13px; }
+  .tool-source i { color: #7669d8; font-style: normal; font-weight: 900; }
+  .tool-source strong { text-align: right; }
+  .tool-source.muted { background: #f5f3f7; color: #a09ba9; }
+  .tool-source.muted i { color: #c1657d; }
+  .tool-card > p { margin: 24px 0 0; color: #777185; font-size: 14px; line-height: 1.75; }
+  .fact-note { display: flex; gap: 18px; align-items: baseline; margin-top: 38px; padding: 22px 26px; border: 2px solid #35304e; border-radius: 22px; background: #ffdba4; transform: rotate(-.5deg); }
+  .fact-note strong { white-space: nowrap; font-size: 18px; }
+  .fact-note p { margin: 0; color: #686173; line-height: 1.6; }
+  .permission-section { background: #34304f; color: #fff; }
+  .permission-section .explain-kicker { color: #c8c0ff; }
+  .permission-section .explain-kicker span { background: #c8c0ff; }
+  .permission-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: clamp(50px, 8vw, 110px); align-items: start; }
+  .permission-list { display: grid; gap: 20px; }
+  .permission-list article { display: grid; grid-template-columns: 54px 1fr; gap: 18px; padding: 24px; border: 1px solid #5a5476; border-radius: 24px; background: #403b5c; }
+  .permission-list article > span { display: grid; width: 50px; height: 50px; place-items: center; border-radius: 50%; background: #8173e0; font-size: 20px; font-weight: 900; box-shadow: 4px 5px 0 #28243f; }
+  .permission-list strong { font-size: 18px; }
+  .permission-list p { margin: 7px 0 0; color: #c4bfd1; font-size: 14px; line-height: 1.7; }
+  .experience-section { background: #fff; }
+  .experience-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 55px; }
+  .experience-grid section { padding: 30px; border: 2px solid #35304e; border-radius: 28px; background: #f2efff; box-shadow: 8px 9px 0 #dcd6ff; }
+  .experience-grid section + section { background: #fff3e7; box-shadow-color: #ffd9b0; }
+  .experience-grid header { display: flex; align-items: center; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid #d4ceeb; }
+  .experience-grid header span { display: grid; width: 35px; height: 35px; place-items: center; border-radius: 50%; background: #7467d5; color: #fff; font-weight: 900; }
+  .experience-grid section + section header span { background: #ef996c; }
+  .experience-grid header strong { font-size: 21px; }
+  .experience-grid ul { display: grid; gap: 14px; margin: 23px 0 0; padding-left: 20px; color: #686173; line-height: 1.55; }
+  .faq-section { background: linear-gradient(135deg, #e9f7ff, #f5efff); }
+  .faq-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: clamp(55px, 9vw, 120px); align-items: start; }
+  .explain-cta { display: inline-flex; align-items: center; gap: 22px; margin-top: 34px; padding: 15px 20px; border: 3px solid #35304e; border-radius: 999px; background: #7c70e3; color: #fff; font-weight: 900; box-shadow: 5px 6px 0 #4f477f; }
+  .explain-cta span { font-size: 22px; }
+  .faq-list { display: grid; gap: 14px; }
+  .faq-list details { border: 2px solid #d5cff6; border-radius: 22px; background: #fff; box-shadow: 5px 6px 0 #e1dcff; }
+  .faq-list summary { display: flex; justify-content: space-between; gap: 20px; padding: 22px 24px; cursor: pointer; font-size: 17px; font-weight: 900; list-style: none; }
+  .faq-list summary::-webkit-details-marker { display: none; }
+  .faq-list summary span { color: #7669d8; font-size: 22px; transition: transform .2s ease; }
+  .faq-list details[open] summary span { transform: rotate(45deg); }
+  .faq-list details p { margin: 0; padding: 0 24px 24px; color: #706a7d; font-size: 14px; line-height: 1.75; }
+  @media (max-width: 900px) {
+    .explain-hero-grid, .permission-grid, .faq-grid, .section-heading-grid { grid-template-columns: 1fr; }
+    .contract-stack { max-width: 600px; width: 100%; margin-inline: auto; }
+    .system-map { grid-template-columns: 1fr; }
+    .merge-column { flex-direction: row; min-height: 72px; }
+    .merge-column i { width: 54px; height: 2px; background: repeating-linear-gradient(to right, #9c91d5 0 5px, transparent 5px 9px); }
+    .unified-view { grid-column: auto; grid-template-columns: 1fr auto; }
+    .unified-view p { grid-column: 1 / -1; }
+  }
+  @media (max-width: 680px) {
+    .explain-shell { width: min(100% - 28px, 1180px); }
+    .explain-hero { padding-top: 64px; }
+    .explain-hero h1 { font-size: clamp(43px, 14vw, 62px); }
+    .explain-hero h1 em { text-shadow: 4px 5px 0 #dcd7ff; }
+    .explain-summary { border-radius: 22px; }
+    .contract-stack { padding-bottom: 70px; }
+    .contract-output { right: 0; }
+    .system-lane, .tool-card, .experience-grid section { padding: 24px 20px; }
+    .tool-compare, .experience-grid { grid-template-columns: 1fr; }
+    .tool-source { grid-template-columns: 1fr auto; }
+    .tool-source strong { grid-column: 1 / -1; text-align: left; }
+    .fact-note { display: block; }
+    .fact-note p { margin-top: 7px; }
+    .permission-list article { grid-template-columns: 44px 1fr; padding: 20px 17px; }
+    .permission-list article > span { width: 42px; height: 42px; }
+    .unified-view { padding: 22px 18px; }
+    .artwork { width: 50px; height: 50px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .faq-list summary span { transition: none; }
+  }
+</style>

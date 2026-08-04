@@ -49,7 +49,7 @@ const MOMENT_MEDIA_KINDS = new Set<MomentMediaKind>(["image", "video", "audio", 
 const MOMENT_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const MOMENT_CURSOR_ID = /^[A-Za-z0-9-]{1,128}$/;
 
-export type ApiStatus = 400 | 404 | 413 | 503;
+export type ApiStatus = 400 | 401 | 403 | 404 | 409 | 413 | 502 | 503;
 
 export class ApiError extends Error {
   constructor(

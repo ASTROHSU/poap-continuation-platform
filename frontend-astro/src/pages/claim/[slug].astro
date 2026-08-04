@@ -1,0 +1,16 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ClaimDemo from "../../components/ClaimDemo";
+const { slug } = Astro.params;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+---
+<BaseLayout
+  title="鑄造數位紀念"
+  robots="noindex,nofollow,noarchive"
+  referrer="no-referrer"
+>
+  <section class="mx-auto max-w-7xl px-5 py-10 lg:px-10 lg:py-16">
+    <ClaimDemo client:load slug={slug ?? ""} />
+  </section>
+</BaseLayout>

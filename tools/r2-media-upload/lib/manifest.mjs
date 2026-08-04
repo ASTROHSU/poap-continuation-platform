@@ -13,7 +13,10 @@ export class ArtworkManifestError extends Error {
   }
 }
 
-export async function loadArtworkManifest(filePath, { snapshotId, cacheControl }) {
+export async function loadArtworkManifest(
+  filePath,
+  { snapshotId, cacheControl, mediaBaseUrl = "https://media.poap.in" },
+) {
   const absolutePath = resolve(filePath);
   const fileStat = await stat(absolutePath).catch((error) => {
     throw new ArtworkManifestError(
@@ -44,7 +47,7 @@ export async function loadArtworkManifest(filePath, { snapshotId, cacheControl }
     } catch {
       throw new ArtworkManifestError(`Artwork manifest line ${index + 1} is not valid JSON.`);
     }
-    const normalized = validateRow(row, index + 1, { snapshotId, cacheControl });
+    const normalized = validateRow(row, index + 1, { snapshotId, cacheControl, mediaBaseUrl });
     if (entries.has(normalized.sourcePath)) {
       throw new ArtworkManifestError(`Artwork manifest repeats drop ${normalized.dropId}.`);
     }
@@ -82,7 +85,7 @@ export function createMemoryManifest(rows, { label = "fixture-manifest.ndjson" }
   };
 }
 
-function validateRow(row, lineNumber, { snapshotId, cacheControl }) {
+function validateRow(row, lineNumber, { snapshotId, cacheControl, mediaBaseUrl }) {
   const prefix = `Artwork manifest line ${lineNumber}`;
   if (!row || typeof row !== "object" || Array.isArray(row)) {
     throw new ArtworkManifestError(`${prefix} must be an object.`);
@@ -107,7 +110,7 @@ function validateRow(row, lineNumber, { snapshotId, cacheControl }) {
   if (row.object.cacheControl !== cacheControl) {
     throw new ArtworkManifestError(`${prefix} has unexpected Cache-Control metadata.`);
   }
-  const expectedPublicUrl = `https://media.poap.in/${key}`;
+  const expectedPublicUrl = `${mediaBaseUrl}/${key}`;
   if (row.object.publicUrl !== expectedPublicUrl) {
     throw new ArtworkManifestError(`${prefix} has an unexpected publicUrl.`);
   }

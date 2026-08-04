@@ -6,10 +6,32 @@ updates:
       interval: weekly
       day: monday
       time: "09:00"
-      timezone: Asia/Tokyo
+      timezone: Asia/Taipei
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
+
+  - package-ecosystem: npm
+    directory: /frontend-astro
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Taipei
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(frontend-deps)"
+
+  - package-ecosystem: npm
+    directory: /contracts
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Taipei
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(contract-deps)"
 
   - package-ecosystem: github-actions
     directory: /
@@ -17,7 +39,7 @@ updates:
       interval: weekly
       day: monday
       time: "09:00"
-      timezone: Asia/Tokyo
+      timezone: Asia/Taipei
     open-pull-requests-limit: 3
     commit-message:
       prefix: "ci(deps)"

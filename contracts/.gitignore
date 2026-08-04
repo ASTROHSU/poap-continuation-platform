@@ -1,0 +1,6 @@
+artifacts/
+cache/
+coverage/
+ignition/deployments/
+deployment-output/
+.env

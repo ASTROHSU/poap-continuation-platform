@@ -67,7 +67,7 @@ signature merely to access already-public snapshot data.
 Use the public data-report issue form for ordinary factual corrections,
 attribution, missing media, or provenance questions that do not require private
 information. For a request containing personal, confidential, or sensitive
-context, email [kira@glorylab.xyz](mailto:kira@glorylab.xyz).
+context, email [poap@stevechoice.org](mailto:poap@stevechoice.org).
 
 A report should identify the snapshot and record, explain the requested change,
 and provide enough evidence to evaluate it. Maintainers may hide material while

@@ -1,0 +1,17 @@
+{
+  "eventId": "event-2026-mvp-demo",
+  "slug": "mvp-demo",
+  "title": "協會數位紀念章 MVP 測試",
+  "description": "用來驗證唯一領取碼、地址登記，以及新舊收藏合併顯示的測試活動。",
+  "imageUrl": "/brand/logo_poap.svg",
+  "imageFile": "../public/brand/logo_poap.svg",
+  "eventUrl": null,
+  "startsAt": "2026-08-01T00:00:00.000Z",
+  "claimOpensAt": "2026-07-01T00:00:00.000Z",
+  "claimClosesAt": "2026-12-31T23:59:59.999Z",
+  "maxSupply": 100,
+  "claimCount": 10,
+  "claimMode": "unique",
+  "chainId": 84532,
+  "publicBaseUrl": "http://localhost:5173"
+}

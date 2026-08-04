@@ -5,6 +5,7 @@ import { Link, navigate } from "../router";
 import type { ArchiveMeta } from "../types";
 import { isAbortError } from "../utils";
 import { OwnerPage } from "./OwnerPage";
+import { LiveOwnerPage } from "./LiveOwnerPage";
 
 const ADDRESS_PATTERN = /^0x[a-f0-9]{40}$/;
 
@@ -12,15 +13,26 @@ export function AddressRoutePage({
   identifier,
   pathname,
   meta,
+  archiveEnabled = true,
 }: {
   identifier: string;
   pathname: string;
   meta: ArchiveMeta | null;
+  archiveEnabled?: boolean;
 }) {
   const address = identifier.toLowerCase();
   if (ADDRESS_PATTERN.test(address)) {
-    return <CanonicalOwnerPage address={address} requestedPathname={pathname} meta={meta} />;
+    return (
+      <CanonicalOwnerPage
+        address={address}
+        requestedPathname={pathname}
+        meta={meta}
+        archiveEnabled={archiveEnabled}
+      />
+    );
   }
+
+  if (!archiveEnabled) return <InvalidAddressIdentifier liveOnly />;
 
   const looksLikeEns =
     identifier.length <= 255 && identifier.includes(".") && !/[\/\\?#\s]/u.test(identifier);
@@ -33,10 +45,12 @@ function CanonicalOwnerPage({
   address,
   requestedPathname,
   meta,
+  archiveEnabled,
 }: {
   address: string;
   requestedPathname: string;
   meta: ArchiveMeta | null;
+  archiveEnabled: boolean;
 }) {
   useEffect(() => {
     if (requestedPathname !== `/address/${address}`) {
@@ -44,7 +58,11 @@ function CanonicalOwnerPage({
     }
   }, [address, requestedPathname]);
 
-  return <OwnerPage address={address} meta={meta} />;
+  return archiveEnabled ? (
+    <OwnerPage address={address} meta={meta} />
+  ) : (
+    <LiveOwnerPage address={address} />
+  );
 }
 
 function EnsAddressResolver({ name }: { name: string }) {
@@ -102,7 +120,7 @@ function EnsAddressResolver({ name }: { name: string }) {
   );
 }
 
-function InvalidAddressIdentifier() {
+function InvalidAddressIdentifier({ liveOnly = false }: { liveOnly?: boolean }) {
   return (
     <main className="owner-page shell" id="main-content" tabIndex={-1}>
       <Link className="back-link" href="/">
@@ -111,7 +129,11 @@ function InvalidAddressIdentifier() {
       <section className="owner-resolver__panel glass-panel">
         <span className="eyebrow">Address lookup</span>
         <h1>That address is not valid</h1>
-        <p>Use a complete 0x address or an ENS name such as poap.eth.</p>
+        <p>
+          {liveOnly
+            ? "請輸入包含 40 個十六進位字元的完整 0x 錢包地址。"
+            : "Use a complete 0x address or an ENS name such as poap.eth."}
+        </p>
       </section>
     </main>
   );

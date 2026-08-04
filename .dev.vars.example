@@ -1,0 +1,8 @@
+MINT_SIGNER_PRIVATE_KEY=
+MINT_RELAYER_PRIVATE_KEY=
+EMAIL_LOOKUP_SECRET=
+EMAIL_DATA_KEY=
+RESEND_API_KEY=
+# Required for regular Magic Embedded Wallet DID verification.
+# Wallet PreGen remains optional and disabled until separately approved.
+MAGIC_SECRET_KEY=

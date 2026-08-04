@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getOwner, getPersonalExportManifest } from "../api";
+import { getLiveHoldings, getOwner, getPersonalExportManifest } from "../api";
 import { DropCard } from "../components/DropCard";
 import { EmptyState, ErrorState, GridSkeleton } from "../components/States";
 import { DownloadIcon } from "../icons";
 import { Link } from "../router";
-import type { ArchiveMeta, Holding, PersonalExportManifest } from "../types";
+import type { ArchiveMeta, Holding, LiveHolding, PersonalExportManifest } from "../types";
 import { isAbortError } from "../utils";
 
 const MAX_SYNC_EXPORT_RECORDS = 5_000;
@@ -20,6 +20,8 @@ export function OwnerPage({ address, meta }: OwnerPageProps) {
   const [total, setTotal] = useState<number | null>(null);
   const [uniqueDrops, setUniqueDrops] = useState<number | null>(null);
   const [manifest, setManifest] = useState<PersonalExportManifest | null>(null);
+  const [liveItems, setLiveItems] = useState<LiveHolding[]>([]);
+  const [liveUnavailable, setLiveUnavailable] = useState(false);
   const [manifestUnavailable, setManifestUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -89,6 +91,19 @@ export function OwnerPage({ address, meta }: OwnerPageProps) {
       .then(setManifest)
       .catch((cause: unknown) => {
         if (!isAbortError(cause)) setManifestUnavailable(true);
+      });
+    return () => controller.abort();
+  }, [address, valid]);
+
+  useEffect(() => {
+    if (!valid) return;
+    const controller = new AbortController();
+    setLiveItems([]);
+    setLiveUnavailable(false);
+    getLiveHoldings(address, controller.signal)
+      .then((response) => setLiveItems(response.items))
+      .catch((cause: unknown) => {
+        if (!isAbortError(cause)) setLiveUnavailable(true);
       });
     return () => controller.abort();
   }, [address, valid]);
@@ -178,6 +193,51 @@ export function OwnerPage({ address, meta }: OwnerPageProps) {
           Collection and Moment counts are temporarily unavailable. The POAP collection is still
           available below.
         </p>
+      ) : null}
+
+      {liveUnavailable ? (
+        <p className="owner-related-warning" role="status">
+          新發行收藏目前無法載入，歷史 POAP 仍可在下方查看。
+        </p>
+      ) : null}
+
+      {liveItems.length > 0 ? (
+        <section className="archive-section live-holdings" aria-labelledby="live-holdings-heading">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">2026 年 7 月之後</span>
+              <h2 id="live-holdings-heading">新發行收藏</h2>
+            </div>
+            <span className="result-count">{liveItems.length} 枚</span>
+          </div>
+          {liveItems.length > 0 ? (
+            <div className="drop-grid">
+              {liveItems.map((item) => (
+                <article className="drop-card live-holding-card" key={item.eventId}>
+                  <div className="drop-card__artwork">
+                    <img src={item.imageUrl} alt="" loading="lazy" />
+                  </div>
+                  <div className="drop-card__body">
+                    <span className="eyebrow">
+                      {item.mintStatus === "minted"
+                        ? item.ownershipSource === "chain-index"
+                          ? "Base · 鏈上目前持有"
+                          : "Base · 已鑄造，等待索引"
+                        : "Base · 已保留"}
+                    </span>
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                    <span className="search-hint">
+                      {item.ownershipSource === "chain-index"
+                        ? `鏈上狀態同步於 ${formatSnapshot(item.chainSyncedAt ?? item.claimedAt)}`
+                        : `登記於 ${formatSnapshot(item.claimedAt)}`}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </section>
       ) : null}
 
       <section className="archive-section owner-holdings" aria-labelledby="holdings-heading">

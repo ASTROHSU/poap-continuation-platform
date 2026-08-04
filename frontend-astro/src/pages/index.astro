@@ -1,0 +1,147 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import CollectionSearch from "../components/CollectionSearch";
+---
+
+<BaseLayout title="查看你的 POAP 收藏" description="輸入 Email、ENS 或 Ethereum 錢包地址，查看你的 POAP 收藏。">
+  <div id="top" class="page-anchor" aria-hidden="true"></div>
+  <section class="ref-hero" id="collection-search-section">
+    <div class="ref-orb ref-orb-pink" aria-hidden="true"></div>
+    <div class="ref-orb ref-orb-green" aria-hidden="true"></div>
+    <div class="ref-orb ref-orb-blue" aria-hidden="true"></div>
+    <div class="ref-hero-grid">
+      <div class="ref-hero-content relative z-10">
+        <h1 class="ref-hero-title">查看你的<br /><span>POAP 收藏</span></h1>
+        <div class="ref-rotating-copy" aria-label="POAP 留下的是線上讀書會、教育課程、社群聚會與共同記憶">
+          <strong>POAP 留下的是</strong>
+          <div class="ref-word-window">
+            <div class="ref-word-track">
+              <span>線上讀書會</span>
+              <span>教育課程</span>
+              <span>社群聚會</span>
+              <span>共同記憶</span>
+              <span>線上讀書會</span>
+            </div>
+          </div>
+        </div>
+        <div class="ref-search-card">
+          <p class="ref-search-label">搜尋 POAP 收藏</p>
+          <CollectionSearch client:load />
+          <div class="ref-search-tags"><span>Email</span><span>ENS</span><span>Ethereum 地址</span></div>
+        </div>
+      </div>
+
+      <div class="ref-drop-stage" aria-label="最新數位紀念：8 月線上讀書會">
+        <div class="ref-ring ref-ring-solid" aria-hidden="true"></div>
+        <div class="ref-ring ref-ring-dashed" aria-hidden="true"></div>
+        <div class="ref-spark ref-spark-one" aria-hidden="true"></div>
+        <div class="ref-spark ref-spark-two" aria-hidden="true"></div>
+        <div class="ref-hero-drop">
+          <div class="ref-drop-meta"><span>最新 DROP</span><strong>活動紀念</strong></div>
+          <div class="ref-badge-wrap"><div class="badge-art"></div></div>
+          <div class="ref-drop-copy">
+            <h2>8 月線上讀書會</h2>
+            <p>兆量富足教育協會 · 2026 年 8 月 9 日</p>
+          </div>
+        </div>
+        <span class="ref-chip ref-chip-study">共同學習</span>
+        <span class="ref-chip ref-chip-chain">鏈上收藏</span>
+        <span class="ref-dot ref-dot-one" aria-hidden="true"></span>
+        <span class="ref-dot ref-dot-two" aria-hidden="true"></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="ref-scallop ref-scallop-down" aria-hidden="true"></div>
+
+  <section class="ref-section ref-what" id="what-is-poap">
+    <div class="ref-ghost-line ref-ghost-moving" aria-hidden="true">
+      <div class="ref-ghost-track">
+        <div class="ref-ghost-group"><span>什麼是 POAP？</span><span>什麼是 POAP？</span><span>什麼是 POAP？</span></div>
+        <div class="ref-ghost-group"><span>什麼是 POAP？</span><span>什麼是 POAP？</span><span>什麼是 POAP？</span></div>
+      </div>
+    </div>
+    <div class="ref-container relative z-10">
+      <div class="ref-section-label"><strong>01</strong><span>這是什麼？</span></div>
+      <h2 class="ref-section-title">POAP 是共同經歷的<span>數位紀念</span></h2>
+      <div class="ref-story-grid">
+        <article class="ref-story-card ref-story-purple">
+          <small>過去</small>
+          <h3>每一枚 POAP，都在記錄「我曾在場」</h3>
+          <p>活動名稱、圖片、日期與鏈上持有紀錄，共同組成一段可以被收藏、被找回的記憶。</p>
+        </article>
+        <article class="ref-story-card ref-story-pink">
+          <small>串接</small>
+          <h3>收藏留著，新的紀念繼續發行</h3>
+          <p>歷史 POAP 來自官方 Archive；新的活動紀念由 Base 發行系統承接，最後在同一個介面呈現。</p>
+          <div class="ref-bridge"><span>歷史</span><i></i><span>未來</span></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <div class="ref-ticker" aria-hidden="true">
+    <div class="ref-ticker-track">
+      <div class="ref-ticker-group"><span>記憶留下，故事繼續</span><b>✦</b><span>POAP 是共同經歷的數位紀念</span><b>✦</b><span>你的收藏，仍然屬於你</span><b>✦</b></div>
+      <div class="ref-ticker-group"><span>記憶留下，故事繼續</span><b>✦</b><span>POAP 是共同經歷的數位紀念</span><b>✦</b><span>你的收藏，仍然屬於你</span><b>✦</b></div>
+    </div>
+  </div>
+
+  <section class="ref-section ref-how" id="how-it-works">
+    <div class="ref-ghost-line ref-ghost-dark" aria-hidden="true"><span>POAP 如何運作？</span><span>POAP 如何運作？</span><span>POAP 如何運作？</span></div>
+    <div class="ref-container relative z-10">
+      <div class="ref-section-label ref-section-label-dark"><strong>02</strong><span>如何運作？</span></div>
+      <h2 class="ref-section-title ref-section-title-dark">三個步驟，收藏一段<span>共同記憶</span></h2>
+      <div class="ref-process-grid">
+        <article class="ref-process-card"><div><strong>1</strong><small>參與</small></div><h3>參加一場活動</h3><p>線上讀書會、課程、聚會，或任何值得共同記住的時刻。</p></article>
+        <article class="ref-process-card ref-process-pink"><div><strong>2</strong><small>領取</small></div><h3>用 Email 或錢包領取</h3><p>輸入 Email 完成驗證，系統會自動開啟錢包並鑄造；也可以直接連接既有錢包。</p></article>
+        <article class="ref-process-card ref-process-green"><div><strong>3</strong><small>收藏</small></div><h3>在同一頁查看</h3><p>協會代付 Gas。歷史 POAP 與新的 Base 紀念物會出現在同一個收藏頁。</p></article>
+      </div>
+
+      <div class="ref-continuity">
+        <p class="ref-continuity-label">統一呈現</p>
+        <div class="ref-continuity-grid">
+          <article><small>2026 年 7 月以前</small><h3>歷史 POAP Archive</h3><p>鏈上 Token、Drop 資料與圖片快照</p><span class="ref-status ref-status-ready">Archive 已接入</span></article>
+          <div class="ref-arrow" aria-hidden="true">＋</div>
+          <article><small>2026 年 8 月以後</small><h3>新的 Base 紀念物</h3><p>發行、領取、鑄造與收藏</p><span class="ref-status ref-status-ready">MVP 已可測試</span></article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ref-section ref-latest" id="latest-drop">
+    <div class="ref-ghost-line ref-ghost-moving ref-ghost-reverse" aria-hidden="true">
+      <div class="ref-ghost-track">
+        <div class="ref-ghost-group"><span>最新 DROP</span><span>最新 DROP</span><span>最新 DROP</span></div>
+        <div class="ref-ghost-group"><span>最新 DROP</span><span>最新 DROP</span><span>最新 DROP</span></div>
+      </div>
+    </div>
+    <div class="ref-container relative z-10">
+      <div class="ref-section-label"><strong>03</strong><span>最新發行</span></div>
+      <h2 class="ref-section-title">故事從這一枚<span>繼續</span></h2>
+
+      <article class="ref-feature-drop">
+        <div class="ref-feature-art"><div class="badge-art"></div></div>
+        <div class="ref-feature-copy">
+          <div class="ref-feature-tags"><span>DROP #001</span><strong>活動限定</strong></div>
+          <h3>8 月線上讀書會</h3>
+          <p>兆量富足教育協會 · 2026 年 8 月 9 日 · 線上鑄造</p>
+          <b>參與者請使用活動現場提供的 QR Code</b>
+        </div>
+      </article>
+
+      <div class="ref-community">
+        <div><p class="ref-kicker">誰正在使用？</p><h3>先從我們自己的社群開始</h3><p>目前由兆量富足教育協會發行，為讀書會、課程與社群活動留下可驗證的共同記錄。</p></div>
+        <div class="ref-community-tags"><span>線上讀書會</span><span>教育課程</span><span>社群聚會</span><span>參與紀念</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ref-scallop ref-scallop-up" aria-hidden="true"></div>
+  <section class="ref-cta">
+    <div class="ref-container">
+      <h2>記憶留下，<span>故事繼續。</span></h2>
+      <p>查詢歷史 POAP，也收藏兆量富足教育協會的新活動紀念。</p>
+    </div>
+  </section>
+</BaseLayout>

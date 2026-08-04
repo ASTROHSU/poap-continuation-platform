@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security report
-    url: mailto:kira@glorylab.xyz?subject=%5BPOAPin%20Archive%20Security%5D
+    url: mailto:poap@stevechoice.org?subject=%5BPOAP%20Continuation%20Security%5D
     about: Report vulnerabilities privately; do not create a public issue.

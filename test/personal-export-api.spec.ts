@@ -7,6 +7,7 @@ const ADDRESS = "0x1111111111111111111111111111111111111111";
 const COLLECTION_OWNER = "0x2222222222222222222222222222222222222222";
 const PRIVATE_HOLDER = "0x4444444444444444444444444444444444444444";
 const PRIVATE_ARTWORK_SHA = `cd${"e".repeat(62)}`;
+const APP_MEDIA_BASE_URL = "https://media.example.invalid";
 
 interface TestBindings extends Bindings {
   TEST_CATALOG_FIXTURE: string;
@@ -202,7 +203,7 @@ describe("paginated personal holdings", () => {
         title: "Private address-bound fixture",
         description: "Private metadata preserved in the Collections snapshot.",
         eventUrl: "https://private-holder.example.invalid/event",
-        imageUrl: `https://media.poap.in/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+        imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
         hasArtwork: true,
         isPrivate: true,
         isHidden: true,
@@ -258,7 +259,7 @@ describe("paginated personal holdings", () => {
       title: "Private address-bound fixture",
       description: "Private metadata preserved in the Collections snapshot.",
       eventUrl: "https://private-holder.example.invalid/event",
-      imageUrl: `https://media.poap.in/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+      imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
       hasArtwork: true,
       isPrivate: true,
       isHidden: true,
@@ -301,7 +302,7 @@ describe("paginated personal holdings", () => {
       expect.objectContaining({
         drop_id: 99,
         title: "Private address-bound fixture",
-        artwork_url: `https://media.poap.in/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+        artwork_url: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
         is_private: true,
         is_hidden: true,
       }),

@@ -62,8 +62,8 @@ test("signed preflight uploads, reuses, and never transmits the root secret", as
   assert.equal(target.protocolVersion, 1);
   assert.deepEqual(first, { disposition: "uploaded", etag: sha256.slice(0, 32) });
   assert.deepEqual(second, { disposition: "reused", etag: sha256.slice(0, 32) });
-  assert.equal(bucket.putCalls, 2);
-  assert.equal(bucket.headCalls, 1);
+  assert.equal(bucket.putCalls, 1);
+  assert.equal(bucket.headCalls, 2);
   assert.equal(Buffer.compare(bucket.stored.get(key).bytes, bytes), 0);
   assert.equal(bucket.lastPutOptions.sha256, sha256);
   assert.deepEqual(bucket.lastPutOptions.onlyIf, { etagDoesNotMatch: "*" });
@@ -165,8 +165,23 @@ test("a lost success response retries as an exact reuse", async () => {
   });
 
   assert.deepEqual(result, { disposition: "reused", etag: digest(bytes).slice(0, 32) });
-  assert.equal(bucket.putCalls, 2);
-  assert.equal(bucket.headCalls, 1);
+  assert.equal(bucket.putCalls, 1);
+  assert.equal(bucket.headCalls, 2);
+});
+
+test("bridge accepts R2 checksum objects that expose sha256 without toJSON", async () => {
+  const bucket = new MemoryR2Bucket();
+  bucket.plainChecksums = true;
+  const uploader = bridgeUploader(bridgeEnv(bucket));
+  const bytes = webp("plain checksum shape");
+  const sha256 = digest(bytes);
+  const key = `snapshots/${SNAPSHOT_ID}/artwork/226162.webp`;
+
+  const first = await uploader.upload({ key, bytes, sha256 });
+  const second = await uploader.upload({ key, bytes, sha256 });
+
+  assert.equal(first.disposition, "uploaded");
+  assert.equal(second.disposition, "reused");
 });
 
 test("preflight rejects stale signatures and mismatched target metadata", async () => {
@@ -307,6 +322,7 @@ class MemoryR2Bucket {
     this.putCalls = 0;
     this.headCalls = 0;
     this.lastPutOptions = null;
+    this.plainChecksums = false;
   }
 
   async put(key, value, options) {
@@ -324,7 +340,7 @@ class MemoryR2Bucket {
       key,
       size: bytes.byteLength,
       etag: sha256.slice(0, 32),
-      checksums: { toJSON: () => ({ sha256 }) },
+      checksums: this.plainChecksums ? { sha256 } : { toJSON: () => ({ sha256 }) },
       httpMetadata: options.httpMetadata,
       customMetadata: options.customMetadata,
       bytes,

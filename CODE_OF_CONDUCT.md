@@ -1,6 +1,6 @@
 # Code of Conduct
 
-POAPin Archive is built to preserve community history. The project should be a
+POAP 留存計畫 is built to preserve community history. The project should be a
 place where people can do careful work without being diminished, harassed, or
 excluded.
 
@@ -28,8 +28,8 @@ community calls, and project-related direct messages.
 
 ## Reporting and enforcement
 
-Report conduct concerns privately to Kira at
-[kira@glorylab.xyz](mailto:kira@glorylab.xyz). Include links, dates, context,
+Report conduct concerns privately at
+[poap@stevechoice.org](mailto:poap@stevechoice.org). Include links, dates, context,
 and any immediate safety concern. Reports will be handled as confidentially as
 practical; information will be shared only when needed to investigate or
 protect participants.

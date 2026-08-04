@@ -83,7 +83,7 @@ describe("Drop detail batch export", () => {
           country: "Germany",
           year: 2018,
           isVirtual: false,
-          imageUrl: "https://media.poap.in/snapshots/2026-07-02-v1/artwork/1.webp",
+          imageUrl: "https://media.example.invalid/snapshots/2026-07-02-v1/artwork/1.webp",
           hasArtwork: true,
           tokenCount: 1,
           eventUrl: "https://www.dappcon.io/",

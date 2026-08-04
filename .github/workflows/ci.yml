@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Typecheck, test, and build
+  worker:
+    name: Worker and archive browser
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -52,3 +52,55 @@ jobs:
 
       - name: Test browser media loading policy
         run: npm run test:browser
+
+  frontend:
+    name: Astro frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: frontend-astro
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend-astro/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check and build
+        run: npm run build
+
+  contracts:
+    name: Smart contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: contracts
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and test
+        run: npm test

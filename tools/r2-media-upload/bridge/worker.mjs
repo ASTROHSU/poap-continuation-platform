@@ -81,6 +81,16 @@ export async function handleBridgeRequest(request, env, now = Date.now) {
   if (!authorized) return jsonError(401, "authorization_failed");
 
   try {
+    const existing = await env.ARCHIVE_BUCKET.head(key);
+    if (existing) {
+      if (
+        !matchesExistingObject(existing, { byteLength, sha256, cacheControl: config.cacheControl })
+      ) {
+        return jsonError(409, "existing_object_conflict");
+      }
+      return objectResponse(200, "reused", existing, sha256);
+    }
+
     const created = await env.ARCHIVE_BUCKET.put(key, request.body, {
       onlyIf: { etagDoesNotMatch: "*" },
       sha256,
@@ -94,20 +104,20 @@ export async function handleBridgeRequest(request, env, now = Date.now) {
       },
     });
     if (created) {
-      const storedSha256 = created.checksums?.toJSON().sha256;
+      const storedSha256 = readStoredSha256(created);
       if (created.size !== byteLength || storedSha256 !== sha256) {
         return jsonError(503, "r2_write_verification_failed");
       }
       return objectResponse(201, "uploaded", created, sha256);
     }
 
-    const existing = await env.ARCHIVE_BUCKET.head(key);
+    const racedObject = await env.ARCHIVE_BUCKET.head(key);
     if (
-      !matchesExistingObject(existing, { byteLength, sha256, cacheControl: config.cacheControl })
+      !matchesExistingObject(racedObject, { byteLength, sha256, cacheControl: config.cacheControl })
     ) {
       return jsonError(409, "existing_object_conflict");
     }
-    return objectResponse(200, "reused", existing, sha256);
+    return objectResponse(200, "reused", racedObject, sha256);
   } catch (error) {
     if (error?.code === 10037) return jsonError(422, "checksum_mismatch");
     return jsonError(503, "r2_write_failed");
@@ -180,7 +190,7 @@ function readConfig(env) {
 }
 
 function matchesExistingObject(object, expected) {
-  const storedSha256 = object?.checksums?.toJSON().sha256;
+  const storedSha256 = readStoredSha256(object);
   return Boolean(
     object &&
     object.size === expected.byteLength &&
@@ -190,6 +200,13 @@ function matchesExistingObject(object, expected) {
     object.httpMetadata?.contentType === "image/webp" &&
     object.httpMetadata?.cacheControl === expected.cacheControl,
   );
+}
+
+function readStoredSha256(object) {
+  const checksums = object?.checksums;
+  if (!checksums) return undefined;
+  if (typeof checksums.toJSON === "function") return checksums.toJSON()?.sha256;
+  return typeof checksums.sha256 === "string" ? checksums.sha256 : undefined;
 }
 
 function parseByteLength(value) {

@@ -3,7 +3,9 @@ export interface Bindings {
   HOLDINGS_DB: D1Database;
   COLLECTIONS_DB: D1Database;
   MOMENTS_DB: D1Database;
+  LIVE_DB: D1Database;
   ARCHIVE_BUCKET: R2Bucket;
+  ARCHIVE_MEDIA_BUCKET: R2Bucket;
   BROWSE_RATE_LIMITER: RateLimit;
   OWNER_RATE_LIMITER: RateLimit;
   EXPORT_RATE_LIMITER: RateLimit;
@@ -18,6 +20,23 @@ export interface Bindings {
   API_CACHE_VERSION: string;
   MEDIA_BASE_URL: string;
   ETHEREUM_RPC_URL: string;
+  BASE_RPC_URL: string;
+  BASE_MAINNET_RPC_URL: string;
+  ARBITRUM_MAINNET_RPC_URL: string;
+  GNOSIS_MAINNET_RPC_URL: string;
+  MINT_SIGNER_PRIVATE_KEY: string;
+  MINT_RELAYER_PRIVATE_KEY: string;
+  PUBLIC_APP_URL: string;
+  EMAIL_PROVIDER: "console" | "resend";
+  EMAIL_FROM: string;
+  RESEND_API_KEY: string;
+  EMAIL_LOOKUP_SECRET: string;
+  EMAIL_DATA_KEY: string;
+  WALLET_PROVISIONING_MODE: "disabled" | "magic-pregen";
+  MAGIC_PUBLISHABLE_API_KEY: string;
+  MAGIC_SECRET_KEY?: string;
+  MAGIC_EMAIL_TEMPLATE_NAME?: string;
+  APP_MODE: "combined" | "live-only";
 }
 
 export interface AppEnv {
