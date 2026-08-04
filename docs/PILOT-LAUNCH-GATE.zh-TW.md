@@ -76,7 +76,7 @@ npm run event:media -- \
   --confirm-remote first-pilot
 ```
 
-接著依 `PHASE-2-BASE-SEPOLIA.zh-TW.md` 部署合約、建立 token ID，記下合約地址與部署
+接著依 `BASE-SEPOLIA-DEPLOYMENT.zh-TW.md` 部署合約、建立 token ID，記下合約地址與部署
 `blockNumber`。活動會先以 `draft` 載入；每一個 Pilot D1 指令都必須明確指定 Pilot config：
 
 ```bash
@@ -124,7 +124,7 @@ npm run event:status -- \
 4. 等待 finalized indexer 後，以 `/address/0x…` 查到該枚收藏。
 5. 再開同一領取連結，確認不能重複占用名額。
 6. 再次以 Pilot config 執行 `event:audit`，確認 reservation、mint、indexer 與 supply 一致。
-7. 執行下列備份，並依 Phase 4 Runbook 在空白 D1 做還原演練：
+7. 執行下列備份，並依 Pilot Runbook 在空白 D1 做還原演練：
 
    ```bash
    npm run live-db:backup -- \

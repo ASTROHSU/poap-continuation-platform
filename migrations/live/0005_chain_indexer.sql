@@ -1,4 +1,4 @@
--- Phase 3: finalized Base event projection for current ERC-1155 ownership.
+-- Finalized Base event projection for current ERC-1155 ownership.
 -- The append-only event journal is authoritative; balances are trigger-maintained.
 
 ALTER TABLE live_events ADD COLUMN contract_start_block INTEGER

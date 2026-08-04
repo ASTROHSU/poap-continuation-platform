@@ -1,6 +1,6 @@
 # AssociationBadges contracts
 
-Phase 2 uses one self-owned ERC-1155 contract. Each event is a token ID. Collectors submit their
+The platform uses one self-owned ERC-1155 contract. Each event is a token ID. Collectors submit their
 own Base Sepolia transaction using a short-lived EIP-712 authorization issued by the Worker.
 
 ## Local verification

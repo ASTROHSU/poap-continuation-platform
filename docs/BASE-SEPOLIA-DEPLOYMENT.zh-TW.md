@@ -1,10 +1,10 @@
-# Phase 2：Base Sepolia 真實鑄造操作手冊
+# Base Sepolia 真實鑄造操作手冊
 
 本階段採「協會 relayer 代付 Gas」方案。領取者連接自己的錢包只為確認收件地址；
 平台簽發 15 分鐘有效的 EIP-712 授權，再由協會 relayer 送出 Base Sepolia 交易。
 平台不持有收藏者私鑰，收藏者不需準備 ETH 或在錢包簽署鑄造交易。
 
-15 GB 歷史快照不在本流程內。Phase 2 只建立 2026 年 7 月之後的新發行系統。
+15 GB 歷史快照不在本流程內；本手冊只處理新發行系統的測試網部署。
 
 ## 已完成的系統能力
 
@@ -173,7 +173,7 @@ npm run event:chain -- \
   --config wrangler.pilot.jsonc
 ```
 
-`--start-block` 使用合約部署指令輸出的 `blockNumber`。它讓 Phase 3 indexer 能從合約
+`--start-block` 使用合約部署指令輸出的 `blockNumber`。它讓鏈上 indexer 能從合約
 誕生的區塊完整重播所有 mint 與 transfer，不能省略或填成目前區塊。
 
 活動以 `draft` 載入。完成 `event:chain` 與 `event:audit` 後，再以同一個 Pilot config 執行
@@ -199,8 +199,8 @@ npm run event:chain -- \
 - 關閉活動後，新資格無法取得授權。
 - Worker 收到偽造 tx hash 時不會寫成 `minted`。
 
-## Phase 2 完成定義
+## 部署驗收標準
 
-程式與本機自動測試完成，不等於 Phase 2 通過。只有在協會自己的 Cloudflare 環境與
+程式與本機自動測試完成，不等於部署驗收通過。只有在操作者自己的 Cloudflare 環境與
 Base Sepolia 上完成 10 地址真實鑄造，保存合約地址與 10 筆 transaction hash，才能把
-Phase 2 標記為 Done 並進入 Base 主網 Phase 3。
+測試網驗收完成後，才評估部署 Base 主網與啟用正式鏈上索引。

@@ -1,4 +1,4 @@
-# MVP 本機操作手冊
+# 本機開發與操作
 
 ## 目前已經能做什麼
 
@@ -16,7 +16,7 @@
 - 建立帶 SHA-256 manifest 的私有 LIVE_DB SQL 備份。
 
 Base 合約與前端已完成本機實作；尚待在協會自己的 Cloudflare account 與 Base Sepolia
-完成真實部署驗收。完整步驟見 `PHASE-2-BASE-SEPOLIA.zh-TW.md`。
+完成真實部署驗收。完整步驟見 `BASE-SEPOLIA-DEPLOYMENT.zh-TW.md`。
 
 ## 啟動
 
@@ -138,7 +138,7 @@ npm run event:stats -- --slug mvp-demo --target local
 - `slots`：產生的資格總數。
 - `used`：已登記地址的數量。
 - `unused`：尚未使用的數量。
-- `minted`：Phase 2 之後已完成鏈上鑄造的數量。
+- `minted`：已完成鏈上鑄造的數量。
 
 完整活動對帳：
 
@@ -148,7 +148,7 @@ npm run event:audit -- --slug mvp-demo --target local
 
 它會同時列出 Email 保留、已綁定錢包、待鑄造、已鑄造、等待 indexer、目前鏈上供應量、
 holder 數與 indexer lag。Pilot 操作、備份與補救流程見
-`PHASE-4-PILOT-RUNBOOK.zh-TW.md`。
+`PILOT-RUNBOOK.zh-TW.md`。
 
 本機 LIVE_DB 備份：
 

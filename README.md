@@ -55,23 +55,21 @@ npm run dev
 
 ## 文件
 
-- [明早只需要完成的四步](docs/MORNING-4-STEPS.zh-TW.md)
-- [POAP 流程對照與設計稽核](docs/POAP-FLOW-AUDIT.zh-TW.md)
-- [Pilot 上線閘門](docs/PILOT-LAUNCH-GATE.zh-TW.md)
-- [MVP 產品規格](docs/MVP-PRD.zh-TW.md)
-- [Phase 0–6 Roadmap](docs/ROADMAP.zh-TW.md)
-- [MVP 技術架構](docs/MVP-ARCHITECTURE.zh-TW.md)
-- [本機操作手冊](docs/MVP-RUNBOOK.zh-TW.md)
-- [Phase 2.5 Email 預約手冊](docs/PHASE-2.5-EMAIL-RESERVATION.zh-TW.md)
-- [Phase 3 Base 鏈上索引手冊](docs/PHASE-3-CHAIN-INDEXER.zh-TW.md)
-- [Phase 4 Pilot 操作與復原手冊](docs/PHASE-4-PILOT-RUNBOOK.zh-TW.md)
-- [錢包建立與 Gas 代付決策](docs/WALLET-AND-GAS-DECISION.zh-TW.md)
+- [平台技術架構](docs/PLATFORM-ARCHITECTURE.zh-TW.md)
+- [本機開發與操作](docs/LOCAL-DEVELOPMENT.zh-TW.md)
+- [Base Sepolia 部署手冊](docs/BASE-SEPOLIA-DEPLOYMENT.zh-TW.md)
+- [Base 鏈上索引手冊](docs/CHAIN-INDEXER.zh-TW.md)
+- [Pilot 操作與復原手冊](docs/PILOT-RUNBOOK.zh-TW.md)
+- [Pilot 上線檢查](docs/PILOT-LAUNCH-GATE.zh-TW.md)
 - [Magic PreGen 接入準備與啟用手冊](docs/MAGIC-PREGEN-READINESS.zh-TW.md)
-- [開源發布檢查表](docs/OPEN-SOURCE-RELEASE-CHECKLIST.zh-TW.md)
+- [資料來源與授權](docs/data-and-licensing.md)
+- [歷史資料匯入](docs/data-import.md)
+- [貢獻指南](CONTRIBUTING.md)
+- [安全政策](SECURITY.md)
 
 目前正式流程使用 Magic Embedded Wallet OTP；Magic Pre-generated Wallet 仍保留為可選整合，
-預設不啟用。鑄造操作見
-[Phase 2 Base Sepolia 手冊](docs/PHASE-2-BASE-SEPOLIA.zh-TW.md)。
+預設不啟用。測試網部署與鑄造操作見
+[Base Sepolia 部署手冊](docs/BASE-SEPOLIA-DEPLOYMENT.zh-TW.md)。
 
 ---
 
