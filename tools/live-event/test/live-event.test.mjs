@@ -99,7 +99,7 @@ async function createFixture(claimMode, claimCount) {
       eventId: `event-test-${claimMode}`,
       slug: `test-${claimMode}`,
       title: "測試活動",
-      description: "Phase 1 自動測試",
+      description: "活動建立自動測試",
       imageUrl: "/artwork.svg",
       imageFile: "./artwork.svg",
       eventUrl: null,

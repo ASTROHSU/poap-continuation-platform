@@ -1,4 +1,4 @@
--- Phase 3: association-sponsored mint transactions.
+-- Issuer-sponsored mint transactions.
 -- A short lease prevents repeated clicks from spending gas more than once.
 
 ALTER TABLE live_claim_codes ADD COLUMN relay_started_at TEXT;

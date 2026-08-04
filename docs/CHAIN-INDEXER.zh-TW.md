@@ -1,11 +1,11 @@
-# Phase 3：Base 鏈上索引與目前持有人
+# Base 鏈上索引與目前持有人
 
 本階段補上「鏈上已經發生什麼事」到收藏頁之間的同步層。領取完成後，即使 NFT
 之後轉移到另一個錢包，`/address/:address` 也會顯示目前持有人，而不是永遠顯示最初
 領取者。
 
-Phase 3 的程式同時支援 Base Sepolia（`84532`）與 Base mainnet（`8453`），但正式主網
-部署仍必須等 Phase 2／2.5 的 Cloudflare、寄信與 Sepolia 真實驗收通過。
+Indexer 同時支援 Base Sepolia（`84532`）與 Base mainnet（`8453`）。正式主網部署前，
+必須先完成 Cloudflare、身分驗證、Gas 代付與 Sepolia 端到端驗收。
 
 ## 資料流
 
@@ -155,7 +155,7 @@ curl https://你的網域/api/live/indexer/status
 7. 確認 cursor 從原位置續跑且結果正確。
 8. 重跑同一區塊，確認 `indexedEvents` 與 balance 不重複。
 
-Phase 3 自動測試已覆蓋 mint、transfer、batch、重複事件、錯誤 batch 回滾、cursor
+自動測試已覆蓋 mint、transfer、batch、重複事件、錯誤 batch 回滾、cursor
 續跑、目前持有人查詢與健康 API。真實 RPC、finality、Cloudflare Cron 與錢包相容性
 仍需在協會環境驗收。
 

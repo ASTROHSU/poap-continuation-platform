@@ -7,7 +7,7 @@ const claimSigner = requiredAddress("CLAIM_SIGNER_ADDRESS");
 console.log("現在請輸入 Hardhat keystore 密碼並按 Enter；輸入時不會顯示字元。");
 const { viem, networkName } = await network.create();
 if (networkName !== "baseSepolia") {
-  throw new Error("Deployment is restricted to --network baseSepolia in Phase 2.");
+  throw new Error("Deployment is restricted to --network baseSepolia by this script.");
 }
 
 const [deployer] = await viem.getWalletClients();

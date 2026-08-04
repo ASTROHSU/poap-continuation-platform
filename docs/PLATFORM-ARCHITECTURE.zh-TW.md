@@ -1,4 +1,4 @@
-# MVP 技術架構
+# 平台技術架構
 
 ## 核心原則
 
@@ -29,9 +29,12 @@ flowchart LR
   API --> WEB
 ```
 
-## 為何由收藏者錢包送出交易
+## 為何由發行方代付 Gas
 
-若網站替收藏者即時鑄造，Worker 必須持有熱錢包私鑰，並處理 nonce 競爭、RPC 重試、Gas 補價與失敗復原。對單一發行人與低頻活動而言，這些維運風險大於即時體驗的收益。因此 Worker 只簽發短效 EIP-712 授權，由收藏者自己的錢包送出交易。
+收藏者不需要準備 ETH 或簽署鑄造交易。Worker 驗證領取資格後簽發短效 EIP-712 授權，
+再由只持有少量資金的 relayer 送出交易並支付 Gas。合約 owner、claim signer 與 relayer
+分離，以限制任一憑證外洩時的影響範圍；失敗交易可安全重試，成功後再由 receipt 與
+finalized indexer 更新收藏狀態。
 
 MVP 將領取分成兩步：
 
@@ -91,7 +94,7 @@ live/{event_id}/metadata.json
 - Base RPC 只供 receipt 驗證與每分鐘 finalized event indexer；一般瀏覽只讀 D1，
   不在每次頁面請求時呼叫 RPC。
 
-上游 repo 的 Collections 與 Moments 可以保留，但不列為 MVP 上線依賴。若要進一步降低維護面，可在 Phase 1 移除其 route、binding 與 UI。
+上游 repo 的 Collections 與 Moments 可以保留，但不列為新發行流程的上線依賴。若要進一步降低維護面，可移除未使用的 route、binding 與 UI。
 
 ## 主要故障模式
 

@@ -1,4 +1,4 @@
--- Phase 2.5: reserve a claim by verified email, then bind an existing wallet later.
+-- Reserve a claim by verified email, then bind an existing wallet later.
 -- Raw email addresses, magic-link tokens, and session tokens are never stored.
 
 ALTER TABLE live_claim_codes ADD COLUMN reservation_id TEXT;

@@ -1,4 +1,4 @@
--- Phase 1: one claim URL may either represent one slot (unique mode)
+-- One claim URL may either represent one slot (unique mode)
 -- or a pool of slots (shared mode).
 
 ALTER TABLE live_events

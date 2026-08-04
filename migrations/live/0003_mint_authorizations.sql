@@ -1,4 +1,4 @@
--- Phase 2: a reserved claim can be exchanged repeatedly for the same
+-- A reserved claim can be exchanged repeatedly for the same
 -- short-lived EIP-712 mint authorization until the onchain mint succeeds.
 
 ALTER TABLE live_claim_codes

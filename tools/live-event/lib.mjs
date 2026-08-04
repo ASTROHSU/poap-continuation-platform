@@ -236,7 +236,7 @@ export async function inspectEventImage(event, inputDirectory) {
   const fileStat = await stat(path);
   if (!fileStat.isFile()) throw new Error(`imageFile is not a file: ${path}`);
   if (file.byteLength > MAX_IMAGE_BYTES) {
-    throw new Error(`imageFile exceeds the 10 MiB Phase 1 limit: ${path}`);
+    throw new Error(`imageFile exceeds the 10 MiB event-image limit: ${path}`);
   }
   const image = detectImage(file, extname(path).toLowerCase());
   if (!image) {
