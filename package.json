@@ -90,7 +90,7 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1092.0",
     "@cloudflare/vite-plugin": "^1.15.3",
-    "@cloudflare/vitest-pool-workers": "^0.12.4",
+    "@cloudflare/vitest-pool-workers": "^0.20.1",
     "@playwright/test": "1.61.1",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.7",
