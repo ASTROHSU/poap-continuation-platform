@@ -47,14 +47,33 @@ const {
     </header>
     <main><slot /></main>
     <footer class="overflow-hidden bg-leaf-dark px-5 py-12 text-white/72">
-      <div class="mx-auto grid max-w-7xl gap-8 md:grid-cols-[1fr_auto] md:items-end lg:px-5">
+      <div class="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,auto)] lg:items-end lg:px-5">
         <div>
           <p class="text-xl font-bold text-white">記憶留下，故事繼續。</p>
           <p class="mt-3 max-w-xl text-sm leading-6 text-white/58">查詢歷史 POAP，也收藏兆量富足教育協會的新活動紀念。</p>
         </div>
-        <div class="text-sm md:text-right">
-          <a class="font-bold text-white transition hover:text-blush" href="/email/collection">我的收藏</a>
-          <p class="mt-3 text-xs text-white/42">社群延續實驗 · 非 POAP 官方服務</p>
+        <div class="border-t border-white/14 pt-7 lg:border-t-0 lg:border-l lg:py-1 lg:pl-9">
+          <p class="text-[11px] font-black tracking-[.18em] text-mint">OPEN SOURCE</p>
+          <p class="mt-2 text-base font-bold leading-7 text-white">這是一個開源專案，歡迎社群一起協作。</p>
+          <div class="mt-4 flex flex-col items-start gap-3 text-sm sm:flex-row sm:flex-wrap">
+            <a
+              class="rounded-full border border-white/24 bg-white/8 px-4 py-2 font-bold text-white transition hover:border-blush hover:bg-white/14 hover:text-blush focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blush"
+              href="https://github.com/ASTROHSU/poap-continuation-platform"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              在 GitHub 參與協作 ↗
+            </a>
+            <a
+              class="px-1 py-2 font-bold text-white/72 underline decoration-white/24 underline-offset-4 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blush"
+              href="https://github.com/glorylab/poapin-archive"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Built on POAPin Archive by Glory Lab ↗
+            </a>
+          </div>
+          <p class="mt-4 text-xs text-white/42">社群延續實驗 · 非 POAP 官方服務</p>
         </div>
       </div>
     </footer>
