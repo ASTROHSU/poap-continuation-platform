@@ -273,7 +273,7 @@ export default function ClaimDemo({ slug }: { slug: string }) {
               )}
               <p className="mt-5 text-center text-xs leading-5 text-ink/38">
                 Email 會自動建立或開啟錢包；ENS 與地址會直接作為收件地址。Gas 由協會支付，現在使用
-                Base Sepolia 測試網。
+                Base 主網。
               </p>
             </div>
           )}
