@@ -134,7 +134,11 @@ export async function verifyMintTransaction(
     ) {
       return "pending";
     }
-    throw error;
+    // Receipt providers can temporarily reject historical or finalized-block
+    // reads even after accepting the relay transaction. Treat that as pending:
+    // confirmation remains fail-closed until a provider returns a receipt whose
+    // logs contain the exact contract, recipient, and token id.
+    return "pending";
   }
   if (receipt.status !== "success") return "invalid";
   return receiptContainsMint(

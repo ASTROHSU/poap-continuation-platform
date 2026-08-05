@@ -68,7 +68,7 @@
     "MEDIA_BASE_URL": "https://your-worker.example.workers.dev/media/archive",
     "ETHEREUM_RPC_URL": "https://ethereum-rpc.publicnode.com",
     "BASE_RPC_URL": "https://sepolia.base.org",
-    "BASE_MAINNET_RPC_URL": "https://base-rpc.publicnode.com",
+    "BASE_MAINNET_RPC_URL": "https://mainnet.base.org",
     "ARBITRUM_MAINNET_RPC_URL": "https://arb1.arbitrum.io/rpc",
     "GNOSIS_MAINNET_RPC_URL": "https://gnosis-rpc.publicnode.com",
     "PUBLIC_APP_URL": "https://badge.example.org",
