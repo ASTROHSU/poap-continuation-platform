@@ -1,0 +1,25 @@
+{
+  "name": "8 月線上讀書會",
+  "description": "參與兆量富足教育協會 2026 年 8 月線上讀書會的共同紀念。",
+  "image": "https://association-poap-pilot.mingnhsu.workers.dev/media/live/events/august-book-club-2026/artwork.jpg",
+  "external_url": "https://poap.blocktrend.today",
+  "attributes": [
+    {
+      "trait_type": "主辦單位",
+      "value": "兆量富足教育協會"
+    },
+    {
+      "display_type": "date",
+      "trait_type": "活動日期",
+      "value": 1786233600
+    },
+    {
+      "trait_type": "活動形式",
+      "value": "線上讀書會"
+    },
+    {
+      "trait_type": "鏈",
+      "value": "Base"
+    }
+  ]
+}

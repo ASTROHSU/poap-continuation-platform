@@ -26,7 +26,8 @@
 | ----------------------- | ---------------------------------------------------- |
 | `frontend-astro/`       | 目前公開使用的 Astro 前端                            |
 | `src/worker/`           | Cloudflare Worker API、領取、Email、Magic 與鏈上索引 |
-| `contracts/`            | ERC-1155 活動紀念智慧合約                            |
+| `contracts/`            | ERC-1155 活動紀念智慧合約與下一版 UUPS Proxy         |
+| `metadata/`             | 可公開重現的活動與合約層 metadata                    |
 | `tools/live-event/`     | 建立活動、QR、匯入、稽核與備份工具                   |
 | `tools/archive-import/` | 歷史 Archive 的 D1／R2 匯入工具                      |
 | `migrations/`           | D1 schema 與 migrations                              |
