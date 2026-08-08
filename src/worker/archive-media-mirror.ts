@@ -3,7 +3,11 @@ import { ApiError } from "./validation";
 export const PUBLIC_ARCHIVE_MEDIA_ORIGIN = "https://media.poap.in";
 
 const MAX_BATCH_SIZE = 18;
-const COPY_CONCURRENCY = 3;
+// Cloudflare Workers Paid permits six simultaneous outgoing connections per
+// request. Each transfer streams source-to-R2 without buffering, so six
+// parallel objects gives the migration useful throughput while staying inside
+// that documented limit.
+const COPY_CONCURRENCY = 6;
 const CONTENT_TYPES: Record<string, string> = {
   png: "image/png",
   jpg: "image/jpeg",
