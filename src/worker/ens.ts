@@ -5,7 +5,7 @@ import { ApiError } from "./validation";
 
 export const DEFAULT_ETHEREUM_RPC_URL = "https://ethereum-rpc.publicnode.com";
 
-const ENS_CACHE_SCHEMA = "ens-v1";
+const ENS_CACHE_SCHEMA = "ens-v2";
 const ENS_NAME_MAX_BYTES = 255;
 const ENS_LABEL_MAX_BYTES = 63;
 const ENS_POSITIVE_EDGE_TTL_SECONDS = 604_800;
@@ -150,7 +150,10 @@ export async function withEnsCache(
 async function lookupEnsAddress(name: string, rpcUrl: string): Promise<string | null> {
   const client = createPublicClient({
     chain: mainnet,
-    ccipRead: false,
+    // POAP Nicknames such as name.onpoap.eth, name.withpoap.eth, and
+    // name.poap.xyz use ENS wildcard/offchain resolution. Keeping CCIP Read
+    // enabled is required for those names to resolve to their wallet address.
+    ccipRead: {},
     transport: http(rpcUrl, {
       retryCount: 0,
       timeout: 3_500,

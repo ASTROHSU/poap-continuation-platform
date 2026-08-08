@@ -14,6 +14,7 @@ import {
   verifyMagicSession,
 } from "../lib/live-api";
 import { loginWithMagicEmail } from "../lib/magic-wallet";
+import { looksLikeEnsName } from "../lib/recipient-input";
 
 type Progress = "idle" | "authenticating" | "resolving" | "minting" | "done";
 
@@ -97,7 +98,7 @@ export default function ClaimDemo({ slug }: { slug: string }) {
         walletAddress = verified.address;
       } else if (/^0x[a-fA-F0-9]{40}$/.test(value)) {
         walletAddress = value as `0x${string}`;
-      } else if (value.toLowerCase().endsWith(".eth")) {
+      } else if (looksLikeEnsName(value)) {
         setProgress("resolving");
         const resolved = await resolveEns(value);
         walletAddress = resolved.address as `0x${string}`;

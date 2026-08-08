@@ -7,6 +7,7 @@ import {
   verifyMagicSession,
 } from "../lib/live-api";
 import { loginWithMagicEmail } from "../lib/magic-wallet";
+import { looksLikeEnsName } from "../lib/recipient-input";
 
 export default function CollectionSearch() {
   const [query, setQuery] = useState("");
@@ -56,7 +57,7 @@ export default function CollectionSearch() {
       window.location.href = `/address/${encodeURIComponent(value)}`;
       return;
     }
-    if (value.toLowerCase().endsWith(".eth")) {
+    if (looksLikeEnsName(value)) {
       setSearching(true);
       setError("");
       try {

@@ -12,6 +12,9 @@ import {
 describe("ENS resolution", () => {
   it("normalizes ENSIP-15 names and accepts exactly one query parameter", () => {
     expect(normalizeEnsName("  EricMWalk.eth  ")).toBe("ericmwalk.eth");
+    expect(normalizeEnsName("  Renie.POAP.XYZ  ")).toBe("renie.poap.xyz");
+    expect(normalizeEnsName("Clover.ONPOAP.ETH")).toBe("clover.onpoap.eth");
+    expect(normalizeEnsName("Name.WITHPOAP.ETH")).toBe("name.withpoap.eth");
     expect(
       parseEnsNameQuery(new URL("https://poap.in/api/resolve-address?name=EricMWalk.eth")),
     ).toBe("ericmwalk.eth");
