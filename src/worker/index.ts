@@ -237,8 +237,8 @@ app.post("/api/admin/archive-media/mirror", async (context) => {
     throw new ApiError(401, "Archive media mirror authorization is required.", "mirror_unauthorized");
   }
   const body = await parseJsonObject(context.req.raw, "Archive media mirror request");
-  const { afterDropId, limit } = parseArchiveMediaMirrorRequest(body);
-  const result = await mirrorArchiveMediaBatch(context.env, afterDropId, limit);
+  const { afterDropId, limit, untilDropId } = parseArchiveMediaMirrorRequest(body);
+  const result = await mirrorArchiveMediaBatch(context.env, afterDropId, limit, untilDropId);
   return context.json(result, 200, { "Cache-Control": "private, no-store" });
 });
 
@@ -443,7 +443,7 @@ app.get(
     const namespace = context.req.param("namespace");
     const prefix = context.req.param("prefix");
     const filename = context.req.param("filename");
-    const match = /^([0-9a-f]{64})\.(png|jpg|gif|webp|avif)$/.exec(filename);
+    const match = /^([0-9a-f]{64})\.(png|jpg|gif|webp|avif|heic)$/.exec(filename);
     const activeSnapshot =
       (namespace === "collections" && snapshotId === context.env.COLLECTIONS_SNAPSHOT_ID) ||
       (namespace === "holdings" && snapshotId === context.env.HOLDINGS_SNAPSHOT_ID);
@@ -466,6 +466,7 @@ app.get(
       ["gif", "image/gif"],
       ["webp", "image/webp"],
       ["avif", "image/avif"],
+      ["heic", "image/heic"],
     ]).get(match[2]);
     if (!expectedContentType) throw new ApiError(404, "Archive artwork not found.", "media_not_found");
 

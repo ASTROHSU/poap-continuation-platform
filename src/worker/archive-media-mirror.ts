@@ -10,6 +10,7 @@ const CONTENT_TYPES: Record<string, string> = {
   gif: "image/gif",
   webp: "image/webp",
   avif: "image/avif",
+  heic: "image/heic",
 };
 
 export type ArchiveMediaMirrorRow = {
@@ -47,17 +48,25 @@ export async function mirrorArchiveMediaBatch(
   env: MirrorBindings,
   afterDropId: number,
   requestedLimit: number | undefined,
+  untilDropId: number | undefined,
 ): Promise<ArchiveMediaMirrorResult> {
   const limit = normalizeLimit(requestedLimit);
-  const rows = await env.HOLDINGS_DB.prepare(
-    `SELECT drop_id, object_key, sha256, byte_length, content_type
-     FROM holding_drop_artwork
-     WHERE drop_id > ?1
-     ORDER BY drop_id
-     LIMIT ?2`,
-  )
-    .bind(afterDropId, limit)
-    .all<ArchiveMediaMirrorRow>();
+  const statement = untilDropId
+    ? env.HOLDINGS_DB.prepare(
+        `SELECT drop_id, object_key, sha256, byte_length, content_type
+         FROM holding_drop_artwork
+         WHERE drop_id > ?1 AND drop_id <= ?2
+         ORDER BY drop_id
+         LIMIT ?3`,
+      ).bind(afterDropId, untilDropId, limit)
+    : env.HOLDINGS_DB.prepare(
+        `SELECT drop_id, object_key, sha256, byte_length, content_type
+         FROM holding_drop_artwork
+         WHERE drop_id > ?1
+         ORDER BY drop_id
+         LIMIT ?2`,
+      ).bind(afterDropId, limit);
+  const rows = await statement.all<ArchiveMediaMirrorRow>();
   const items = rows.results ?? [];
 
   const outcomes = await mapWithConcurrency(items, COPY_CONCURRENCY, async (row) =>
@@ -79,7 +88,9 @@ export async function mirrorArchiveMediaBatch(
     );
   }
 
-  const complete = items.length < limit;
+  const complete =
+    items.length < limit ||
+    (untilDropId !== undefined && (items.at(-1)?.drop_id ?? afterDropId) >= untilDropId);
   const copied = outcomes.filter(
     (outcome) => outcome.status === "fulfilled" && outcome.value === "copied",
   ).length;
@@ -178,7 +189,7 @@ export function validateMirrorRow(
     segments[3] === "drop-artwork" &&
     segments[4] === "sha256";
   const filename = segments[6] ?? "";
-  const match = /^([0-9a-f]{64})\.(png|jpg|gif|webp|avif)$/.exec(filename);
+  const match = /^([0-9a-f]{64})\.(png|jpg|gif|webp|avif|heic)$/.exec(filename);
   if (
     (!isCollectionArtwork && !isHoldingArtwork) ||
     !match ||
@@ -197,6 +208,7 @@ export function validateMirrorRow(
 export function parseArchiveMediaMirrorRequest(value: unknown): {
   afterDropId: number;
   limit: number | undefined;
+  untilDropId: number | undefined;
 } {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ApiError(400, "Archive media mirror request is invalid.", "invalid_mirror_request");
@@ -213,9 +225,19 @@ export function parseArchiveMediaMirrorRequest(value: unknown): {
   ) {
     throw new ApiError(400, "Archive media mirror limit is invalid.", "invalid_mirror_limit");
   }
+  const untilDropId = input.untilDropId;
+  if (
+    untilDropId !== undefined &&
+    (typeof untilDropId !== "number" ||
+      !Number.isSafeInteger(untilDropId) ||
+      untilDropId <= afterDropId)
+  ) {
+    throw new ApiError(400, "Archive media mirror stop cursor is invalid.", "invalid_mirror_stop");
+  }
   return {
     afterDropId,
     limit: rawLimit as number | undefined,
+    untilDropId: untilDropId as number | undefined,
   };
 }
 

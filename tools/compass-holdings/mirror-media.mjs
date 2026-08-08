@@ -12,7 +12,7 @@ if (!secret || secret.length < 32) {
 }
 
 const endpoint = options.endpoint.replace(/\/+$/, "");
-const state = await readState(options.state);
+const state = await readState(options.state, options.afterDropId, options.untilDropId);
 console.log(
   `[archive-media-mirror] resuming after drop ${state.afterDropId}; ` +
     `${state.copied} copied, ${state.skipped} already present`,
@@ -20,7 +20,13 @@ console.log(
 
 let processedThisRun = 0;
 while (!state.complete && processedThisRun < options.maxBatches) {
-  const result = await mirrorPage(endpoint, secret, state.afterDropId, options.limit);
+  const result = await mirrorPage(
+    endpoint,
+    secret,
+    state.afterDropId,
+    options.limit,
+    state.untilDropId ?? undefined,
+  );
   state.afterDropId = result.nextAfterDropId;
   state.complete = result.complete;
   state.copied += result.copied;
@@ -46,7 +52,7 @@ if (state.complete) {
   console.log(`[archive-media-mirror] paused after ${processedThisRun} batch(es); rerun with the same state file.`);
 }
 
-async function mirrorPage(endpoint, secret, afterDropId, limit) {
+async function mirrorPage(endpoint, secret, afterDropId, limit, untilDropId) {
   let lastError = null;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     try {
@@ -56,7 +62,7 @@ async function mirrorPage(endpoint, secret, afterDropId, limit) {
           Authorization: `Bearer ${secret}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ afterDropId, limit }),
+        body: JSON.stringify({ afterDropId, limit, ...(untilDropId ? { untilDropId } : {}) }),
       });
       if (!response.ok) {
         const payload = await response.text();
@@ -89,7 +95,7 @@ function validateResult(value) {
   return result;
 }
 
-async function readState(path) {
+async function readState(path, afterDropId, untilDropId) {
   try {
     const parsed = JSON.parse(await readFile(path, "utf8"));
     if (
@@ -100,16 +106,22 @@ async function readState(path) {
       !Number.isSafeInteger(parsed.skipped) ||
       !Number.isSafeInteger(parsed.bytesCopied) ||
       !Number.isSafeInteger(parsed.batches) ||
-      typeof parsed.complete !== "boolean"
+      typeof parsed.complete !== "boolean" ||
+      (parsed.untilDropId !== null &&
+        (!Number.isSafeInteger(parsed.untilDropId) || parsed.untilDropId <= parsed.afterDropId))
     ) {
       throw new Error("Mirror state file was invalid.");
+    }
+    if (untilDropId !== undefined && parsed.untilDropId !== untilDropId) {
+      throw new Error("Mirror state file does not match the requested --until cursor.");
     }
     return parsed;
   } catch (error) {
     if (error && typeof error === "object" && error.code === "ENOENT") {
       return {
         schemaVersion: 1,
-        afterDropId: 0,
+        afterDropId,
+        untilDropId: untilDropId ?? null,
         complete: false,
         copied: 0,
         skipped: 0,
@@ -133,12 +145,16 @@ function parseArgs(argv) {
   let state = process.env.ARCHIVE_MEDIA_MIRROR_STATE;
   let limit = Number(process.env.ARCHIVE_MEDIA_MIRROR_LIMIT ?? DEFAULT_LIMIT);
   let maxBatches = Number.POSITIVE_INFINITY;
+  let afterDropId = 0;
+  let untilDropId;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--endpoint") endpoint = argv[++index];
     else if (value === "--state") state = argv[++index];
     else if (value === "--limit") limit = Number(argv[++index]);
     else if (value === "--max-batches") maxBatches = Number(argv[++index]);
+    else if (value === "--after") afterDropId = Number(argv[++index]);
+    else if (value === "--until") untilDropId = Number(argv[++index]);
     else throw new Error(`Unknown argument: ${value}`);
   }
   if (!endpoint || !/^https:\/\/[a-z0-9.-]+(?:\/.*)?$/i.test(endpoint)) {
@@ -148,10 +164,19 @@ function parseArgs(argv) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 18) {
     throw new Error("--limit must be an integer between 1 and 18.");
   }
-  if (!Number.isSafeInteger(maxBatches) || maxBatches < 1) {
+  if (maxBatches !== Number.POSITIVE_INFINITY && (!Number.isSafeInteger(maxBatches) || maxBatches < 1)) {
     throw new Error("--max-batches must be a positive integer.");
   }
-  return { endpoint, state, limit, maxBatches };
+  if (!Number.isSafeInteger(afterDropId) || afterDropId < 0) {
+    throw new Error("--after must be a non-negative integer.");
+  }
+  if (
+    untilDropId !== undefined &&
+    (!Number.isSafeInteger(untilDropId) || untilDropId <= afterDropId)
+  ) {
+    throw new Error("--until must be an integer greater than --after.");
+  }
+  return { endpoint, state, limit, maxBatches, afterDropId, untilDropId };
 }
 
 function formatBytes(bytes) {

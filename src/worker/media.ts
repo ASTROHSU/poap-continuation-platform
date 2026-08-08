@@ -1,6 +1,6 @@
 const TRAILING_SLASHES = /\/+$/;
 const SNAPSHOT_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-const CONTENT_ADDRESSED_FILE = /^([0-9a-f]{64})\.(png|jpg|gif|webp|avif)$/;
+const CONTENT_ADDRESSED_FILE = /^([0-9a-f]{64})\.(png|jpg|gif|webp|avif|heic)$/;
 const ARCHIVE_ARTWORK_FILE = /^([1-9][0-9]*)\.webp$/;
 
 /** Returns the immutable R2 custom-domain path for an archived original. */

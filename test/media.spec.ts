@@ -156,6 +156,20 @@ describe("archive media mirror policy", () => {
       ),
     ).toBe("image/png");
 
+    expect(
+      validateMirrorRow(
+        {
+          drop_id: 43,
+          object_key: HOLDING_DROP_KEY.replace(/\.png$/, ".heic"),
+          sha256: SHA256,
+          byte_length: 128,
+          content_type: "image/heic",
+        },
+        HOLDINGS_SNAPSHOT,
+        COLLECTIONS_SNAPSHOT,
+      ),
+    ).toBe("image/heic");
+
     expect(() =>
       validateMirrorRow(
         {
@@ -175,10 +189,14 @@ describe("archive media mirror policy", () => {
     expect(parseArchiveMediaMirrorRequest({ afterDropId: 123, limit: 12 })).toEqual({
       afterDropId: 123,
       limit: 12,
+      untilDropId: undefined,
     });
     expect(() => parseArchiveMediaMirrorRequest({ afterDropId: -1 })).toThrow(
       "cursor is invalid",
     );
     expect(() => parseArchiveMediaMirrorRequest({ limit: "12" })).toThrow("limit is invalid");
+    expect(() => parseArchiveMediaMirrorRequest({ afterDropId: 5, untilDropId: 5 })).toThrow(
+      "stop cursor is invalid",
+    );
   });
 });
