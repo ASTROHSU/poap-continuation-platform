@@ -18,7 +18,8 @@ console.log(
     `${state.copied} copied, ${state.skipped} already present`,
 );
 
-while (!state.complete) {
+let processedThisRun = 0;
+while (!state.complete && processedThisRun < options.maxBatches) {
   const result = await mirrorPage(endpoint, secret, state.afterDropId, options.limit);
   state.afterDropId = result.nextAfterDropId;
   state.complete = result.complete;
@@ -28,6 +29,7 @@ while (!state.complete) {
   state.batches += 1;
   state.updatedAt = new Date().toISOString();
   await writeState(options.state, state);
+  processedThisRun += 1;
   console.log(
     `[archive-media-mirror] batch ${state.batches}: ${result.scanned} rows, ` +
       `${result.copied} copied, ${result.skipped} present, ` +
@@ -35,10 +37,14 @@ while (!state.complete) {
   );
 }
 
-console.log(
-  `[archive-media-mirror] complete: ${state.copied} copied, ${state.skipped} present, ` +
-    `${formatBytes(state.bytesCopied)} transferred.`,
-);
+if (state.complete) {
+  console.log(
+    `[archive-media-mirror] complete: ${state.copied} copied, ${state.skipped} present, ` +
+      `${formatBytes(state.bytesCopied)} transferred.`,
+  );
+} else {
+  console.log(`[archive-media-mirror] paused after ${processedThisRun} batch(es); rerun with the same state file.`);
+}
 
 async function mirrorPage(endpoint, secret, afterDropId, limit) {
   let lastError = null;
@@ -126,11 +132,13 @@ function parseArgs(argv) {
   let endpoint = process.env.ARCHIVE_MEDIA_MIRROR_ENDPOINT;
   let state = process.env.ARCHIVE_MEDIA_MIRROR_STATE;
   let limit = Number(process.env.ARCHIVE_MEDIA_MIRROR_LIMIT ?? DEFAULT_LIMIT);
+  let maxBatches = Number.POSITIVE_INFINITY;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--endpoint") endpoint = argv[++index];
     else if (value === "--state") state = argv[++index];
     else if (value === "--limit") limit = Number(argv[++index]);
+    else if (value === "--max-batches") maxBatches = Number(argv[++index]);
     else throw new Error(`Unknown argument: ${value}`);
   }
   if (!endpoint || !/^https:\/\/[a-z0-9.-]+(?:\/.*)?$/i.test(endpoint)) {
@@ -140,7 +148,10 @@ function parseArgs(argv) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 18) {
     throw new Error("--limit must be an integer between 1 and 18.");
   }
-  return { endpoint, state, limit };
+  if (!Number.isSafeInteger(maxBatches) || maxBatches < 1) {
+    throw new Error("--max-batches must be a positive integer.");
+  }
+  return { endpoint, state, limit, maxBatches };
 }
 
 function formatBytes(bytes) {
