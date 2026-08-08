@@ -36,6 +36,7 @@ export interface Bindings {
   MAGIC_PUBLISHABLE_API_KEY: string;
   MAGIC_SECRET_KEY?: string;
   MAGIC_EMAIL_TEMPLATE_NAME?: string;
+  ARCHIVE_MEDIA_MIRROR_SECRET?: string;
   APP_MODE: "combined" | "live-only";
 }
 

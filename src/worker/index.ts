@@ -91,6 +91,11 @@ import {
 import { transactionExplorerUrl } from "../shared/live-chains";
 import { publicMagicEmbeddedWalletConfig, verifyMagicIdentity } from "./magic-auth";
 import {
+  mirrorArchiveMediaBatch,
+  parseArchiveMediaMirrorRequest,
+  PUBLIC_ARCHIVE_MEDIA_ORIGIN,
+} from "./archive-media-mirror";
+import {
   fetchDrop,
   fetchDropCollectors,
   fetchDropDetailBatch,
@@ -142,7 +147,6 @@ const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v7";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
 const DROP_COLLECTORS_CACHE_SCHEMA = "drop-collectors-v2";
 const LEGACY_POAP_CACHE_SCHEMA = "legacy-poap-v6";
-const PUBLIC_ARCHIVE_MEDIA_ORIGIN = "https://media.poap.in";
 
 export function collectionsApiVersion(
   bindings: Pick<Bindings, "API_CACHE_VERSION" | "COLLECTIONS_RELEASE_ID">,
@@ -219,6 +223,23 @@ app.get("/api/app-config", (context) => {
     walletProvisioning: publicWalletProvisioningConfig(context.env),
     embeddedWallet: publicMagicEmbeddedWalletConfig(context.env),
   });
+});
+
+/**
+ * A deliberately non-public migration control plane. It is used only by the
+ * local mirror runner while moving the verified supplemental artwork release
+ * into this project's R2 bucket. The endpoint is unavailable until its secret
+ * has been configured in the deployed Worker.
+ */
+app.post("/api/admin/archive-media/mirror", async (context) => {
+  const secret = context.env.ARCHIVE_MEDIA_MIRROR_SECRET;
+  if (!isAuthorizedArchiveMediaMirrorRequest(context.req.raw, secret)) {
+    throw new ApiError(401, "Archive media mirror authorization is required.", "mirror_unauthorized");
+  }
+  const body = await parseJsonObject(context.req.raw, "Archive media mirror request");
+  const { afterDropId, limit } = parseArchiveMediaMirrorRequest(body);
+  const result = await mirrorArchiveMediaBatch(context.env, afterDropId, limit);
+  return context.json(result, 200, { "Cache-Control": "private, no-store" });
 });
 
 app.post("/api/live/magic/session", async (context) => {
@@ -439,6 +460,37 @@ app.get(
       prefix,
       filename,
     ];
+    const expectedContentType = new Map([
+      ["png", "image/png"],
+      ["jpg", "image/jpeg"],
+      ["gif", "image/gif"],
+      ["webp", "image/webp"],
+      ["avif", "image/avif"],
+    ]).get(match[2]);
+    if (!expectedContentType) throw new ApiError(404, "Archive artwork not found.", "media_not_found");
+
+    const objectKey = segments.join("/");
+    const mirrored = await context.env.ARCHIVE_MEDIA_BUCKET.get(objectKey);
+    if (mirrored) {
+      if (
+        mirrored.customMetadata?.sha256 !== match[1] ||
+        mirrored.httpMetadata?.contentType !== expectedContentType
+      ) {
+        throw new ApiError(502, "Archive artwork response was invalid.", "media_invalid");
+      }
+      const headers = new Headers({
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Type": expectedContentType,
+        "Cross-Origin-Resource-Policy": "cross-origin",
+        "ETag": mirrored.httpEtag,
+        "X-Content-Type-Options": "nosniff",
+      });
+      return new Response(mirrored.body, { headers });
+    }
+
+    // Keep the public archive functional while the one-time mirror runs. Once
+    // the runner verifies all rows, this fallback is removed in its own deploy.
     const upstreamUrl = `${PUBLIC_ARCHIVE_MEDIA_ORIGIN}/${segments
       .map((segment) => encodeURIComponent(segment))
       .join("/")}`;
@@ -449,18 +501,7 @@ app.get(
         "X-Content-Type-Options": "nosniff",
       });
     }
-
-    const expectedContentType = new Map([
-      ["png", "image/png"],
-      ["jpg", "image/jpeg"],
-      ["gif", "image/gif"],
-      ["webp", "image/webp"],
-      ["avif", "image/avif"],
-    ]).get(match[2]);
-    if (
-      !expectedContentType ||
-      upstream.headers.get("Content-Type")?.split(";", 1)[0] !== expectedContentType
-    ) {
+    if (upstream.headers.get("Content-Type")?.split(";", 1)[0] !== expectedContentType) {
       throw new ApiError(502, "Archive artwork response was invalid.", "media_invalid");
     }
 
@@ -2486,6 +2527,18 @@ function normalizeLiveMediaFilename(value: string): string {
     return value;
   }
   throw new ApiError(404, "Media not found.", "media_not_found");
+}
+
+function isAuthorizedArchiveMediaMirrorRequest(request: Request, secret: string | undefined): boolean {
+  if (!secret || secret.length < 32) return false;
+  const authorization = request.headers.get("Authorization");
+  const expected = `Bearer ${secret}`;
+  if (!authorization || authorization.length !== expected.length) return false;
+  let difference = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    difference |= expected.charCodeAt(index) ^ authorization.charCodeAt(index);
+  }
+  return difference === 0;
 }
 
 async function parseClaimBody(request: Request): Promise<{ code: string; address: string }> {

@@ -58,6 +58,7 @@
     "holdings:package": "node tools/compass-holdings/cli.mjs package",
     "holdings:upload-backup": "node tools/compass-holdings/cli.mjs upload-backup",
     "holdings:artwork": "node tools/compass-holdings/artwork-cli.mjs",
+    "holdings:mirror-media": "node tools/compass-holdings/mirror-media.mjs",
     "moments:snapshot": "node tools/moments-backup/cli.mjs snapshot",
     "moments:compare": "node tools/moments-backup/cli.mjs compare",
     "moments:verify": "node tools/moments-backup/cli.mjs verify",

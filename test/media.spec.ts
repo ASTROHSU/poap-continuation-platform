@@ -4,6 +4,10 @@ import {
   collectionMediaObjectUrl,
   holdingDropArtworkUrl,
 } from "../src/worker/media";
+import {
+  parseArchiveMediaMirrorRequest,
+  validateMirrorRow,
+} from "../src/worker/archive-media-mirror";
 
 const MEDIA_ORIGIN = "https://media.poap.in";
 const ARCHIVE_SNAPSHOT = "2026-07-02-v1";
@@ -133,5 +137,48 @@ describe("public media object-key policy", () => {
         42,
       ),
     ).toBeNull();
+  });
+});
+
+describe("archive media mirror policy", () => {
+  it("accepts only active, content-addressed artwork rows", () => {
+    expect(
+      validateMirrorRow(
+        {
+          drop_id: 42,
+          object_key: HOLDING_DROP_KEY,
+          sha256: SHA256,
+          byte_length: 128,
+          content_type: "image/png",
+        },
+        HOLDINGS_SNAPSHOT,
+        COLLECTIONS_SNAPSHOT,
+      ),
+    ).toBe("image/png");
+
+    expect(() =>
+      validateMirrorRow(
+        {
+          drop_id: 42,
+          object_key: `private/${SHA256}.png`,
+          sha256: SHA256,
+          byte_length: 128,
+          content_type: "image/png",
+        },
+        HOLDINGS_SNAPSHOT,
+        COLLECTIONS_SNAPSHOT,
+      ),
+    ).toThrow("outside the active release");
+  });
+
+  it("accepts bounded numeric mirror cursors only", () => {
+    expect(parseArchiveMediaMirrorRequest({ afterDropId: 123, limit: 12 })).toEqual({
+      afterDropId: 123,
+      limit: 12,
+    });
+    expect(() => parseArchiveMediaMirrorRequest({ afterDropId: -1 })).toThrow(
+      "cursor is invalid",
+    );
+    expect(() => parseArchiveMediaMirrorRequest({ limit: "12" })).toThrow("limit is invalid");
   });
 });

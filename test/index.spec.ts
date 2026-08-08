@@ -553,6 +553,21 @@ describe("archive API", () => {
     expect(wrongSnapshot.status).toBe(404);
   });
 
+  it("prefers mirrored supplemental artwork from the dedicated bucket", async () => {
+    const key = `snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/ab/${HOLDING_ARTWORK_SHA}.png`;
+    const bytes = new Uint8Array([137, 80, 78, 71]);
+    await bindings.ARCHIVE_MEDIA_BUCKET.put(key, bytes, {
+      httpMetadata: { contentType: "image/png" },
+      customMetadata: { sha256: HOLDING_ARTWORK_SHA },
+    });
+
+    const response = await SELF.fetch(`https://poap.in/media/archive/${key}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("cross-origin-resource-policy")).toBe("cross-origin");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
+  });
+
   it("streams a versioned JSON owner export", async () => {
     const response = await SELF.fetch(`https://poap.in/api/owners/${ADDRESS}/export.json`);
     expect(response.status).toBe(200);
