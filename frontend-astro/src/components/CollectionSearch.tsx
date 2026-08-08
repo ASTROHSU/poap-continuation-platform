@@ -62,7 +62,8 @@ export default function CollectionSearch() {
       setError("");
       try {
         const resolved = await resolveEns(value);
-        window.location.href = `/address/${encodeURIComponent(resolved.address)}`;
+        const query = new URLSearchParams({ name: resolved.name });
+        window.location.href = `/address/${encodeURIComponent(resolved.address)}?${query}`;
       } catch (problem) {
         setError(readableError(problem));
         setSearching(false);

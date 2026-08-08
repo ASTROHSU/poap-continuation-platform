@@ -2,7 +2,8 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import WalletCollectionDemo from "../../components/WalletCollectionDemo";
 const { address = "" } = Astro.params;
+const displayName = Astro.url.searchParams.get("name") ?? "";
 ---
 <BaseLayout title="POAP 收藏｜POAP 社群版">
-  <section class="mx-auto max-w-7xl px-5 py-12 lg:px-10 lg:py-20"><WalletCollectionDemo client:load address={address} /></section>
+  <section class="mx-auto max-w-7xl px-5 py-12 lg:px-10 lg:py-20"><WalletCollectionDemo client:load address={address} displayName={displayName} /></section>
 </BaseLayout>

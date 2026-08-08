@@ -10,8 +10,15 @@ import {
   type LegacyPoapHolding,
   type LiveHolding,
 } from "../lib/live-api";
+import { looksLikeEnsName } from "../lib/recipient-input";
 
-export default function WalletCollectionDemo({ address }: { address: string }) {
+export default function WalletCollectionDemo({
+  address,
+  displayName = "",
+}: {
+  address: string;
+  displayName?: string;
+}) {
   const [items, setItems] = useState<LiveHolding[] | null>(null);
   const [archiveItems, setArchiveItems] = useState<ArchiveHolding[] | null>(null);
   const [legacyItems, setLegacyItems] = useState<LegacyPoapHolding[] | null>(null);
@@ -139,6 +146,7 @@ export default function WalletCollectionDemo({ address }: { address: string }) {
     (items?.length ?? 0) > 0 ||
     (legacyComplete ? (legacyItems?.length ?? 0) > 0 : (archiveItems?.length ?? 0) > 0);
   const unavailable = Boolean(error && archiveError && legacyError);
+  const collectionName = looksLikeEnsName(displayName) ? displayName.trim() : "";
   const monthGroups = useMemo(
     () =>
       groupCollectionByMonth(
@@ -156,7 +164,9 @@ export default function WalletCollectionDemo({ address }: { address: string }) {
       <div className="flex flex-col gap-5 border-b border-ink/10 pb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="eyebrow">COLLECTORS</span>
-          <h1 className="display-title mt-5 text-5xl sm:text-6xl">POAP 收藏</h1>
+          <h1 className="display-title mt-5 break-words text-5xl sm:text-6xl">
+            {collectionName || "POAP 收藏"}
+          </h1>
           <p className="mt-4 max-w-xl break-all font-mono text-xs text-ink/42">{resolvedAddress}</p>
         </div>
         <span className="self-start rounded-full border-2 border-[#7669d8] bg-white px-5 py-2.5 font-display text-sm font-bold text-[#4f457c] shadow-[4px_5px_0_#ddd9ff] sm:self-auto">
@@ -186,13 +196,6 @@ export default function WalletCollectionDemo({ address }: { address: string }) {
         </div>
       ) : hasAny ? (
         <>
-          {(error || archiveError || legacyError || !legacyComplete) && (
-            <p className="mt-7 rounded-2xl bg-blush/35 px-5 py-4 text-sm font-bold text-ink/65">
-              {legacyError || !legacyComplete
-                ? "鏈上收藏正在使用歷史快照補足；少數近期或已轉移的 POAP 可能稍後才會更新。"
-                : "部分收藏暫時無法載入，已先顯示可讀取的內容。"}
-            </p>
-          )}
           <div className="mt-10 space-y-10 sm:space-y-12">
             {monthGroups.map((group) => (
               <section key={group.key} aria-labelledby={`collection-month-${group.key}`}>

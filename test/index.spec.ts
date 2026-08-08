@@ -487,6 +487,42 @@ describe("archive API", () => {
     });
   });
 
+  it("accepts verified Collections artwork referenced by supplemental Holdings", async () => {
+    const collectionKey =
+      `snapshots/${bindings.COLLECTIONS_SNAPSHOT_ID}/collections/drop-artwork/sha256/de/` +
+      `${CATALOG_FALLBACK_ARTWORK_SHA}.png`;
+    const originalKey =
+      `snapshots/${bindings.HOLDINGS_SNAPSHOT_ID}/holdings/drop-artwork/sha256/de/` +
+      `${CATALOG_FALLBACK_ARTWORK_SHA}.png`;
+    await bindings.HOLDINGS_DB.prepare(
+      "UPDATE holding_drop_artwork SET object_key = ?1 WHERE drop_id = 3",
+    )
+      .bind(collectionKey)
+      .run();
+
+    try {
+      const response = await SELF.fetch(
+        "https://poap.in/api/archive/owners/0x3333333333333333333333333333333333333333?limit=1",
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        total: 1,
+        items: [
+          expect.objectContaining({
+            dropId: 3,
+            imageUrl: `${APP_MEDIA_BASE_URL}/${collectionKey}`,
+          }),
+        ],
+      });
+    } finally {
+      await bindings.HOLDINGS_DB.prepare(
+        "UPDATE holding_drop_artwork SET object_key = ?1 WHERE drop_id = 3",
+      )
+        .bind(originalKey)
+        .run();
+    }
+  });
+
   it("serves core ZIP Drop metadata for the collection detail view", async () => {
     const response = await SELF.fetch("https://poap.in/api/archive/drops/2");
     expect(response.status).toBe(200);

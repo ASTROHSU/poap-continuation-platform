@@ -26,6 +26,7 @@ export const ALL: APIRoute = async ({ params, request }) => {
   const responseHeaders = new Headers(upstream.headers);
   responseHeaders.delete("content-length");
   responseHeaders.delete("content-encoding");
+  responseHeaders.set("cache-control", "private, no-store");
   responseHeaders.set("x-content-type-options", "nosniff");
 
   return new Response(upstream.body, {

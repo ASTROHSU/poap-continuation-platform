@@ -142,6 +142,7 @@ const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v7";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
 const DROP_COLLECTORS_CACHE_SCHEMA = "drop-collectors-v2";
 const LEGACY_POAP_CACHE_SCHEMA = "legacy-poap-v6";
+const PUBLIC_ARCHIVE_MEDIA_ORIGIN = "https://media.poap.in";
 
 export function collectionsApiVersion(
   bindings: Pick<Bindings, "API_CACHE_VERSION" | "COLLECTIONS_RELEASE_ID">,
@@ -412,6 +413,71 @@ app.get("/media/archive/snapshots/:snapshotId/artwork/:filename", async (context
   headers.set("Cache-Control", "public, max-age=31536000, immutable");
   return new Response(object.body, { headers });
 });
+
+app.get(
+  "/media/archive/snapshots/:snapshotId/:namespace/drop-artwork/sha256/:prefix/:filename",
+  async (context) => {
+    assertNoQuery(new URL(context.req.url));
+    const snapshotId = context.req.param("snapshotId");
+    const namespace = context.req.param("namespace");
+    const prefix = context.req.param("prefix");
+    const filename = context.req.param("filename");
+    const match = /^([0-9a-f]{64})\.(png|jpg|gif|webp|avif)$/.exec(filename);
+    const activeSnapshot =
+      (namespace === "collections" && snapshotId === context.env.COLLECTIONS_SNAPSHOT_ID) ||
+      (namespace === "holdings" && snapshotId === context.env.HOLDINGS_SNAPSHOT_ID);
+    if (!activeSnapshot || !match || prefix !== match[1].slice(0, 2)) {
+      throw new ApiError(404, "Archive artwork not found.", "media_not_found");
+    }
+
+    const segments = [
+      "snapshots",
+      snapshotId,
+      namespace,
+      "drop-artwork",
+      "sha256",
+      prefix,
+      filename,
+    ];
+    const upstreamUrl = `${PUBLIC_ARCHIVE_MEDIA_ORIGIN}/${segments
+      .map((segment) => encodeURIComponent(segment))
+      .join("/")}`;
+    const upstream = await fetch(upstreamUrl);
+    if (!upstream.ok || !upstream.body) {
+      return context.json({ error: "Media not found.", code: "media_not_found" }, 404, {
+        "Cache-Control": "public, max-age=60",
+        "X-Content-Type-Options": "nosniff",
+      });
+    }
+
+    const expectedContentType = new Map([
+      ["png", "image/png"],
+      ["jpg", "image/jpeg"],
+      ["gif", "image/gif"],
+      ["webp", "image/webp"],
+      ["avif", "image/avif"],
+    ]).get(match[2]);
+    if (
+      !expectedContentType ||
+      upstream.headers.get("Content-Type")?.split(";", 1)[0] !== expectedContentType
+    ) {
+      throw new ApiError(502, "Archive artwork response was invalid.", "media_invalid");
+    }
+
+    const headers = new Headers({
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "Content-Type": expectedContentType,
+      "Cross-Origin-Resource-Policy": "cross-origin",
+      "X-Content-Type-Options": "nosniff",
+    });
+    const etag = upstream.headers.get("ETag");
+    const lastModified = upstream.headers.get("Last-Modified");
+    if (etag) headers.set("ETag", etag);
+    if (lastModified) headers.set("Last-Modified", lastModified);
+    return new Response(upstream.body, { headers });
+  },
+);
 
 app.get("/api/live/events/:slug", async (context) => {
   const limited = await enforceRateLimit(context.env.BROWSE_RATE_LIMITER, context.req.raw);
@@ -2293,7 +2359,7 @@ app.get("/api/archive/owners/:address", async (context) => {
           query,
           context.env.HOLDINGS_SNAPSHOT_ID,
           context.env.SNAPSHOT_ID,
-          context.env.SNAPSHOT_ID,
+          context.env.COLLECTIONS_SNAPSHOT_ID,
           context.env.MEDIA_BASE_URL,
         ),
       );
