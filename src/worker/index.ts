@@ -94,6 +94,7 @@ import {
   mirrorArchiveMediaBatch,
   parseArchiveMediaMirrorRequest,
   PUBLIC_ARCHIVE_MEDIA_ORIGIN,
+  runScheduledArchiveMediaMirror,
 } from "./archive-media-mirror";
 import {
   fetchDrop,
@@ -2885,10 +2886,15 @@ export default {
     env: Bindings,
     _context: ExecutionContext,
   ): Promise<void> {
-    const [indexer, emailPrune] = await Promise.all([
+    const [indexer, emailPrune, archiveMediaMirror] = await Promise.all([
       runLiveChainIndexer(env),
       pruneExpiredEmailAuthArtifacts(env.LIVE_DB),
+      runScheduledArchiveMediaMirror(env),
     ]);
-    console.log("Scheduled continuation maintenance completed", { indexer, emailPrune });
+    console.log("Scheduled continuation maintenance completed", {
+      indexer,
+      emailPrune,
+      archiveMediaMirror,
+    });
   },
 };

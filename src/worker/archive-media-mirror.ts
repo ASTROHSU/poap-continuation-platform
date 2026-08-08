@@ -42,6 +42,24 @@ type MirrorBindings = {
   COLLECTIONS_SNAPSHOT_ID: string;
 };
 
+type ScheduledMirrorBindings = MirrorBindings & {
+  ARCHIVE_BUCKET: R2Bucket;
+  ARCHIVE_MEDIA_MIRROR_ENABLED?: string;
+};
+
+const SCHEDULED_MIRROR_STATE_KEY = "maintenance/archive-media-mirror-v1.json";
+
+type ScheduledMirrorState = {
+  schemaVersion: 1;
+  afterDropId: number;
+  complete: boolean;
+  copied: number;
+  skipped: number;
+  bytesCopied: number;
+  batches: number;
+  updatedAt: string;
+};
+
 /**
  * Copies one bounded page of content-addressed, public supplemental artwork
  * from the release origin into the project's R2 bucket. Bodies are streamed
@@ -113,6 +131,44 @@ export async function mirrorArchiveMediaBatch(
     copied,
     skipped,
     bytesCopied,
+  };
+}
+
+/**
+ * Durable fallback for the one-time transfer. It advances a persisted cursor
+ * every minute, so an interrupted local runner never leaves the project
+ * dependent on the external media host. It is opt-in through a Worker var and
+ * stops itself permanently once the final cursor is reached.
+ */
+export async function runScheduledArchiveMediaMirror(
+  env: ScheduledMirrorBindings,
+): Promise<{ enabled: boolean; complete: boolean; copied: number; skipped: number }> {
+  if (env.ARCHIVE_MEDIA_MIRROR_ENABLED !== "true") {
+    return { enabled: false, complete: false, copied: 0, skipped: 0 };
+  }
+  const state = await readScheduledMirrorState(env.ARCHIVE_BUCKET);
+  if (state.complete) {
+    return { enabled: true, complete: true, copied: 0, skipped: 0 };
+  }
+  const result = await mirrorArchiveMediaBatch(env, state.afterDropId, 18, undefined);
+  const nextState: ScheduledMirrorState = {
+    ...state,
+    afterDropId: result.nextAfterDropId,
+    complete: result.complete,
+    copied: state.copied + result.copied,
+    skipped: state.skipped + result.skipped,
+    bytesCopied: state.bytesCopied + result.bytesCopied,
+    batches: state.batches + 1,
+    updatedAt: new Date().toISOString(),
+  };
+  await env.ARCHIVE_BUCKET.put(SCHEDULED_MIRROR_STATE_KEY, JSON.stringify(nextState), {
+    httpMetadata: { contentType: "application/json", cacheControl: "private, no-store" },
+  });
+  return {
+    enabled: true,
+    complete: nextState.complete,
+    copied: result.copied,
+    skipped: result.skipped,
   };
 }
 
@@ -277,4 +333,40 @@ async function mapWithConcurrency<T, U>(
 
 function failureMessage(value: unknown): string {
   return value instanceof Error ? value.message : "unknown error";
+}
+
+async function readScheduledMirrorState(bucket: R2Bucket): Promise<ScheduledMirrorState> {
+  const object = await bucket.get(SCHEDULED_MIRROR_STATE_KEY);
+  if (!object) return emptyScheduledMirrorState();
+  try {
+    const state = await object.json<ScheduledMirrorState>();
+    if (
+      state.schemaVersion !== 1 ||
+      !Number.isSafeInteger(state.afterDropId) ||
+      state.afterDropId < 0 ||
+      typeof state.complete !== "boolean" ||
+      !Number.isSafeInteger(state.copied) ||
+      !Number.isSafeInteger(state.skipped) ||
+      !Number.isSafeInteger(state.bytesCopied) ||
+      !Number.isSafeInteger(state.batches)
+    ) {
+      throw new Error("invalid state");
+    }
+    return state;
+  } catch {
+    throw new Error("Scheduled archive media mirror state is invalid.");
+  }
+}
+
+function emptyScheduledMirrorState(): ScheduledMirrorState {
+  return {
+    schemaVersion: 1,
+    afterDropId: 0,
+    complete: false,
+    copied: 0,
+    skipped: 0,
+    bytesCopied: 0,
+    batches: 0,
+    updatedAt: new Date(0).toISOString(),
+  };
 }
