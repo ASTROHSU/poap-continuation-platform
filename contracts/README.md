@@ -8,8 +8,8 @@ Two implementations are retained:
 
 - `AssociationBadges.sol` is the immutable first deployment used by the current Base event.
 - `AssociationBadgesUpgradeable.sol` is the next UUPS proxy implementation. It keeps the same claim
-  model and adds collection metadata, owner-controlled metadata updates, a global emergency pause,
-  and owner-authorized upgrades.
+  model and adds explorer-compatible collection name/symbol getters, ERC-7572 collection metadata,
+  owner-controlled metadata updates, a global emergency pause, and owner-authorized upgrades.
 
 An existing immutable contract cannot be converted into a proxy. Deploying the proxy creates a new
 contract address; the application must aggregate both addresses so previously issued badges remain
@@ -57,6 +57,8 @@ npm run deploy:proxy:base-sepolia
 ```
 
 The deploy script records both the stable proxy address and the replaceable implementation address.
+It also verifies and records the collection name, symbol, and contract-level metadata URI so an
+incomplete explorer identity is caught before deployment.
 For Base mainnet it refuses to send a transaction unless the explicit confirmation variable is set:
 
 ```bash

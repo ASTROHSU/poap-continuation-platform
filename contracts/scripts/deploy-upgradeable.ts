@@ -35,6 +35,11 @@ if ((await contract.claimSigner()).toLowerCase() !== claimSigner.toLowerCase()) 
 if ((await contract.contractURI()) !== contractMetadataUri) {
   throw new Error("Proxy contract metadata initialization did not persist.");
 }
+const contractName = await contract.name();
+const contractSymbol = await contract.symbol();
+if (!contractName.trim() || !contractSymbol.trim()) {
+  throw new Error("Proxy collection identity is empty.");
+}
 
 const outputDir = resolve("deployment-output");
 await mkdir(outputDir, { recursive: true, mode: 0o700 });
@@ -48,6 +53,8 @@ const output = {
   deployer: deployer.address,
   owner,
   claimSigner,
+  contractName,
+  contractSymbol,
   contractMetadataUri,
   implementationVersion: String(await contract.implementationVersion()),
   deployedAt: new Date().toISOString(),

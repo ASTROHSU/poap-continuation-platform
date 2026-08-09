@@ -1,7 +1,9 @@
 {
   "name": "兆量富足教育協會數位紀念",
+  "symbol": "ZLFZ",
   "description": "記錄共同學習、活動參與與值得收藏的共同經歷。",
   "image": "https://association-poap-pilot.mingnhsu.workers.dev/media/live/events/august-book-club-2026/artwork.jpg",
+  "banner_image": "https://association-poap-pilot.mingnhsu.workers.dev/media/live/events/august-book-club-2026/artwork.jpg",
   "featured_image": "https://association-poap-pilot.mingnhsu.workers.dev/media/live/events/august-book-club-2026/artwork.jpg",
-  "external_link": "https://poap.blocktrend.today"
+  "external_link": "https://stevechoice.org/"
 }

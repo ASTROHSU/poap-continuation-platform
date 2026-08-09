@@ -8,4 +8,5 @@
 - R2 上的正式 JSON 與這裡的版本一致。
 
 `events/*.json` 是單一 token ID 的 metadata；`association-badges.json` 是可升級合約透過
-ERC-7572 `contractURI()` 提供的 collection-level metadata。
+ERC-7572 `contractURI()` 提供的 collection-level metadata。Collection 的 `external_link`
+應指向協會官方網站；單一活動的 `external_url` 可以指向平台內的活動或收藏頁。

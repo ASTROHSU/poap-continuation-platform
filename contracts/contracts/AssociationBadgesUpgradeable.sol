@@ -22,6 +22,11 @@ contract AssociationBadgesUpgradeable is
     EIP712Upgradeable,
     UUPSUpgradeable
 {
+    /// @dev Optional ERC-1155 collection identity getters used by block explorers and wallets.
+    ///      ERC-1155 does not require name/symbol; token-level metadata remains canonical.
+    string private constant _COLLECTION_NAME = unicode"兆量富足教育協會數位紀念";
+    string private constant _COLLECTION_SYMBOL = "ZLFZ";
+
     struct EventConfig {
         uint128 maxSupply;
         bool active;
@@ -194,6 +199,16 @@ contract AssociationBadgesUpgradeable is
         EventConfig storage config = _events[tokenId];
         if (config.maxSupply == 0) revert EventDoesNotExist(tokenId);
         return (config.maxSupply, config.active, config.metadataUri);
+    }
+
+    /// @notice Human-readable collection name for explorer and wallet compatibility.
+    function name() external pure returns (string memory) {
+        return _COLLECTION_NAME;
+    }
+
+    /// @notice Short collection identifier for explorer and wallet compatibility.
+    function symbol() external pure returns (string memory) {
+        return _COLLECTION_SYMBOL;
     }
 
     /// @notice ERC-7572 collection-level metadata URI.
