@@ -66,3 +66,17 @@ export async function logoutMagicEmailSession(publishableKey: string): Promise<v
   const magic = new Magic(publishableKey, { deferPreload: true, locale: "zh_TW" });
   if (await magic.user.isLoggedIn()) await magic.user.logout();
 }
+
+/**
+ * Open Magic's protected key-export interface for the current EVM wallet.
+ * The private key stays inside Magic's iframe and is never returned to this app.
+ */
+export async function revealMagicEvmPrivateKey(publishableKey: string): Promise<void> {
+  if (!publishableKey) throw new Error("Magic Email 錢包尚未啟用。");
+  const { Magic } = await import("magic-sdk");
+  const magic = new Magic(publishableKey, { deferPreload: true, locale: "zh_TW" });
+  if (!(await magic.user.isLoggedIn())) {
+    throw new Error("請先使用這個 Email 登入收藏。");
+  }
+  await magic.user.revealEVMPrivateKey();
+}

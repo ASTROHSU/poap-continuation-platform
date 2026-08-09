@@ -2,15 +2,27 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getArchiveDrop,
   getArchiveHoldings,
+  getAppConfig,
   getLegacyPoapHoldings,
   getLiveHoldings,
   readableError,
+  verifyMagicSession,
   type ArchiveDropDetail,
   type ArchiveHolding,
   type LegacyPoapHolding,
   type LiveHolding,
 } from "../lib/live-api";
+import {
+  resumeMagicEmailSession,
+  revealMagicEvmPrivateKey,
+} from "../lib/magic-wallet";
 import { looksLikeEnsName } from "../lib/recipient-input";
+
+interface MagicCollectionOwner {
+  email: string;
+  address: `0x${string}`;
+  publishableKey: string;
+}
 
 export default function WalletCollectionDemo({
   address,
@@ -34,6 +46,10 @@ export default function WalletCollectionDemo({
   const [archiveDetail, setArchiveDetail] = useState<ArchiveDropDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [magicOwner, setMagicOwner] = useState<MagicCollectionOwner | null>(null);
+  const [showKeyExport, setShowKeyExport] = useState(false);
+  const [exportingKey, setExportingKey] = useState(false);
+  const [keyExportError, setKeyExportError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -84,6 +100,43 @@ export default function WalletCollectionDemo({
   }, [address]);
 
   useEffect(() => {
+    let active = true;
+    setMagicOwner(null);
+    setShowKeyExport(false);
+    setKeyExportError("");
+
+    const restoreOwner = async () => {
+      try {
+        const config = await getAppConfig();
+        const publishableKey = config.embeddedWallet.publishableKey;
+        if (!config.embeddedWallet.enabled || !publishableKey) return;
+
+        const session = await resumeMagicEmailSession(publishableKey);
+        if (!session) return;
+        const verified = await verifyMagicSession(session.didToken, session.email);
+        const targetAddress = address.trim().toLowerCase();
+        if (verified.address.toLowerCase() !== targetAddress) return;
+
+        if (active) {
+          setMagicOwner({
+            email: session.email,
+            address: verified.address,
+            publishableKey,
+          });
+        }
+      } catch {
+        // Collection pages remain public. Account controls simply stay hidden
+        // when an authenticated Magic session cannot be verified.
+      }
+    };
+
+    void restoreOwner();
+    return () => {
+      active = false;
+    };
+  }, [address]);
+
+  useEffect(() => {
     if (!selected) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -96,6 +149,20 @@ export default function WalletCollectionDemo({
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [selected]);
+
+  useEffect(() => {
+    if (!showKeyExport) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !exportingKey) setShowKeyExport(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [showKeyExport, exportingKey]);
 
   useEffect(() => {
     let active = true;
@@ -147,6 +214,7 @@ export default function WalletCollectionDemo({
     (legacyComplete ? (legacyItems?.length ?? 0) > 0 : (archiveItems?.length ?? 0) > 0);
   const unavailable = Boolean(error && archiveError && legacyError);
   const collectionName = looksLikeEnsName(displayName) ? displayName.trim() : "";
+  const identityName = magicOwner?.email || collectionName;
   const monthGroups = useMemo(
     () =>
       groupCollectionByMonth(
@@ -159,13 +227,37 @@ export default function WalletCollectionDemo({
     [items, archiveItems, legacyItems, legacyComplete, resolvedAddress],
   );
 
+  const exportPrivateKey = async () => {
+    if (!magicOwner || exportingKey) return;
+    setExportingKey(true);
+    setKeyExportError("");
+    try {
+      await revealMagicEvmPrivateKey(magicOwner.publishableKey);
+      setShowKeyExport(false);
+    } catch (problem) {
+      const message = problem instanceof Error ? problem.message.toLowerCase() : "";
+      if (
+        message.includes("not approved") ||
+        message.includes("not enabled") ||
+        message.includes("unauthorized") ||
+        message.includes("access")
+      ) {
+        setKeyExportError("Magic 尚未替這個應用程式開啟私鑰匯出功能。");
+      } else {
+        setKeyExportError("目前無法開啟私鑰匯出，請確認仍以這個 Email 登入後再試一次。");
+      }
+    } finally {
+      setExportingKey(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-col gap-5 border-b border-ink/10 pb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="eyebrow">COLLECTORS</span>
           <h1 className="display-title mt-5 break-words text-5xl sm:text-6xl">
-            {collectionName || "POAP 收藏"}
+            {identityName || "POAP 收藏"}
           </h1>
           <p className="mt-4 max-w-xl break-all font-mono text-xs text-ink/42">{resolvedAddress}</p>
         </div>
@@ -173,6 +265,26 @@ export default function WalletCollectionDemo({
           {total.toLocaleString("zh-TW")} 枚 POAP
         </span>
       </div>
+      {magicOwner ? (
+        <section className="mt-6 flex flex-col gap-5 rounded-[2rem] border-2 border-[#dedaff] bg-white/75 p-5 shadow-[6px_7px_0_#efedff] sm:flex-row sm:items-center sm:justify-between sm:p-7">
+          <div>
+            <p className="font-display text-lg font-bold text-[#40375f]">管理你的 Magic 錢包</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/55">
+              這個 Email 對應的錢包由你掌控；需要時可匯出私鑰，自行備份或移至其他 EVM 錢包。
+            </p>
+          </div>
+          <button
+            className="btn-secondary shrink-0"
+            type="button"
+            onClick={() => {
+              setKeyExportError("");
+              setShowKeyExport(true);
+            }}
+          >
+            匯出錢包私鑰
+          </button>
+        </section>
+      ) : null}
       {loading ? (
         <div className="mt-10 space-y-8" aria-label="正在載入收藏">
           {[0, 1, 2].map((group) => (
@@ -264,6 +376,63 @@ export default function WalletCollectionDemo({
           error={detailError}
           onClose={() => setSelected(null)}
         />
+      ) : null}
+      {showKeyExport && magicOwner ? (
+        <div
+          className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-[#2d2847]/55 p-5 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="key-export-title"
+        >
+          <div className="w-full max-w-lg rounded-[2rem] border-2 border-[#514777] bg-white p-6 shadow-[10px_12px_0_#bdb6ff] sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="eyebrow">WALLET CONTROL</span>
+                <h2 id="key-export-title" className="mt-4 font-display text-3xl font-bold">
+                  匯出錢包私鑰
+                </h2>
+              </div>
+              <button
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-[#7669d8] bg-white text-xl font-bold text-[#4f457c]"
+                type="button"
+                aria-label="關閉"
+                disabled={exportingKey}
+                onClick={() => setShowKeyExport(false)}
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-6 text-base leading-7 text-ink/65">
+              私鑰代表這個錢包的完整控制權。任何取得私鑰的人都能操作其中資產，請勿截圖、傳送或貼給任何人。
+            </p>
+            <div className="mt-5 rounded-2xl bg-[#efedff] p-4 text-sm leading-6 text-[#514777]">
+              Magic 會在安全視窗中直接向你顯示私鑰；本站不會讀取、收到或保存私鑰。
+            </div>
+            {keyExportError ? (
+              <p className="mt-4 text-sm font-medium text-[#ab5e74]" role="alert">
+                {keyExportError}
+              </p>
+            ) : null}
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                className="btn-secondary"
+                type="button"
+                disabled={exportingKey}
+                onClick={() => setShowKeyExport(false)}
+              >
+                取消
+              </button>
+              <button
+                className="btn-primary"
+                type="button"
+                disabled={exportingKey}
+                onClick={exportPrivateKey}
+              >
+                {exportingKey ? "正在開啟…" : "我了解，繼續匯出"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );
