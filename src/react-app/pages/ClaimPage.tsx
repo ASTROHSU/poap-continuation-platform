@@ -13,6 +13,7 @@ import {
   getLiveEvent,
   relayLiveEventMint,
   reserveLiveEventByEmail,
+  waitForLiveMintJob,
 } from "../api";
 import { EmptyState, ErrorState } from "../components/States";
 import { Link } from "../router";
@@ -143,22 +144,40 @@ export function ClaimPage({ slug, search }: { slug: string; search: string }) {
       }
       setProgress("協會正在支付 Gas 並送出鑄造…");
       const relayed = await relayLiveEventMint(slug, { code, address: account });
-      const hash = relayed.transactionHash;
-      setTransactionHash(hash);
-      writePendingMint(pendingKey, hash);
-      setProgress("交易已送出，等待 Base Sepolia 確認…");
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash,
-        confirmations: 1,
-      });
-      if (receipt.status !== "success") {
+      if (relayed.jobId) {
+        setProgress("正在鑄造");
+        const completed = await waitForLiveMintJob(relayed.jobId);
+        if (
+          completed.mintStatus !== "minted" ||
+          !completed.transactionHash ||
+          !completed.explorerUrl
+        ) {
+          setProgress("正在鑄造");
+          return;
+        }
+        setTransactionHash(completed.transactionHash);
+        setResult({
+          eventId: event.eventId,
+          slug,
+          address: account,
+          mintStatus: "minted",
+          mintedAt: new Date().toISOString(),
+          transactionHash: completed.transactionHash,
+          explorerUrl: completed.explorerUrl,
+        });
+      } else if (relayed.transactionHash) {
+        const hash = relayed.transactionHash;
+        setTransactionHash(hash);
+        writePendingMint(pendingKey, hash);
+        setProgress("正在鑄造");
+        const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
+        if (receipt.status !== "success") {
+          removePendingMint(pendingKey);
+          throw new Error("正在鑄造");
+        }
+        setResult(await confirmLiveMint(slug, { code, address: account, transactionHash: hash }));
         removePendingMint(pendingKey);
-        throw new Error("鑄造交易失敗，資格仍可重試。");
       }
-
-      setProgress("正在把鏈上結果寫回收藏頁…");
-      setResult(await confirmLiveMint(slug, { code, address: account, transactionHash: hash }));
-      removePendingMint(pendingKey);
       setProgress("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "鑄造失敗，請稍後再試。");

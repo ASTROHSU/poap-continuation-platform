@@ -16,6 +16,7 @@ import {
   provisionEmailWallet,
   relayEmailReservationMint,
   requestEmailLogin,
+  waitForLiveMintJob,
 } from "../api";
 import type { EmailReservation, EmailWallet, WalletProvisioningConfig } from "../types";
 import { isAbortError } from "../utils";
@@ -208,20 +209,27 @@ export function EmailCollectionPage() {
         setMessage("這份紀念章已經鑄造完成。");
         return;
       }
-      setMessage("協會正在支付 Gas 並送出鑄造…");
+      setMessage("正在鑄造");
       const relayed = await relayEmailReservationMint(reservation.reservationId, account);
-      const hash = relayed.transactionHash;
-      localStorage.setItem(pendingKey, hash);
-      setMessage("等待 Base Sepolia 確認…");
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      if (receipt.status !== "success") throw new Error("鑄造交易失敗，保留資格仍可重試。");
-      await confirmEmailReservationMint(reservation.reservationId, {
-        address: account,
-        transactionHash: hash,
-      });
-      localStorage.removeItem(pendingKey);
+      if (relayed.jobId) {
+        const completed = await waitForLiveMintJob(relayed.jobId);
+        if (completed.mintStatus !== "minted") {
+          setMessage("正在鑄造");
+          return;
+        }
+      } else if (relayed.transactionHash) {
+        const hash = relayed.transactionHash;
+        localStorage.setItem(pendingKey, hash);
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== "success") throw new Error("正在鑄造");
+        await confirmEmailReservationMint(reservation.reservationId, {
+          address: account,
+          transactionHash: hash,
+        });
+        localStorage.removeItem(pendingKey);
+      }
       await load();
-      setMessage("鑄造完成，已寫回收藏頁。");
+      setMessage("鑄造完成");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "鑄造失敗，請稍後再試。");
     } finally {

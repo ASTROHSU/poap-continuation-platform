@@ -207,6 +207,23 @@ export function relayLiveEventMint(
   );
 }
 
+export function getLiveMintJob(jobId: string, signal?: AbortSignal) {
+  return requestJson<import("./types").MintJobResponse>(
+    `/api/live/mint-jobs/${encodeURIComponent(jobId)}`,
+    signal,
+    "no-store",
+  );
+}
+
+export async function waitForLiveMintJob(jobId: string, signal?: AbortSignal) {
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    const job = await getLiveMintJob(jobId, signal);
+    if (job.mintStatus === "minted") return job;
+    await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+  }
+  return getLiveMintJob(jobId, signal);
+}
+
 export function getLiveHoldings(address: string, signal?: AbortSignal) {
   if (isDemoMode()) return Promise.resolve(demoGetHoldings(address));
   return requestJson<LiveHoldingsResponse>(

@@ -88,6 +88,8 @@ export function demoRelayMint(address: string): LiveRelayResponse {
     eventId: "event-2026-first-pilot",
     slug: "first-pilot",
     address: address.toLowerCase(),
+    jobId: null,
+    mintStatus: "minting",
     transactionHash: DEMO_TRANSACTION_HASH,
     explorerUrl: "/help",
   };

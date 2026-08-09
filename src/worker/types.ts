@@ -4,6 +4,9 @@ export interface Bindings {
   COLLECTIONS_DB: D1Database;
   MOMENTS_DB: D1Database;
   LIVE_DB: D1Database;
+  MINT_RELAY_COORDINATOR: DurableObjectNamespace<
+    import("./mint-relay-coordinator").MintRelayCoordinator
+  >;
   ARCHIVE_BUCKET: R2Bucket;
   ARCHIVE_MEDIA_BUCKET: R2Bucket;
   BROWSE_RATE_LIMITER: RateLimit;

@@ -74,6 +74,7 @@ export interface LiveCollectorsRecord {
 }
 
 export interface LiveClaimRecord {
+  codeHash: string;
   claimedAt: string;
   claimedBy: Address;
   mintNonce: Hash;
@@ -84,6 +85,7 @@ export interface LiveClaimRecord {
 }
 
 interface LiveClaimRow {
+  code_hash: string;
   claimed_at: string;
   claimed_by: Address;
   mint_nonce: Hash;
@@ -153,6 +155,7 @@ export async function fetchLiveClaim(
   const row = await db
     .prepare(
       `SELECT
+         code_hash,
          claimed_at,
          claimed_by,
          mint_nonce,
@@ -213,6 +216,7 @@ export async function reserveLiveClaim(
              AND claim_closes_at >= ?
          )
        RETURNING
+         code_hash,
          claimed_at,
          claimed_by,
          mint_nonce,
@@ -254,6 +258,7 @@ export async function refreshLiveClaimAuthorization(
          AND mint_nonce IS NOT NULL
          AND minted_tx_hash IS NULL
        RETURNING
+         code_hash,
          claimed_at,
          claimed_by,
          mint_nonce,
@@ -540,6 +545,7 @@ function mapEvent(row: LiveEventRow): LiveEventRecord {
 
 function mapClaim(row: LiveClaimRow): LiveClaimRecord {
   return {
+    codeHash: row.code_hash,
     claimedAt: row.claimed_at,
     claimedBy: row.claimed_by,
     mintNonce: row.mint_nonce,

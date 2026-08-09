@@ -23,6 +23,7 @@ interface EmailChallengeRow {
 }
 
 export interface EmailReservationRecord {
+  codeHash: string;
   reservationId: string;
   reservedAt: string;
   boundAddress: Address | null;
@@ -37,6 +38,7 @@ export interface EmailReservationRecord {
 }
 
 interface EmailReservationRow {
+  code_hash: string;
   reservation_id: string;
   reserved_at: string;
   claimed_by: Address | null;
@@ -68,6 +70,7 @@ interface EmailReservationRow {
 
 const EMAIL_RESERVATION_SELECT = `
   SELECT
+    codes.code_hash,
     codes.reservation_id,
     codes.reserved_at,
     codes.claimed_by,
@@ -545,6 +548,7 @@ function fetchEmailReservationByEvent(
 
 function mapEmailReservation(row: EmailReservationRow): EmailReservationRecord {
   return {
+    codeHash: row.code_hash,
     reservationId: row.reservation_id,
     reservedAt: row.reserved_at,
     boundAddress: row.claimed_by,
@@ -587,6 +591,7 @@ export function asLiveClaimRecord(reservation: EmailReservationRecord): LiveClai
     return null;
   }
   return {
+    codeHash: reservation.codeHash,
     claimedAt: reservation.claimedAt,
     claimedBy: reservation.boundAddress,
     mintNonce: reservation.mintNonce,

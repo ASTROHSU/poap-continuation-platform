@@ -129,8 +129,17 @@ export interface LiveRelayResponse {
   eventId: string;
   slug: string;
   address: string;
-  transactionHash: `0x${string}`;
-  explorerUrl: string;
+  jobId: string | null;
+  mintStatus: "minting" | "minted";
+  transactionHash: `0x${string}` | null;
+  explorerUrl: string | null;
+}
+
+export interface MintJobResponse {
+  jobId: string;
+  mintStatus: "minting" | "minted";
+  transactionHash: `0x${string}` | null;
+  explorerUrl: string | null;
 }
 
 export interface EmailReservation {

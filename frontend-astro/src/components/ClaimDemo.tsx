@@ -8,6 +8,7 @@ import {
   relayWalletMintWithRetry,
   resolveEns,
   waitForMintConfirmation,
+  waitForMintJob,
   type LiveEvent,
   type LiveMintResponse,
   type EmbeddedWalletConfig,
@@ -15,6 +16,7 @@ import {
 } from "../lib/live-api";
 import { loginWithMagicEmail } from "../lib/magic-wallet";
 import { looksLikeEnsName } from "../lib/recipient-input";
+import { mintProgressLabel } from "../lib/mint-progress";
 
 type Progress = "idle" | "authenticating" | "resolving" | "minting" | "done";
 
@@ -116,11 +118,27 @@ export default function ClaimDemo({ slug }: { slug: string }) {
         );
       } else {
         const relayed = await relayWalletMintWithRetry(slug, code, walletAddress);
-        setMint(
-          await waitForMintConfirmation(() =>
-            confirmWalletMint(slug, code, walletAddress, relayed.transactionHash),
-          ),
-        );
+        if (relayed.jobId) {
+          const completed = await waitForMintJob(relayed.jobId);
+          if (completed.mintStatus !== "minted") {
+            throw new Error("正在鑄造，完成後會自動出現在收藏頁。");
+          }
+          setMint({
+            eventId: claim.eventId,
+            slug,
+            address: walletAddress,
+            mintStatus: "minted",
+            mintedAt: new Date().toISOString(),
+            transactionHash: completed.transactionHash!,
+            explorerUrl: completed.explorerUrl!,
+          });
+        } else if (relayed.transactionHash) {
+          setMint(
+            await waitForMintConfirmation(() =>
+              confirmWalletMint(slug, code, walletAddress, relayed.transactionHash!),
+            ),
+          );
+        }
       }
       setProgress("done");
       getLiveEvent(slug)
@@ -212,7 +230,7 @@ export default function ClaimDemo({ slug }: { slug: string }) {
               <span className="mx-auto grid size-12 place-items-center rounded-full bg-leaf text-2xl text-white">
                 ✓
               </span>
-              <h2 className="mt-4 text-xl font-bold">已鑄造</h2>
+              <h2 className="mt-4 text-xl font-bold">{mintProgressLabel("minted")}</h2>
               <p className="mt-2 text-sm text-ink/58">
                 這份數位紀念已送到你的錢包，Gas 由協會支付。
               </p>
@@ -258,7 +276,7 @@ export default function ClaimDemo({ slug }: { slug: string }) {
                     : progress === "resolving"
                       ? "正在解析 ENS…"
                       : progress === "minting"
-                        ? "協會代付 Gas 鑄造中…"
+                        ? `${mintProgressLabel("minting")}…`
                         : remaining === 0
                           ? "已領取完畢"
                           : "領取"}

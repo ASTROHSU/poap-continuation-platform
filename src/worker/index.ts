@@ -34,7 +34,6 @@ import {
 import { mayExposeDevelopmentMagicLink, sendMagicLinkEmail } from "./email";
 import {
   asLiveClaimRecord,
-  beginEmailReservationRelay,
   bindEmailReservationWallet,
   consumeChallengeAndCreateSession,
   createEmailSession,
@@ -46,9 +45,7 @@ import {
   hasAvailableEmailClaimSlot,
   markEmailReservationMinted,
   pruneExpiredEmailAuthArtifacts,
-  recordEmailReservationRelayTransaction,
   refreshEmailReservationAuthorization,
-  releaseEmailReservationRelay,
   reserveClaimForVerifiedEmail,
   revokeEmailSession,
 } from "./email-reservations";
@@ -72,18 +69,23 @@ import {
   momentsReleaseIdentity,
 } from "./moments-repository";
 import {
-  beginLiveClaimRelay,
   fetchLiveClaim,
   fetchLiveCollectors,
   fetchLiveEvent,
   fetchLiveHoldings,
   markLiveClaimMinted,
-  recordLiveClaimRelayTransaction,
   refreshLiveClaimAuthorization,
   reserveLiveClaim,
-  releaseLiveClaimRelay,
 } from "./live";
-import { relayMintAuthorization, signMintAuthorization, verifyMintTransaction } from "./minting";
+import { mintRelayerAddress, signMintAuthorization, verifyMintTransaction } from "./minting";
+import {
+  activeMintRelayShards,
+  createOrReuseMintJob,
+  fetchMintJob,
+  mintJobPublicStatus,
+  wakeMintRelay,
+} from "./mint-jobs";
+export { MintRelayCoordinator } from "./mint-relay-coordinator";
 import {
   ensureVerifiedEmailWallet,
   publicWalletProvisioningConfig,
@@ -921,76 +923,15 @@ app.post("/api/live/email/reservations/:reservationId/relay", async (context) =>
     throw new ApiError(409, "Onchain minting is not configured.", "live_mint_not_configured");
   }
 
-  const startedAt = new Date().toISOString();
-  const staleBefore = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  const acquired = await beginEmailReservationRelay(
-    context.env.LIVE_DB,
-    reservationId,
-    emailHmac,
-    address,
-    startedAt,
-    staleBefore,
-  );
-  if (!acquired) {
-    const current = await fetchEmailReservation(
-      context.env.LIVE_DB.withSession("first-primary"),
-      reservationId,
-      emailHmac,
-    );
-    const currentHash = current?.mintedTxHash ?? current?.relayTxHash;
-    if (currentHash) {
-      return context.json(
-        relayResponse(reservation.event, address, currentHash),
-        current?.mintedTxHash ? 200 : 202,
-        { "Cache-Control": "private, no-store" },
-      );
-    }
-    throw new ApiError(409, "The sponsored mint is already being submitted.", "live_relay_pending");
-  }
-
-  let transactionHash: `0x${string}`;
-  try {
-    transactionHash = await relayMintAuthorization(
-      liveRpcUrl(context.env, reservation.event.chainId),
-      reservation.event,
-      authorization,
-      context.env.MINT_RELAYER_PRIVATE_KEY,
-    );
-  } catch (error) {
-    await releaseEmailReservationRelay(
-      context.env.LIVE_DB,
-      reservationId,
-      emailHmac,
-      address,
-      startedAt,
-    );
-    console.error("Sponsored email-reservation mint failed", error);
-    throw new ApiError(502, "The sponsored mint could not be submitted.", "live_relay_failed");
-  }
-
-  try {
-    const recorded = await recordEmailReservationRelayTransaction(
-      context.env.LIVE_DB,
-      reservationId,
-      emailHmac,
-      address,
-      startedAt,
-      transactionHash,
-    );
-    if (!recorded) {
-      console.error("Sponsored mint was submitted but its hash could not be recorded", {
-        reservationId,
-        transactionHash,
-      });
-    }
-  } catch (error) {
-    console.error("Sponsored mint was submitted but its hash could not be recorded", {
-      reservationId,
-      transactionHash,
-      error,
-    });
-  }
-  return context.json(relayResponse(reservation.event, address, transactionHash), 202, {
+  const job = await createOrReuseMintJob(context.env.LIVE_DB, {
+    event: reservation.event,
+    claimCodeHash: reservation.codeHash,
+    recipient: address,
+    relayerAddress: mintRelayerAddress(context.env.MINT_RELAYER_PRIVATE_KEY),
+    authorization,
+  });
+  context.executionCtx.waitUntil(wakeMintRelay(context.env, job.shardKey));
+  return context.json(mintJobResponse(job, reservation.event), 202, {
     "Cache-Control": "private, no-store",
   });
 });
@@ -1219,73 +1160,15 @@ app.post("/api/live/events/:slug/relay", async (context) => {
     throw new ApiError(409, "Onchain minting is not configured.", "live_mint_not_configured");
   }
 
-  const startedAt = new Date().toISOString();
-  const staleBefore = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  const acquired = await beginLiveClaimRelay(
-    context.env.LIVE_DB,
-    event.eventId,
-    codeHash,
-    address,
-    startedAt,
-    staleBefore,
-  );
-  if (!acquired) {
-    const current = await fetchLiveClaim(
-      context.env.LIVE_DB.withSession("first-primary"),
-      event.eventId,
-      codeHash,
-      address,
-    );
-    const currentHash = current?.mintedTxHash ?? current?.relayTxHash;
-    if (currentHash) {
-      return context.json(
-        relayResponse(event, address, currentHash),
-        current?.mintedTxHash ? 200 : 202,
-        {
-          "Cache-Control": "private, no-store",
-        },
-      );
-    }
-    throw new ApiError(409, "The sponsored mint is already being submitted.", "live_relay_pending");
-  }
-
-  let transactionHash: `0x${string}`;
-  try {
-    transactionHash = await relayMintAuthorization(
-      liveRpcUrl(context.env, event.chainId),
-      event,
-      authorization,
-      context.env.MINT_RELAYER_PRIVATE_KEY,
-    );
-  } catch (error) {
-    await releaseLiveClaimRelay(context.env.LIVE_DB, event.eventId, codeHash, address, startedAt);
-    console.error("Sponsored mint failed", error);
-    throw new ApiError(502, "The sponsored mint could not be submitted.", "live_relay_failed");
-  }
-
-  try {
-    const recorded = await recordLiveClaimRelayTransaction(
-      context.env.LIVE_DB,
-      event.eventId,
-      codeHash,
-      address,
-      startedAt,
-      transactionHash,
-    );
-    if (!recorded) {
-      console.error("Sponsored mint was submitted but its hash could not be recorded", {
-        eventId: event.eventId,
-        transactionHash,
-      });
-    }
-  } catch (error) {
-    console.error("Sponsored mint was submitted but its hash could not be recorded", {
-      eventId: event.eventId,
-      transactionHash,
-      error,
-    });
-  }
-  return context.json(relayResponse(event, address, transactionHash), 202, {
+  const job = await createOrReuseMintJob(context.env.LIVE_DB, {
+    event,
+    claimCodeHash: claim.codeHash,
+    recipient: address,
+    relayerAddress: mintRelayerAddress(context.env.MINT_RELAYER_PRIVATE_KEY),
+    authorization,
+  });
+  context.executionCtx.waitUntil(wakeMintRelay(context.env, job.shardKey));
+  return context.json(mintJobResponse(job, event), 202, {
     "Cache-Control": "private, no-store",
   });
 });
@@ -1356,6 +1239,29 @@ app.post("/api/live/events/:slug/mints", async (context) => {
       mintedAt: minted.mintedAt,
       transactionHash: body.transactionHash,
       explorerUrl: transactionExplorerUrl(event.chainId, body.transactionHash),
+    },
+    200,
+    { "Cache-Control": "private, no-store" },
+  );
+});
+
+app.get("/api/live/mint-jobs/:jobId", async (context) => {
+  const limited = await enforceRateLimit(context.env.OWNER_RATE_LIMITER, context.req.raw);
+  if (limited) return limited;
+  assertNoQuery(new URL(context.req.url));
+  const jobId = context.req.param("jobId").trim().toLowerCase();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(jobId)) {
+    throw new ApiError(404, "Mint progress was not found.", "mint_job_not_found");
+  }
+  const job = await fetchMintJob(context.env.LIVE_DB.withSession("first-primary"), jobId);
+  if (!job) throw new ApiError(404, "Mint progress was not found.", "mint_job_not_found");
+  const status = mintJobPublicStatus(job);
+  return context.json(
+    {
+      ...status,
+      explorerUrl: status.transactionHash
+        ? transactionExplorerUrl(job.chainId, status.transactionHash)
+        : null,
     },
     200,
     { "Cache-Control": "private, no-store" },
@@ -2816,8 +2722,26 @@ function relayResponse(
     eventId: event.eventId,
     slug: event.slug,
     address,
+    jobId: null,
+    mintStatus: "minting" as const,
     transactionHash,
     explorerUrl: transactionExplorerUrl(event.chainId, transactionHash),
+  };
+}
+
+function mintJobResponse(
+  job: Awaited<ReturnType<typeof createOrReuseMintJob>>,
+  event: { eventId: string; slug: string; chainId: number },
+) {
+  const status = mintJobPublicStatus(job);
+  return {
+    eventId: event.eventId,
+    slug: event.slug,
+    address: job.recipient,
+    ...status,
+    explorerUrl: status.transactionHash
+      ? transactionExplorerUrl(event.chainId, status.transactionHash)
+      : null,
   };
 }
 
@@ -2910,15 +2834,23 @@ export default {
     env: Bindings,
     _context: ExecutionContext,
   ): Promise<void> {
-    const [indexer, emailPrune, archiveMediaMirror] = await Promise.all([
+    const [indexer, emailPrune, archiveMediaMirror, mintRelayRecovery] = await Promise.all([
       runLiveChainIndexer(env),
       pruneExpiredEmailAuthArtifacts(env.LIVE_DB),
       runScheduledArchiveMediaMirror(env),
+      recoverMintRelays(env),
     ]);
     console.log("Scheduled continuation maintenance completed", {
       indexer,
       emailPrune,
       archiveMediaMirror,
+      mintRelayRecovery,
     });
   },
 };
+
+async function recoverMintRelays(env: Bindings): Promise<{ shards: number }> {
+  const shards = await activeMintRelayShards(env.LIVE_DB);
+  await Promise.all(shards.map((shard) => wakeMintRelay(env, shard)));
+  return { shards: shards.length };
+}

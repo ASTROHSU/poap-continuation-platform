@@ -20,6 +20,8 @@ import {
 import { supportedLiveChain } from "../shared/live-chains";
 import type { LiveClaimRecord, LiveEventRecord } from "./live";
 
+type MintEvent = Pick<LiveEventRecord, "chainId" | "contractAddress" | "tokenId">;
+
 export interface MintAuthorization {
   chainId: number;
   contractAddress: Address;
@@ -73,9 +75,11 @@ export async function signMintAuthorization(
 
 export async function relayMintAuthorization(
   rpcUrl: string,
-  event: LiveEventRecord,
+  event: MintEvent,
   authorization: MintAuthorization,
   privateKey: string,
+  transactionNonce?: number,
+  feeBumpBps = 0,
 ): Promise<Hash> {
   if (!event.contractAddress || event.tokenId === null) {
     throw new Error("Onchain minting is not configured.");
@@ -101,6 +105,10 @@ export async function relayMintAuthorization(
     chain,
     transport: http(rpcUrl),
   });
+  const feeOptions =
+    transactionNonce === undefined
+      ? {}
+      : await transactionFeeOptions(rpcUrl, chain.id, Math.max(0, feeBumpBps));
   return client.writeContract({
     address: contractAddress,
     abi: associationBadgesAbi,
@@ -112,13 +120,62 @@ export async function relayMintAuthorization(
       authorization.nonce,
       authorization.signature,
     ],
+    nonce: transactionNonce,
+    ...feeOptions,
+  });
+}
+
+async function transactionFeeOptions(rpcUrl: string, chainId: number, feeBumpBps: number) {
+  const chain = supportedLiveChain(chainId);
+  if (!chain) throw new Error(`Unsupported live chain: ${chainId}`);
+  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+  const fees = await publicClient.estimateFeesPerGas();
+  const multiplier = 10_000n + BigInt(Math.min(feeBumpBps, 10_000));
+  return {
+    maxFeePerGas: (fees.maxFeePerGas * multiplier) / 10_000n,
+    maxPriorityFeePerGas: (fees.maxPriorityFeePerGas * multiplier) / 10_000n,
+  };
+}
+
+export function mintRelayerAddress(privateKey: string): Address {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
+    throw new Error("MINT_RELAYER_PRIVATE_KEY is not configured.");
+  }
+  return privateKeyToAccount(privateKey as Hex).address;
+}
+
+export async function pendingTransactionNonce(
+  rpcUrl: string,
+  chainId: number,
+  address: Address,
+): Promise<number> {
+  const chain = supportedLiveChain(chainId);
+  if (!chain) throw new Error(`Unsupported live chain: ${chainId}`);
+  const client = createPublicClient({ chain, transport: http(rpcUrl) });
+  return client.getTransactionCount({ address, blockTag: "pending" });
+}
+
+export async function hasMintedBadge(
+  rpcUrl: string,
+  event: MintEvent,
+  account: Address,
+): Promise<boolean> {
+  if (!event.contractAddress || event.tokenId === null) return false;
+  const chain = supportedLiveChain(event.chainId);
+  if (!chain) return false;
+  const client = createPublicClient({ chain, transport: http(rpcUrl) });
+  return client.readContract({
+    address: getAddress(event.contractAddress),
+    abi: associationBadgesAbi,
+    functionName: "hasClaimed",
+    args: [BigInt(event.tokenId), account],
   });
 }
 
 export async function verifyMintTransaction(
   rpcUrl: string,
   transactionHash: Hash,
-  event: LiveEventRecord,
+  event: MintEvent,
   account: Address,
 ): Promise<"confirmed" | "pending" | "invalid"> {
   if (!event.contractAddress || event.tokenId === null) return "invalid";

@@ -147,8 +147,17 @@ export interface LiveRelayResponse {
   eventId: string;
   slug: string;
   address: `0x${string}`;
-  transactionHash: `0x${string}`;
-  explorerUrl: string;
+  jobId: string | null;
+  mintStatus: "minting" | "minted";
+  transactionHash: `0x${string}` | null;
+  explorerUrl: string | null;
+}
+
+export interface MintJobResponse {
+  jobId: string;
+  mintStatus: "minting" | "minted";
+  transactionHash: `0x${string}` | null;
+  explorerUrl: string | null;
 }
 
 export interface LiveMintResponse {
@@ -282,16 +291,20 @@ export function relayWalletMint(slug: string, code: string, address: string) {
 }
 
 export async function relayWalletMintWithRetry(slug: string, code: string, address: string) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      return await relayWalletMint(slug, code, address);
-    } catch (error) {
-      const retryable = error instanceof ApiError && error.code === "live_relay_failed";
-      if (!retryable || attempt === 2) throw error;
-      await new Promise((resolve) => window.setTimeout(resolve, 800 * (attempt + 1)));
-    }
+  return relayWalletMint(slug, code, address);
+}
+
+export function getMintJob(jobId: string) {
+  return apiRequest<MintJobResponse>(`/api/live/mint-jobs/${encodeURIComponent(jobId)}`);
+}
+
+export async function waitForMintJob(jobId: string): Promise<MintJobResponse> {
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    const job = await getMintJob(jobId);
+    if (job.mintStatus === "minted") return job;
+    await new Promise((resolve) => window.setTimeout(resolve, 2_000));
   }
-  throw new ApiError(502, "鏈上交易暫時無法送出，請稍後再試。", "live_relay_failed");
+  return getMintJob(jobId);
 }
 
 export function confirmWalletMint(
@@ -362,9 +375,14 @@ export async function completePendingEmailReservations(address: `0x${string}`) {
       continue;
     }
     const relayed = await relayEmailReservation(reservation.reservationId, address);
-    await waitForMintConfirmation(() =>
-      confirmEmailReservation(reservation.reservationId, address, relayed.transactionHash),
-    );
+    if (relayed.jobId) {
+      const result = await waitForMintJob(relayed.jobId);
+      if (result.mintStatus !== "minted") break;
+    } else if (relayed.transactionHash) {
+      await waitForMintConfirmation(() =>
+        confirmEmailReservation(reservation.reservationId, address, relayed.transactionHash!),
+      );
+    }
     completed += 1;
   }
   return { completed, pending: pending.length - completed };
@@ -451,13 +469,6 @@ export async function connectExistingWallet(): Promise<`0x${string}`> {
 }
 
 export function readableError(error: unknown) {
-  if (error instanceof ApiError) {
-    if (error.code === "live_relay_failed") {
-      return "鏈上交易暫時無法送出，請稍後再按一次「領取」。";
-    }
-    if (error.code === "live_relay_pending") {
-      return "鑄造交易正在送出，請稍候再查看收藏。";
-    }
-  }
+  if (error instanceof ApiError && error.code?.startsWith("live_relay")) return "正在鑄造。";
   return error instanceof Error ? error.message : "發生未預期的問題，請稍後再試。";
 }

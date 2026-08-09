@@ -10,6 +10,20 @@
   "triggers": {
     "crons": ["* * * * *"],
   },
+  "migrations": [
+    {
+      "tag": "mint-relay-coordinator-v1",
+      "new_sqlite_classes": ["MintRelayCoordinator"],
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MINT_RELAY_COORDINATOR",
+        "class_name": "MintRelayCoordinator",
+      },
+    ],
+  },
   "secrets": {
     "required": [
       "MINT_SIGNER_PRIVATE_KEY",

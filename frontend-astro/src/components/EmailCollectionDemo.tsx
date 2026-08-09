@@ -13,6 +13,7 @@ import {
   relayEmailReservation,
   requestEmailLogin,
   waitForMintConfirmation,
+  waitForMintJob,
   verifyMagicSession,
   type EmbeddedWalletConfig,
   type EmailReservation,
@@ -141,9 +142,17 @@ export default function EmailCollectionDemo() {
         return;
       }
       const relayed = await relayEmailReservation(reservation.reservationId, address);
-      await waitForMintConfirmation(() =>
-        confirmEmailReservation(reservation.reservationId, address, relayed.transactionHash),
-      );
+      if (relayed.jobId) {
+        const completed = await waitForMintJob(relayed.jobId);
+        if (completed.mintStatus !== "minted") {
+          setMessage("正在鑄造，完成後會自動出現在收藏頁。");
+          return;
+        }
+      } else if (relayed.transactionHash) {
+        await waitForMintConfirmation(() =>
+          confirmEmailReservation(reservation.reservationId, address, relayed.transactionHash!),
+        );
+      }
       await load();
       setMessage("鑄造完成，這份數位紀念已送到你的錢包。");
     } catch (problem) {
@@ -413,7 +422,7 @@ export default function EmailCollectionDemo() {
                           onClick={() => void bindAndMint(item)}
                         >
                           {working
-                            ? "協會代付 Gas 鑄造中…"
+                            ? "正在鑄造…"
                             : embeddedWallet?.enabled ||
                                 (data?.walletConfig.enabled && data.wallet?.status === "ready")
                               ? "完成領取"
