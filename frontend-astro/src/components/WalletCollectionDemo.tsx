@@ -262,13 +262,26 @@ export default function WalletCollectionDemo({
           <p className="mt-4 max-w-xl break-all font-mono text-xs text-ink/42">{resolvedAddress}</p>
           {magicOwner ? (
             <button
-              className="mt-3 text-xs font-bold text-[#665b9a]/70 underline decoration-[#7669d8]/35 underline-offset-4 transition hover:text-[#514777]"
+              className="mt-4 inline-flex items-center gap-2 rounded-full border-2 border-[#7669d8]/75 bg-white/85 px-3.5 py-2 font-display text-xs font-bold text-[#514777] shadow-[3px_4px_0_#ddd9ff] transition duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[3px_5px_0_#c9c2ff] focus-visible:outline-4 focus-visible:outline-offset-3 focus-visible:outline-[#a89cff]"
               type="button"
               onClick={() => {
                 setKeyExportError("");
                 setShowKeyExport(true);
               }}
             >
+              <svg
+                aria-hidden="true"
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="8" cy="15" r="3" />
+                <path d="m10.2 12.8 7.3-7.3 2 2-1.6 1.6 1.2 1.2-2.1 2.1-1.2-1.2-3.4 3.4" />
+              </svg>
               匯出私鑰
             </button>
           ) : null}
