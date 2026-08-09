@@ -260,31 +260,23 @@ export default function WalletCollectionDemo({
             {identityName || "POAP 收藏"}
           </h1>
           <p className="mt-4 max-w-xl break-all font-mono text-xs text-ink/42">{resolvedAddress}</p>
+          {magicOwner ? (
+            <button
+              className="mt-3 text-xs font-bold text-[#665b9a]/70 underline decoration-[#7669d8]/35 underline-offset-4 transition hover:text-[#514777]"
+              type="button"
+              onClick={() => {
+                setKeyExportError("");
+                setShowKeyExport(true);
+              }}
+            >
+              匯出私鑰
+            </button>
+          ) : null}
         </div>
         <span className="self-start rounded-full border-2 border-[#7669d8] bg-white px-5 py-2.5 font-display text-sm font-bold text-[#4f457c] shadow-[4px_5px_0_#ddd9ff] sm:self-auto">
           {total.toLocaleString("zh-TW")} 枚 POAP
         </span>
       </div>
-      {magicOwner ? (
-        <section className="mt-6 flex flex-col gap-5 rounded-[2rem] border-2 border-[#dedaff] bg-white/75 p-5 shadow-[6px_7px_0_#efedff] sm:flex-row sm:items-center sm:justify-between sm:p-7">
-          <div>
-            <p className="font-display text-lg font-bold text-[#40375f]">管理你的 Magic 錢包</p>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/55">
-              這個 Email 對應的錢包由你掌控；需要時可匯出私鑰，自行備份或移至其他 EVM 錢包。
-            </p>
-          </div>
-          <button
-            className="btn-secondary shrink-0"
-            type="button"
-            onClick={() => {
-              setKeyExportError("");
-              setShowKeyExport(true);
-            }}
-          >
-            匯出錢包私鑰
-          </button>
-        </section>
-      ) : null}
       {loading ? (
         <div className="mt-10 space-y-8" aria-label="正在載入收藏">
           {[0, 1, 2].map((group) => (
