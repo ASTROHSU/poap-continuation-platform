@@ -56,6 +56,34 @@ export interface ArchiveHoldingsResponse {
   nextCursor: string | null;
 }
 
+export interface ArchiveCollector {
+  poapId: number;
+  ownerAddress: string;
+  mintedOn: number | null;
+  network: string;
+  transferCount: number;
+}
+
+export interface ArchiveCollectorsResponse {
+  snapshotId: string;
+  dropId: number;
+  items: ArchiveCollector[];
+  nextCursor: string | null;
+}
+
+export interface LiveCollector {
+  ownerAddress: string;
+  acquiredAt: string;
+}
+
+export interface LiveCollectorsResponse {
+  eventId: string;
+  slug: string;
+  chainId: number;
+  collectorCount: number;
+  items: LiveCollector[];
+}
+
 export interface ArchiveDropDetail {
   dropId: number;
   fancyId: string;
@@ -368,6 +396,18 @@ export function getLegacyPoapHoldings(address: string) {
 
 export function getArchiveDrop(dropId: number) {
   return apiRequest<ArchiveDropDetail>(`/api/archive/drops/${dropId}`);
+}
+
+export function getArchiveCollectors(dropId: number, cursor: string | null = null) {
+  const query = new URLSearchParams({ limit: "48" });
+  if (cursor) query.set("cursor", cursor);
+  return apiRequest<ArchiveCollectorsResponse>(`/api/drops/${dropId}/collectors?${query}`);
+}
+
+export function getLiveCollectors(slug: string) {
+  return apiRequest<LiveCollectorsResponse>(
+    `/api/live/events/${encodeURIComponent(slug)}/collectors`,
+  );
 }
 
 export function resolveEns(name: string) {

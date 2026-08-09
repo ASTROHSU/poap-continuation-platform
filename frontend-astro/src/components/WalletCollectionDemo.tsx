@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  getArchiveCollectors,
   getArchiveDrop,
   getArchiveHoldings,
   getAppConfig,
   getLegacyPoapHoldings,
+  getLiveCollectors,
   getLiveHoldings,
   readableError,
   verifyMagicSession,
+  type ArchiveCollector,
   type ArchiveDropDetail,
   type ArchiveHolding,
   type LegacyPoapHolding,
+  type LiveCollector,
   type LiveHolding,
 } from "../lib/live-api";
 import { resumeMagicEmailSession, revealMagicEvmPrivateKey } from "../lib/magic-wallet";
@@ -453,6 +457,7 @@ interface GalleryItem {
   fullDate: string;
   source: "archive" | "legacy" | "live";
   dropId: number | null;
+  eventSlug: string | null;
   tokenLabel: string;
   ownerAddress: string;
   network: string;
@@ -462,6 +467,12 @@ interface GalleryItem {
   description: string | null;
   eventUrl: string | null;
   technicalUrl: string | null;
+  ownerExplorerUrl: string;
+}
+
+interface CollectorListItem {
+  ownerAddress: string;
+  explorerUrl: string;
 }
 
 interface MonthGroup {
@@ -493,6 +504,7 @@ function groupCollectionByMonth(
           {
             source: archive ? "archive" : "legacy",
             dropId: archive?.dropId ?? item.dropId,
+            eventSlug: null,
             tokenLabel: `Token #${item.poapId}`,
             ownerAddress,
             network: legacyNetworkName(item.network),
@@ -505,6 +517,7 @@ function groupCollectionByMonth(
             description: item.description,
             eventUrl: item.eventUrl,
             technicalUrl: item.explorerUrl,
+            ownerExplorerUrl: addressExplorerUrl(item.chainId, ownerAddress),
           },
         );
       })
@@ -519,6 +532,7 @@ function groupCollectionByMonth(
           {
             source: "archive",
             dropId: item.dropId,
+            eventSlug: null,
             tokenLabel: `Token #${item.poapId}`,
             ownerAddress: item.ownerAddress,
             network: archiveNetworkName(item.network),
@@ -528,6 +542,7 @@ function groupCollectionByMonth(
             description: null,
             eventUrl: null,
             technicalUrl: null,
+            ownerExplorerUrl: addressExplorerUrl(item.network, item.ownerAddress),
           },
         ),
       );
@@ -536,6 +551,7 @@ function groupCollectionByMonth(
       toGalleryItem(`live-${item.eventId}-${item.tokenId}`, item, {
         source: "live",
         dropId: null,
+        eventSlug: item.slug,
         tokenLabel: item.tokenId ? `Token #${item.tokenId}` : "數位紀念",
         ownerAddress,
         network: chainName(item.chainId),
@@ -545,8 +561,9 @@ function groupCollectionByMonth(
         description: item.description,
         eventUrl: item.eventUrl,
         technicalUrl: item.mintedTxHash
-          ? `https://sepolia.basescan.org/tx/${item.mintedTxHash}`
+          ? transactionExplorerUrl(item.chainId, item.mintedTxHash)
           : null,
+        ownerExplorerUrl: addressExplorerUrl(item.chainId, ownerAddress),
       }),
     ),
     ...historicalItems,
@@ -602,11 +619,64 @@ function CollectionDetail({
   error: string;
   onClose: () => void;
 }) {
+  const [showCollectors, setShowCollectors] = useState(false);
+  const [collectors, setCollectors] = useState<CollectorListItem[]>([]);
+  const [collectorsCursor, setCollectorsCursor] = useState<string | null>(null);
+  const [collectorsLoading, setCollectorsLoading] = useState(false);
+  const [collectorsError, setCollectorsError] = useState("");
   const description = archiveDetail?.description ?? item.description;
   const eventUrl = archiveDetail?.eventUrl ?? item.eventUrl;
   const location =
     [archiveDetail?.city, archiveDetail?.country].filter(Boolean).join(" · ") || item.location;
   const dropLabel = item.dropId ? `Drop #${item.dropId}` : "新發行";
+
+  useEffect(() => {
+    setShowCollectors(false);
+    setCollectors([]);
+    setCollectorsCursor(null);
+    setCollectorsError("");
+  }, [item.key]);
+
+  const loadCollectors = async (cursor: string | null = null) => {
+    if (collectorsLoading) return;
+    setCollectorsLoading(true);
+    setCollectorsError("");
+    try {
+      if (item.source === "live" && item.eventSlug) {
+        const result = await getLiveCollectors(item.eventSlug);
+        setCollectors(
+          result.items.map((collector: LiveCollector) => ({
+            ownerAddress: collector.ownerAddress,
+            explorerUrl: addressExplorerUrl(result.chainId, collector.ownerAddress),
+          })),
+        );
+        setCollectorsCursor(null);
+      } else if (item.dropId) {
+        const result = await getArchiveCollectors(item.dropId, cursor);
+        const nextItems = result.items.map((collector: ArchiveCollector) => ({
+          ownerAddress: collector.ownerAddress,
+          explorerUrl: addressExplorerUrl(collector.network, collector.ownerAddress),
+        }));
+        setCollectors((current) =>
+          mergeCollectors(cursor ? [...current, ...nextItems] : nextItems),
+        );
+        setCollectorsCursor(result.nextCursor);
+      }
+    } catch (collectorError) {
+      setCollectorsError(readableError(collectorError));
+    } finally {
+      setCollectorsLoading(false);
+    }
+  };
+
+  const toggleCollectors = () => {
+    const next = !showCollectors;
+    setShowCollectors(next);
+    if (next && collectors.length === 0 && !collectorsLoading) void loadCollectors();
+  };
+  const visibleCollectors = collectors.filter(
+    (collector) => collector.ownerAddress.toLowerCase() !== item.ownerAddress.toLowerCase(),
+  );
 
   return (
     <div
@@ -647,9 +717,17 @@ function CollectionDetail({
               <span className="rounded-full bg-[#efedff] px-3 py-1.5">{dropLabel}</span>
               <span className="rounded-full bg-[#efedff] px-3 py-1.5">{item.tokenLabel}</span>
               {item.collectorCount > 0 ? (
-                <span className="rounded-full bg-[#efedff] px-3 py-1.5">
+                <button
+                  className="rounded-full bg-[#efedff] px-3 py-1.5 transition hover:bg-[#dedaff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#665b9a]"
+                  type="button"
+                  aria-expanded={showCollectors}
+                  onClick={toggleCollectors}
+                >
                   {item.collectorCount.toLocaleString("zh-TW")} 人收藏
-                </span>
+                  <span className="ml-1" aria-hidden="true">
+                    {showCollectors ? "↑" : "↓"}
+                  </span>
+                </button>
               ) : null}
             </div>
 
@@ -658,13 +736,85 @@ function CollectionDetail({
             </h1>
 
             <dl className="mt-7 grid gap-4 rounded-[2rem] border-2 border-[#dedaff] bg-white p-5 shadow-[6px_7px_0_#efedff] sm:grid-cols-2 sm:p-7">
-              <Metadata label="收藏地址" value={item.ownerAddress} mono />
+              <Metadata
+                label="收藏地址"
+                value={item.ownerAddress}
+                href={item.ownerExplorerUrl}
+                mono
+              />
               <Metadata label="鑄造時間" value={item.mintedDate} />
               <Metadata label="活動日期" value={item.fullDate} />
               <Metadata label="網路" value={item.network} />
               <Metadata label="地點" value={location} />
               <Metadata label="紀念編號" value={`${dropLabel} · ${item.tokenLabel}`} />
             </dl>
+
+            {showCollectors ? (
+              <section className="mt-7 rounded-[2rem] border-2 border-[#dedaff] bg-white p-5 shadow-[6px_7px_0_#efedff] sm:p-7">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-display text-xl font-bold">收藏者</h2>
+                    <p className="mt-1 text-sm leading-6 text-ink/50">
+                      僅顯示公開錢包地址，不顯示 Email。
+                    </p>
+                  </div>
+                  <button
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#efedff] font-bold text-[#665b9a]"
+                    type="button"
+                    onClick={() => setShowCollectors(false)}
+                    aria-label="收起收藏者清單"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {visibleCollectors.length > 0 ? (
+                  <ol className="mt-5 divide-y divide-ink/10">
+                    {visibleCollectors.map((collector, index) => (
+                      <li key={collector.ownerAddress}>
+                        <a
+                          className="flex items-center gap-3 py-3.5 text-[#4f457c] transition hover:text-[#7669d8]"
+                          href={collector.explorerUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#efedff] text-xs font-extrabold">
+                            {index + 1}
+                          </span>
+                          <span className="min-w-0 flex-1 break-all font-mono text-xs font-bold leading-5 sm:text-sm">
+                            {collector.ownerAddress}
+                          </span>
+                          <span className="shrink-0 text-sm font-bold" aria-hidden="true">
+                            ↗
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+
+                {collectorsLoading ? (
+                  <p className="mt-5 text-sm font-bold text-[#665b9a]">正在載入收藏者…</p>
+                ) : null}
+                {collectorsError ? (
+                  <p className="mt-5 text-sm font-bold text-[#b35b72]">
+                    收藏者清單暫時無法載入，請稍後再試。
+                  </p>
+                ) : null}
+                {!collectorsLoading && !collectorsError && visibleCollectors.length === 0 ? (
+                  <p className="mt-5 text-sm text-ink/50">目前沒有其他可顯示的收藏者。</p>
+                ) : null}
+                {collectorsCursor && !collectorsLoading ? (
+                  <button
+                    className="mt-5 w-full rounded-full border-2 border-[#7669d8] bg-white px-5 py-3 text-sm font-extrabold text-[#5d52aa]"
+                    type="button"
+                    onClick={() => void loadCollectors(collectorsCursor)}
+                  >
+                    顯示更多收藏者
+                  </button>
+                ) : null}
+              </section>
+            ) : null}
 
             {loading ? (
               <div className="mt-8 h-28 animate-pulse rounded-[2rem] bg-[#efedff]" />
@@ -703,17 +853,33 @@ function CollectionDetail({
 function Metadata({
   label,
   value,
+  href,
   mono = false,
 }: {
   label: string;
   value: string;
+  href?: string;
   mono?: boolean;
 }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs font-bold tracking-wider text-ink/38">{label}</dt>
       <dd className={`mt-1.5 break-words font-bold text-ink/78 ${mono ? "font-mono text-xs" : ""}`}>
-        {value || "未提供"}
+        {href ? (
+          <a
+            className="inline-flex max-w-full items-start gap-1 text-[#5d52aa] underline decoration-[#c8c1ff] underline-offset-4 hover:text-[#7669d8]"
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="break-all">{value || "未提供"}</span>
+            <span className="shrink-0 font-sans" aria-hidden="true">
+              ↗
+            </span>
+          </a>
+        ) : (
+          value || "未提供"
+        )}
       </dd>
     </div>
   );
@@ -736,6 +902,37 @@ function archiveNetworkName(value: string) {
   if (value.toLowerCase() === "xdai" || value.toLowerCase() === "gnosis") return "Gnosis";
   if (value.toLowerCase() === "eth" || value.toLowerCase() === "ethereum") return "Ethereum";
   return value || "未保存";
+}
+
+function addressExplorerUrl(network: string | number, address: string) {
+  const normalized = String(network).toLowerCase();
+  if (normalized === "84532" || normalized.includes("sepolia")) {
+    return `https://sepolia.basescan.org/address/${address}`;
+  }
+  if (normalized === "8453" || normalized === "base") {
+    return `https://basescan.org/address/${address}`;
+  }
+  if (normalized === "42161" || normalized.includes("arbitrum")) {
+    return `https://arbiscan.io/address/${address}`;
+  }
+  if (normalized === "100" || normalized === "xdai" || normalized === "gnosis") {
+    return `https://gnosisscan.io/address/${address}`;
+  }
+  return `https://etherscan.io/address/${address}`;
+}
+
+function transactionExplorerUrl(chainId: number, transactionHash: string) {
+  if (chainId === 84532) return `https://sepolia.basescan.org/tx/${transactionHash}`;
+  if (chainId === 8453) return `https://basescan.org/tx/${transactionHash}`;
+  if (chainId === 42161) return `https://arbiscan.io/tx/${transactionHash}`;
+  if (chainId === 100) return `https://gnosisscan.io/tx/${transactionHash}`;
+  return `https://etherscan.io/tx/${transactionHash}`;
+}
+
+function mergeCollectors(items: CollectorListItem[]) {
+  const unique = new Map<string, CollectorListItem>();
+  for (const item of items) unique.set(item.ownerAddress.toLowerCase(), item);
+  return [...unique.values()];
 }
 
 function normalizeArchiveNetwork(value: string) {

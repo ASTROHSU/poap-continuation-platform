@@ -357,6 +357,22 @@ describe("continuation claim API", () => {
       ],
     });
 
+    const collectorsBeforeIndex = await SELF.fetch(
+      "https://example.test/api/live/events/mint-demo/collectors",
+    );
+    expect(collectorsBeforeIndex.status).toBe(200);
+    const collectorsBeforeIndexBody = await collectorsBeforeIndex.json<{
+      chainId: number;
+      collectorCount: number;
+      items: Array<{ ownerAddress: string }>;
+    }>();
+    expect(collectorsBeforeIndexBody).toMatchObject({
+      chainId: 84532,
+      collectorCount: 1,
+      items: [{ ownerAddress: mintAddress }],
+    });
+    expect(JSON.stringify(collectorsBeforeIndexBody)).not.toContain("email");
+
     await bindings.LIVE_DB.prepare(
       `INSERT INTO live_chain_events (
          chain_id, contract_address, transaction_hash, log_index, sub_index,
@@ -379,6 +395,18 @@ describe("continuation claim API", () => {
       ownershipSource: "chain-index",
       mintedTxHash: relayHash,
     });
+
+    const collectorsAfterIndex = await SELF.fetch(
+      "https://example.test/api/live/events/mint-demo/collectors",
+    );
+    const collectorsAfterIndexBody = await collectorsAfterIndex.json<{
+      collectorCount: number;
+      items: Array<{ ownerAddress: string }>;
+    }>();
+    expect(collectorsAfterIndexBody.collectorCount).toBe(1);
+    expect(collectorsAfterIndexBody.items).toEqual([
+      { ownerAddress: mintAddress, acquiredAt: expect.any(String) },
+    ]);
   });
 
   it("reserves by verified Email and later binds an existing wallet", async () => {

@@ -60,6 +60,19 @@ export interface LiveHoldingRecord extends LiveEventRecord {
   chainFinalizedBlock: number | null;
 }
 
+export interface LiveCollectorRecord {
+  ownerAddress: string;
+  acquiredAt: string;
+}
+
+export interface LiveCollectorsRecord {
+  eventId: string;
+  slug: string;
+  chainId: number;
+  collectorCount: number;
+  items: LiveCollectorRecord[];
+}
+
 export interface LiveClaimRecord {
   claimedAt: string;
   claimedBy: Address;
@@ -422,6 +435,85 @@ export async function fetchLiveHoldings(
     chainSyncedAt: row.chain_synced_at,
     chainFinalizedBlock: row.chain_finalized_block,
   }));
+}
+
+export async function fetchLiveCollectors(
+  db: D1ReadClient,
+  slug: string,
+): Promise<LiveCollectorsRecord | null> {
+  const event = await fetchLiveEvent(db, slug);
+  if (!event) return null;
+
+  const result = await db
+    .prepare(
+      `WITH
+       claim_collectors AS (
+         SELECT
+           lower(codes.claimed_by) AS owner_address,
+           COALESCE(codes.minted_at, codes.relay_started_at, codes.claimed_at) AS acquired_at
+         FROM live_claim_codes codes
+         WHERE codes.event_id = ?
+           AND codes.claimed_by IS NOT NULL
+           AND (codes.minted_tx_hash IS NOT NULL OR codes.relay_tx_hash IS NOT NULL)
+           AND NOT EXISTS (
+             SELECT 1
+             FROM live_chain_events indexed_mint
+             WHERE indexed_mint.chain_id = ?
+               AND indexed_mint.contract_address = ?
+               AND indexed_mint.transaction_hash = COALESCE(
+                 codes.minted_tx_hash,
+                 codes.relay_tx_hash
+               )
+           )
+       ),
+       indexed_collectors AS (
+         SELECT
+           lower(balances.owner_address) AS owner_address,
+           balances.first_acquired_at AS acquired_at
+         FROM live_token_balances balances
+         JOIN live_chain_cursors cursor
+           ON cursor.chain_id = balances.chain_id
+          AND cursor.contract_address = balances.contract_address
+         WHERE balances.chain_id = ?
+           AND balances.contract_address = ?
+           AND balances.token_id = ?
+           AND balances.balance > 0
+           AND cursor.last_synced_at IS NOT NULL
+           AND cursor.last_finalized_block IS NOT NULL
+           AND cursor.next_block > cursor.last_finalized_block
+       ),
+       collectors AS (
+         SELECT owner_address, acquired_at FROM claim_collectors
+         UNION ALL
+         SELECT owner_address, acquired_at FROM indexed_collectors
+       )
+       SELECT owner_address, MIN(acquired_at) AS acquired_at
+       FROM collectors
+       GROUP BY owner_address
+       ORDER BY acquired_at ASC, owner_address ASC
+       LIMIT 1000`,
+    )
+    .bind(
+      event.eventId,
+      event.chainId,
+      event.contractAddress,
+      event.chainId,
+      event.contractAddress,
+      event.tokenId,
+    )
+    .all<{ owner_address: string; acquired_at: string }>();
+
+  const items = result.results.map((row) => ({
+    ownerAddress: row.owner_address,
+    acquiredAt: row.acquired_at,
+  }));
+  return {
+    eventId: event.eventId,
+    slug: event.slug,
+    chainId: event.chainId,
+    collectorCount: items.length,
+    items,
+  };
 }
 
 function mapEvent(row: LiveEventRow): LiveEventRecord {

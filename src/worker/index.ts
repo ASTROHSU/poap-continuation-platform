@@ -74,6 +74,7 @@ import {
 import {
   beginLiveClaimRelay,
   fetchLiveClaim,
+  fetchLiveCollectors,
   fetchLiveEvent,
   fetchLiveHoldings,
   markLiveClaimMinted,
@@ -526,6 +527,21 @@ app.get(
     return new Response(upstream.body, { headers });
   },
 );
+
+app.get("/api/live/events/:slug/collectors", async (context) => {
+  const limited = await enforceRateLimit(context.env.BROWSE_RATE_LIMITER, context.req.raw);
+  if (limited) return limited;
+  assertNoQuery(new URL(context.req.url));
+  const slug = normalizeLiveSlug(context.req.param("slug"));
+  const collectors = await fetchLiveCollectors(
+    context.env.LIVE_DB.withSession("first-primary"),
+    slug,
+  );
+  if (!collectors) {
+    throw new ApiError(404, "This claim event is unavailable.", "live_event_not_found");
+  }
+  return context.json(collectors, 200, { "Cache-Control": "public, max-age=30" });
+});
 
 app.get("/api/live/events/:slug", async (context) => {
   const limited = await enforceRateLimit(context.env.BROWSE_RATE_LIMITER, context.req.raw);
