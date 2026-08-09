@@ -62,7 +62,7 @@ describe("AssociationBadgesUpgradeable", () => {
     assert.equal(await contract.owner(), owner.address);
     assert.equal(await contract.claimSigner(), signer.address);
     assert.equal(await contract.name(), "兆量富足教育協會數位紀念");
-    assert.equal(await contract.symbol(), "ZLFZ");
+    assert.equal(await contract.symbol(), "STEVE");
     assert.equal(await contract.contractURI(), contractMetadataUri);
     assert.equal(await contract.uri(1n), eventMetadataUri);
     assert.equal(await contract.implementationVersion(), 1n);
@@ -170,7 +170,7 @@ describe("AssociationBadgesUpgradeable", () => {
     assert.equal(await upgraded.owner(), owner.address);
     assert.equal(await upgraded.claimSigner(), signer.address);
     assert.equal(await upgraded.name(), "兆量富足教育協會數位紀念");
-    assert.equal(await upgraded.symbol(), "ZLFZ");
+    assert.equal(await upgraded.symbol(), "STEVE");
     assert.equal(await upgraded.uri(1n), eventMetadataUri);
   });
 });

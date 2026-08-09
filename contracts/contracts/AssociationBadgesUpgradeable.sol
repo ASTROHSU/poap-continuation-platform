@@ -25,7 +25,7 @@ contract AssociationBadgesUpgradeable is
     /// @dev Optional ERC-1155 collection identity getters used by block explorers and wallets.
     ///      ERC-1155 does not require name/symbol; token-level metadata remains canonical.
     string private constant _COLLECTION_NAME = unicode"兆量富足教育協會數位紀念";
-    string private constant _COLLECTION_SYMBOL = "ZLFZ";
+    string private constant _COLLECTION_SYMBOL = "STEVE";
 
     struct EventConfig {
         uint128 maxSupply;
