@@ -12,10 +12,7 @@ import {
   type LegacyPoapHolding,
   type LiveHolding,
 } from "../lib/live-api";
-import {
-  resumeMagicEmailSession,
-  revealMagicEvmPrivateKey,
-} from "../lib/magic-wallet";
+import { resumeMagicEmailSession, revealMagicEvmPrivateKey } from "../lib/magic-wallet";
 import { looksLikeEnsName } from "../lib/recipient-input";
 
 interface MagicCollectionOwner {

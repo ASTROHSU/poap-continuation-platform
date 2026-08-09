@@ -1,49 +1,109 @@
 # POAP 留存計畫
 
-這是一套自管的數位活動紀念平台。專案以 Glory Lab 的
-[POAPin Archive](https://github.com/glorylab/poapin-archive) 為基礎，保留固定 POAP
-歷史快照的瀏覽能力，並加入可持續運作的新發行流程。
+[![公開網站](https://img.shields.io/badge/公開網站-poap.blocktrend.today-7869df?style=flat-square)](https://poap.blocktrend.today)
+[![Base](https://img.shields.io/badge/Network-Base-0052ff?style=flat-square)](https://base.org/)
+[![License: MIT](https://img.shields.io/badge/Code-MIT-4f457c?style=flat-square)](LICENSE)
+[![Built on POAPin Archive](https://img.shields.io/badge/Built%20on-POAPin%20Archive-f0a6c1?style=flat-square)](https://github.com/glorylab/poapin-archive)
 
-公開站：[poap.blocktrend.today](https://poap.blocktrend.today)
+一套可自行維運的數位活動紀念平臺：保留過去的 POAP 收藏，也讓社群能在 Base
+上繼續發行新的活動紀念。歷史資料與新憑證來自不同系統，但會呈現在同一個收藏介面中。
+
+**[開啟公開網站](https://poap.blocktrend.today)** ·
+**[閱讀技術架構](docs/PLATFORM-ARCHITECTURE.zh-TW.md)** ·
+**[參與貢獻](CONTRIBUTING.md)**
 
 > [!IMPORTANT]
-> 本專案不是 POAP 官方服務。歷史 POAP 與新活動紀念分別來自不同智慧合約；系統只在同一個
-> 收藏介面中整合呈現，不會把新憑證宣稱為官方 POAP。
+> 這是獨立的社群延續專案，不是 POAP 官方服務。過去的 POAP 仍由原本的 POAP
+> 智慧合約定義；本專案新發行的是另一套 ERC-1155 活動紀念，因此不會自動出現在只支援
+> POAP 官方合約的第三方 App 中。
 
-## 現有功能
+## 為什麼需要這個專案？
 
-- 查詢歷史 POAP Archive 與目前鏈上持有人。
-- 以共用或單次 QR／領取連結發放活動紀念。
-- Email 使用者透過 Magic OTP 取得 Embedded Wallet，驗證後自動完成領取。
-- ENS 或 Ethereum 地址可直接作為收件地址。
-- 由發行方 relayer 代付 Base 鑄造 Gas。
-- 以 Cloudflare Workers、D1 與 R2 提供 API、索引與媒體。
-- 以 Astro、React islands 與 Tailwind CSS 提供公開前端。
+當原 POAP 平臺不再提供 Drop 建立、發放、管理與收藏頁面時，已經寫入鏈上的 Token
+不會消失，但使用者熟悉的產品層會中斷。官方留下的 Archive 快照保存了活動資料、Artwork
+與歷史持有人；接下來仍需要有人補上瀏覽、發行、領取與索引。
 
-## 專案結構
+這個專案把問題拆成兩條互不污染的資料來源，再由同一個前端整合：
 
-| 路徑                    | 用途                                                 |
-| ----------------------- | ---------------------------------------------------- |
-| `frontend-astro/`       | 目前公開使用的 Astro 前端                            |
-| `src/worker/`           | Cloudflare Worker API、領取、Email、Magic 與鏈上索引 |
-| `contracts/`            | ERC-1155 活動紀念智慧合約與下一版 UUPS Proxy         |
-| `metadata/`             | 可公開重現的活動與合約層 metadata                    |
-| `tools/live-event/`     | 建立活動、QR、匯入、稽核與備份工具                   |
-| `tools/archive-import/` | 歷史 Archive 的 D1／R2 匯入工具                      |
-| `migrations/`           | D1 schema 與 migrations                              |
+```mermaid
+flowchart LR
+    A["歷史 POAP<br/>Archive＋原智慧合約"] --> C["統一收藏介面"]
+    B["新活動紀念<br/>Base ERC-1155"] --> C
+    D["Email / ENS / 錢包地址"] --> E["領取頁＋Gas 代付"]
+    E --> B
+```
+
+- 歷史資料保持唯讀，不修改過去的 POAP 紀錄。
+- 新活動使用自行管理的合約、媒體、領取資格與索引。
+- 使用者只需要面對一個搜尋、領取與收藏介面。
+
+## 現在可以做什麼？
+
+- 用 Email、ENS、POAP Nickname 或 Ethereum 地址查詢收藏。
+- 整合歷史 POAP Archive，以及 Ethereum、Gnosis、Base、Arbitrum 的既有 POAP
+  持有人資料。
+- 透過不公開的活動 URL 或 QR Code 發放限量紀念。
+- Email 使用者以 Magic OTP 登入並自動取得 Embedded Wallet。
+- ENS 與 `0x` 地址可直接作為收件地址。
+- 由發行方的 relayer 支付 Base Gas，收藏者不需要準備 ETH。
+- 在收藏頁統一呈現歷史 POAP 與新發行的 Artwork。
+- 已登入的 Magic 使用者可以透過 Magic 的安全介面匯出自己的私鑰；本平臺不會讀取或保存私鑰。
+- 自行架設 Cloudflare Worker、D1、R2 與前端，不必依賴本專案的正式環境。
+
+## 收藏者的使用流程
+
+1. 取得主辦單位現場提供的 QR Code 或領取連結。
+2. 輸入 Email、ENS、POAP Nickname 或 Ethereum 地址。
+3. Email 使用者完成 Magic OTP；其他地址會直接成為收件地址。
+4. 平臺代付 Gas，將活動紀念鑄造到 Base。
+5. 從同一個收藏頁查看過去的 POAP 與新的活動紀念。
+
+領取頁不需要公開列在首頁。主辦單位可以只把連結提供給實際參與者，並設定供應量、開放時間與
+領取碼。
+
+## 系統架構
+
+| 層級       | 技術                                                         | 用途                                      |
+| ---------- | ------------------------------------------------------------ | ----------------------------------------- |
+| 公開前端   | Astro、React islands、Tailwind CSS、Vercel                   | 搜尋、領取與收藏展示                      |
+| API        | Hono、Cloudflare Workers                                     | 驗證、領取、Magic Session、ENS 與索引 API |
+| 資料       | Cloudflare D1                                                | 歷史索引、活動、領取與鏈上同步狀態        |
+| 媒體       | Cloudflare R2                                                | 歷史 Artwork 與新活動 metadata            |
+| 身分與錢包 | Magic Embedded Wallet                                        | Email OTP、錢包建立與私鑰匯出介面         |
+| 發行       | Base、ERC-1155、EIP-712                                      | 限量活動紀念、防重播授權與 Gas 代付       |
+| 歷史底座   | [POAPin Archive](https://github.com/glorylab/poapin-archive) | 歷史資料匯入、查詢與保存工具              |
+
+詳細資料流與信任邊界請見[平臺技術架構](docs/PLATFORM-ARCHITECTURE.zh-TW.md)。
+
+## 主網狀態
+
+公開站目前使用 Base mainnet。已發行的歷史與新憑證不會因為未來更換合約而消失；前端會聚合
+所有已登記的合約。
+
+| 合約               | Base 地址                                                                                                               | 用途                     |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| 第一版不可升級合約 | [`0x09567074611047B24f31bcfc33092fC99B3893e5`](https://basescan.org/address/0x09567074611047B24f31bcfc33092fC99B3893e5) | 第一場 Base 正式活動     |
+| `STEVE` UUPS Proxy | [`0x9375B610859B1a5fEeA3C7c7C45FC20712F506cB`](https://basescan.org/address/0x9375B610859B1a5fEeA3C7c7C45FC20712F506cB) | 後續可升級的活動紀念合約 |
+
+Proxy 的 implementation、部署交易與 metadata 記錄在
+[`contracts/deployments/base-mainnet.json`](contracts/deployments/base-mainnet.json)。合約設計與升級限制請見
+[`contracts/README.md`](contracts/README.md)。
 
 ## 本機開發
 
-需要 Node.js 22 與 npm：
+需要 Node.js 22.13 以上與 npm。根目錄提供 Worker、資料庫與工具；公開前端位於
+`frontend-astro/`。
 
 ```bash
+git clone https://github.com/ASTROHSU/poap-continuation-platform.git
+cd poap-continuation-platform
 npm ci
 cp .dev.vars.example .dev.vars
 npm run db:setup:local
 npm run dev
 ```
 
-Astro 前端：
+另開一個終端啟動 Astro 前端：
 
 ```bash
 cd frontend-astro
@@ -51,289 +111,91 @@ npm ci
 npm run dev
 ```
 
-部署前請複製 `wrangler.pilot.example.jsonc`，建立自己的 Cloudflare D1、R2 與 Worker
-設定。不要提交實際的 `wrangler.pilot.jsonc`、`.dev.vars`、活動 access code、私鑰或部署輸出。
-
-## 文件
-
-- [平台技術架構](docs/PLATFORM-ARCHITECTURE.zh-TW.md)
-- [本機開發與操作](docs/LOCAL-DEVELOPMENT.zh-TW.md)
-- [Base Sepolia 部署手冊](docs/BASE-SEPOLIA-DEPLOYMENT.zh-TW.md)
-- [Base 鏈上索引手冊](docs/CHAIN-INDEXER.zh-TW.md)
-- [Pilot 操作與復原手冊](docs/PILOT-RUNBOOK.zh-TW.md)
-- [Pilot 上線檢查](docs/PILOT-LAUNCH-GATE.zh-TW.md)
-- [Magic PreGen 接入準備與啟用手冊](docs/MAGIC-PREGEN-READINESS.zh-TW.md)
-- [資料來源與授權](docs/data-and-licensing.md)
-- [歷史資料匯入](docs/data-import.md)
-- [貢獻指南](CONTRIBUTING.md)
-- [安全政策](SECURITY.md)
-
-目前正式流程使用 Magic Embedded Wallet OTP；Magic Pre-generated Wallet 仍保留為可選整合，
-預設不啟用。測試網部署與鑄造操作見
-[Base Sepolia 部署手冊](docs/BASE-SEPOLIA-DEPLOYMENT.zh-TW.md)。
-
----
-
-# 上游 POAPin Archive 參考說明
-
-以下保留上游 Archive 的架構與操作背景，方便追溯設計來源。內容中出現的 `poap.in`、
-Glory Lab 資源與部署方式屬於上游專案，不是本 fork 的可直接使用設定。
-
-> **POAP is dead. Long live POAP!**
-
-POAPin Archive is an independent, public browser for a preserved POAP snapshot.
-It exists because a community's memories should not disappear when a website
-does.
-
-The project is designed for Cloudflare Workers and for a deliberately small
-operational footprint: static React assets at the edge, a Hono API, indexed D1
-lookups, original artwork in R2, and versioned public responses in Workers
-Cache.
-
-The public site is [`poap.in`](https://poap.in), with immutable archive
-artwork served from [`media.poap.in`](https://media.poap.in).
-
-> [!IMPORTANT]
-> The public deployment serves a fixed snapshot captured on July 2, 2026, not a
-> canonical or live view of POAP ownership. Its catalog, holdings, and 73,795
-> original artwork objects have been integrity-checked and published. Curated
-> POAP Collections use a separately verified `collections-2026-07-22-v1`
-> snapshot and release lifecycle; every API response identifies the Collections
-> snapshot it came from. POAP Moments use an independent, twice-captured
-> `moments-2026-07-23-v1` snapshot, D1 release gate, and resumable original-media
-> archive. Its media-bound release verified all 30,548 stored R2 objects in two
-> independent remote passes with zero failures.
-
-## What it is
-
-- A focused homepage with small Drops, Collections, and public Moments
-  previews, plus a complete searchable Drops catalog at `/drops`.
-- Bounded browse, detail, and segmented export APIs for preserved POAP
-  Collections.
-- A Moments hub with Drop and Collection albums, authored timelines,
-  bandwidth-safe detail pages, and bounded metadata exports.
-- Address lookup that accepts either a complete `0x` address or an ENS name,
-  including shareable paths such as `/address/poap.eth`, then opens the matching
-  preserved collection without connecting a wallet.
-- Exact Drop pages with a cursor-paginated list of every holder record preserved
-  in the historical Holdings snapshot.
-- A browser-built, deployable personal-site ZIP containing complete paginated
-  Holdings, normalized public and holder-proven private Drop records, opaque
-  missing or hidden Drop references, relevant Collection profiles and
-  owned-Collection exports, public authored and tagged Moments, and historically
-  owned Capsules.
-- A transparent archive: every published dataset should identify its source,
-  capture time, checksum, and known limitations.
-- A small service that can remain affordable even when it becomes popular.
-
-It is not a wallet, an ownership oracle, or a replacement for a live indexer.
-No wallet connection is required.
-
-## Architecture
-
-| Layer       | Technology                       | Responsibility                                                        |
-| ----------- | -------------------------------- | --------------------------------------------------------------------- |
-| Web         | React + Vite                     | Browsing, export collection, static-site generation, and ZIP creation |
-| API         | Hono on Cloudflare Workers       | Validation, bounded reads, and cache-safe responses                   |
-| Catalog     | Cloudflare D1 (`CATALOG_DB`)     | Drops, snapshot metadata, search fields, and artwork references       |
-| Holdings    | Cloudflare D1 (`HOLDINGS_DB`)    | Clustered address-to-token and exact-Drop collector lookup            |
-| Collections | Cloudflare D1 (`COLLECTIONS_DB`) | Curated collections, memberships, sections, and export relations      |
-| Moments     | Cloudflare D1 (`MOMENTS_DB`)     | Moments, tags, Capsules, Drop links, albums, media proof, and exports |
-| Media       | Cloudflare R2 (`ARCHIVE_BUCKET`) | Immutable original artwork; derived thumbnails may follow later       |
-| Resolver    | ENS Universal Resolver           | Server-side ENS-to-address lookup through a configurable mainnet RPC  |
-| Cache       | Workers Cache + HTTP caching     | Snapshot-versioned public GET responses and immutable media           |
-
-Splitting catalog, holdings, Collections, and Moments keeps their access
-patterns and snapshot lifecycles independent. Cache is an expendable
-acceleration layer; D1 and R2 remain the sources of served data. See
-[Architecture](docs/architecture.md) for the request and data flow.
-
-ENS resolution also stays behind the Worker. The browser sends the requested
-name to the POAPin API, while the Worker uses `ETHEREUM_RPC_URL` to call the
-Ethereum mainnet Universal Resolver. The production default is PublicNode's
-keyless public Ethereum endpoint, and operators can replace it with another
-HTTPS mainnet JSON-RPC provider without changing the client.
-
-## Cost is a design constraint
-
-The archive is intentionally optimized for predictable edge cost and low CPU
-time:
-
-- serve built assets without application work;
-- cache only public, deterministic GET responses using the snapshot ID;
-- use indexed keyset pagination with hard page-size limits;
-- precompute counts, normalized search fields, and export-ready records during
-  import rather than during a request;
-- collect complete personal exports through bounded pages, then generate and
-  compress the static site in the browser rather than in a Worker request;
-- store and serve original images from R2 without synchronous transformation;
-- keep imports, integrity scans, and derivative generation outside the request
-  path; and
-- measure Worker CPU, D1 rows read, R2 operations, and cache effectiveness
-  before increasing limits.
-
-Current prices and platform limits are intentionally not copied into this
-README. Review the official [Workers limits](https://developers.cloudflare.com/workers/platform/limits/),
-[D1 limits](https://developers.cloudflare.com/d1/platform/limits/),
-[R2 pricing](https://developers.cloudflare.com/r2/pricing/), and
-[Cache documentation](https://developers.cloudflare.com/workers/runtime-apis/cache/)
-before operating a production deployment.
-
-## Privacy by default
-
-Blockchain addresses and holdings may be public, but browsing intent is still
-personal. The project therefore aims to:
-
-- require no account, wallet signature, or cookie for ordinary use;
-- avoid behavioral advertising and third-party tracking;
-- never cache personalized responses or responses containing cookies;
-- avoid placing exported content in server logs; and
-- collect only the operational telemetry needed to keep the service healthy,
-  with short, documented retention.
-
-An address export describes the selected archive snapshot, not current
-ownership. Persistent Worker invocation logs are disabled by default because
-address routes would otherwise retain lookup intent; operators must review all
-Cloudflare logging and retention settings before enabling them.
-
-A downloaded personal site contains the selected address and its public
-archived history. Publishing that ZIP makes the packaged metadata public at the
-chosen host; the archive does not upload it automatically.
-
-## Local development
-
-Requirements:
-
-- Node.js 22.13 or newer
-- npm
-- a Cloudflare account only when creating or deploying remote resources
-
-```bash
-npm ci
-npm run db:setup:local
-npm run dev
-```
-
-Useful checks:
+常用檢查：
 
 ```bash
 npm run typecheck
 npm test
-npx playwright install chromium
-npm run test:browser
 npm run build
+
+cd frontend-astro
 npm run check
+npm run build
 ```
 
-`npm run check` also performs a Wrangler dry-run. Tests use the Cloudflare
-Workers runtime rather than a Node-only approximation. The focused Chromium
-suite verifies that archived audio and video remain network-idle until the user
-explicitly asks to load them.
+本機 fixtures 刻意維持小型且為合成資料。完整 Archive ZIP、正式 D1、R2 內容、錢包私鑰與
+活動領取碼都不會放入 Git。
 
-The checked-in local fixtures are intentionally tiny and synthetic. They are
-kept outside the migration chain, so applying production migrations can never
-insert sample wallets, events, or Collections.
+## 自行部署
 
-## Data import
+自行架設需要準備：
 
-The archive ZIP is not committed to Git. Its ZIP64 layout, SQLite schema, row
-counts, artwork coverage, and important data-quality findings are recorded in
-the [source inventory](docs/source-inventory.md). The importer checksums its
-input, creates bounded D1 SQL parts and an R2 object manifest, and writes a
-machine-readable validation report before publication.
+- Cloudflare Workers、D1 與 R2；
+- Vercel 或其他可部署 Astro 的環境；
+- Magic 應用程式與允許的正式網域；
+- Ethereum 與 Base RPC；
+- 獨立的合約 owner、claim signer 與 relayer；
+- Base Gas 與自己的網域。
 
-See [Data import](docs/data-import.md) for the reproducible import contract.
-The resulting reviewed artwork manifest can be uploaded without extracting the
-source ZIP by following the [R2 media uploader guide](tools/r2-media-upload/README.md).
+請從 `wrangler.pilot.example.jsonc` 與 `.dev.vars.example` 建立自己的設定。不要提交
+`wrangler.pilot.jsonc`、`.dev.vars`、Magic Secret、RPC Key、活動 access code、私鑰或部署時產生的
+秘密檔案。完整步驟請見[部署文件](docs/deployment.md)與[安全政策](SECURITY.md)。
 
-POAP Compass Collections have their own resumable GraphQL capture, two-pass
-stability comparison, media quarantine, verification, D1 projection, and
-private backup workflow. See the
-[Collections backup guide](tools/collections-backup/README.md).
+## 專案結構
 
-The final local Collections snapshot preserves 2,016 collections, 35,954 items,
-complete cards and anonymous aggregates for 26,004 referenced drops, and a
-26,550-object public media proof spanning reused Archive artwork, newly preserved
-drop originals, and Collection branding. This is an application-level backup of
-data anonymously reachable through Compass, not its physical private database;
-all 26,550 public media objects passed a second remote integrity verification,
-and the snapshot-scoped D1 database was independently loaded, verified, and
-activated before its Worker binding changed.
+| 路徑                      | 用途                                               |
+| ------------------------- | -------------------------------------------------- |
+| `frontend-astro/`         | 目前公開使用的 Astro 前端                          |
+| `src/worker/`             | Cloudflare Worker API、領取、Magic、ENS 與鏈上索引 |
+| `contracts/`              | ERC-1155 合約、測試與 UUPS 部署工具                |
+| `metadata/`               | 可公開重現的合約與活動 metadata                    |
+| `tools/live-event/`       | 建立活動、QR、匯入、稽核與備份工具                 |
+| `tools/archive-import/`   | 歷史 Archive 的 D1／R2 匯入工具                    |
+| `tools/compass-holdings/` | 補充 Holdings 與 Artwork 的保存工具                |
+| `migrations/`             | D1 schema 與 migrations                            |
 
-POAP Moments use a separate two-pass GraphQL capture, canonical stability
-comparison, Drop-to-Collection projection, private structured backup, staged D1
-loader, and resumable R2 media capture. The preserved source contains 25,959
-Moments, 26,521 Moment-to-Drop relationships, 32,891 media records, and 64,862
-gateway records. The first media-bound public projection contains 24,459
-Moments and 26,198 public media records. See
-[Moments preservation](docs/moments.md) and the
-[Moments backup guide](tools/moments-backup/README.md).
+## 主要文件
 
-## Portable personal sites
+- [平臺技術架構](docs/PLATFORM-ARCHITECTURE.zh-TW.md)
+- [本機開發與操作](docs/LOCAL-DEVELOPMENT.zh-TW.md)
+- [Base Sepolia 部署手冊](docs/BASE-SEPOLIA-DEPLOYMENT.zh-TW.md)
+- [Base 鏈上索引手冊](docs/CHAIN-INDEXER.zh-TW.md)
+- [Pilot 操作與復原手冊](docs/PILOT-RUNBOOK.zh-TW.md)
+- [Magic Email 樣式設定](docs/MAGIC-EMAIL-CUSTOMIZATION.zh-TW.md)
+- [歷史資料匯入](docs/data-import.md)
+- [資料來源與授權](docs/data-and-licensing.md)
+- [貢獻指南](CONTRIBUTING.md)
+- [安全政策](SECURITY.md)
 
-The address page can collect a complete personal archive through the paginated
-APIs and build a pure-static ZIP in the browser. Each dataset is held to one
-unchanged release identity during collection; Holdings, Collections, and
-Moments remain three independent snapshots rather than one shared capture time.
-The package contains normalized Holdings; public Catalog details; preserved
-private or hidden Drop metadata where that exact address's Holdings snapshot
-proves the relation; opaque Drop-ID references only for genuinely unavailable
-records; three distinct Collection relationship views; complete public exports
-for historically owned Collections; separate public authored and tagged Moment
-views; and public Capsules whose archived owner is the address. A private or
-hidden Drop can also be opened when its exact ID is known. Drop browse, search,
-batch export, and Collection projections continue to exclude private and hidden
-Drop metadata; an exact Drop page may separately list the public holder
-addresses preserved in Holdings.
+## 歡迎協作
 
-The deployable ZIP remains metadata-focused: its generated page mounts an image,
-video, or audio source only after a visitor explicitly asks to load it. A
-separate, opt-in browser export can download the address's deduplicated archived
-images as an image ZIP without putting those binaries into the website package.
-It accepts only immutable objects in the active Archive, Collections, or
-Holdings snapshot namespaces; preserved mutable source URLs are never download
-targets. Video and audio are not included in that image archive. The website
-ZIP also includes integrity metadata and deployment prompts for Cloudflare,
-Vercel, Filebase, and ICP. After extraction, `index.html` can be opened directly
-without a local server; the same files remain deployable to an ordinary static
-origin.
+這個 repository 的目標不是只服務單一活動，而是留下可重用的社群基礎設施。特別歡迎以下方向：
 
-See [Portable personal-site export](docs/personal-site-export.md) for the API,
-data, packaging, media-loading, and deployment contracts. The legacy one-file
-CSV/JSON address downloads remain capped at 5,000 holdings; the personal-site
-flow follows keyset pages and does not inherit that whole-response limit.
+- Archive 與跨鏈持有人資料的正確性；
+- relayer 併發、nonce 管理、重試與可觀測性；
+- 手機版、無障礙與多語介面；
+- 自行部署流程與成本控制；
+- 合約、API 與資料匯入的安全檢查；
+- 讓其他社群也能建立自己的發行與收藏體驗。
 
-## Deployment
+開始前請閱讀[貢獻指南](CONTRIBUTING.md)、[行為準則](CODE_OF_CONDUCT.md)與
+[安全政策](SECURITY.md)。一般問題與功能建議可以使用
+[GitHub Issues](https://github.com/ASTROHSU/poap-continuation-platform/issues)；安全問題請依
+`SECURITY.md` 私下回報。
 
-Self-hosted deployments must create their own D1 databases, R2 buckets, Worker,
-domain, Magic application, Email provider, RPC endpoints, and signing keys. Use
-`wrangler.pilot.example.jsonc` as a public template; the deployment-specific
-`wrangler.pilot.jsonc` is intentionally excluded from Git.
+## 資料、授權與商標
 
-Do not deploy by guessing those values. Follow the one-time provisioning,
-migration, validation, and deployment checklist in
-[Deployment](docs/deployment.md).
+程式碼使用 [MIT License](LICENSE)。MIT License 不會自動授權 POAP Archive 資料、活動
+Artwork、第三方 Logo、名稱或商標；這些內容仍受各自權利與來源條款約束。鏡像或重新發布資料前，
+請先閱讀 [NOTICE.md](NOTICE.md)、[ASSETS-LICENSE.md](ASSETS-LICENSE.md)與
+[資料來源及授權說明](docs/data-and-licensing.md)。
 
-## Contributing
+本專案不隸屬、不代表，也未獲 POAP 官方背書。
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), our
-[Code of Conduct](CODE_OF_CONDUCT.md), and the [Security Policy](SECURITY.md)
-before opening a pull request. The project uses Conventional Commits and expects
-tests and documentation to travel with behavior changes.
+## 致謝
 
-## License and archive rights
+歷史 Archive 瀏覽、資料匯入與 Cloudflare 架構建立在 Kira 與 Glory Lab 開源的
+[POAPin Archive](https://github.com/glorylab/poapin-archive) 之上。沒有他們先完成歷史保存與瀏覽器，
+這個延續平臺就必須從零開始。
 
-The project code is available under the [MIT License](LICENSE). That license
-does **not** automatically grant rights to imported archive data, POAP event
-artwork, third-party logos, names, or trademarks. Those materials remain subject
-to their respective rights and source terms. See
-[Notices](NOTICE.md) and [Data and licensing](docs/data-and-licensing.md) before mirroring or
-redistributing a snapshot.
-
-This fork and POAPin Archive are independent preservation projects. Neither is
-endorsed by or affiliated with POAP or the operators of POAP Archive.
-
----
-
-The Archive browser was originally created by Kira and Glory Lab. This fork preserves
-their MIT notice and documents its additional work in [NOTICE.md](NOTICE.md).
+本 fork 保留上游 MIT 授權聲明，差異與額外工作記錄在 [NOTICE.md](NOTICE.md)。

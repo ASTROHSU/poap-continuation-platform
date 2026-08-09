@@ -191,9 +191,7 @@ describe("archive media mirror policy", () => {
       limit: 12,
       untilDropId: undefined,
     });
-    expect(() => parseArchiveMediaMirrorRequest({ afterDropId: -1 })).toThrow(
-      "cursor is invalid",
-    );
+    expect(() => parseArchiveMediaMirrorRequest({ afterDropId: -1 })).toThrow("cursor is invalid");
     expect(() => parseArchiveMediaMirrorRequest({ limit: "12" })).toThrow("limit is invalid");
     expect(() => parseArchiveMediaMirrorRequest({ afterDropId: 5, untilDropId: 5 })).toThrow(
       "stop cursor is invalid",

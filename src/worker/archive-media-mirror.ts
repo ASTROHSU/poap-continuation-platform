@@ -120,7 +120,9 @@ export async function mirrorArchiveMediaBatch(
     (outcome) => outcome.status === "fulfilled" && outcome.value === "skipped",
   ).length;
   const bytesCopied = items
-    .filter((_, index) => outcomes[index]?.status === "fulfilled" && outcomes[index].value === "copied")
+    .filter(
+      (_, index) => outcomes[index]?.status === "fulfilled" && outcomes[index].value === "copied",
+    )
     .reduce((sum, row) => sum + row.byte_length, 0);
 
   return {
@@ -213,7 +215,11 @@ async function mirrorOneArchiveMediaObject(
       source: "poapin-archive",
     },
   });
-  if (!uploaded || uploaded.size !== row.byte_length || uploaded.customMetadata?.sha256 !== row.sha256) {
+  if (
+    !uploaded ||
+    uploaded.size !== row.byte_length ||
+    uploaded.customMetadata?.sha256 !== row.sha256
+  ) {
     throw new Error(`R2 rejected or truncated source object ${row.drop_id}.`);
   }
   return "copied";

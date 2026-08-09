@@ -49,7 +49,9 @@ if (state.complete) {
       `${formatBytes(state.bytesCopied)} transferred.`,
   );
 } else {
-  console.log(`[archive-media-mirror] paused after ${processedThisRun} batch(es); rerun with the same state file.`);
+  console.log(
+    `[archive-media-mirror] paused after ${processedThisRun} batch(es); rerun with the same state file.`,
+  );
 }
 
 async function mirrorPage(endpoint, secret, afterDropId, limit, untilDropId) {
@@ -91,7 +93,8 @@ function validateResult(value) {
       throw new Error(`Mirror response ${key} was invalid.`);
     }
   }
-  if (typeof result.complete !== "boolean") throw new Error("Mirror response completion flag was invalid.");
+  if (typeof result.complete !== "boolean")
+    throw new Error("Mirror response completion flag was invalid.");
   return result;
 }
 
@@ -160,11 +163,15 @@ function parseArgs(argv) {
   if (!endpoint || !/^https:\/\/[a-z0-9.-]+(?:\/.*)?$/i.test(endpoint)) {
     throw new Error("Pass the HTTPS Worker URL with --endpoint.");
   }
-  if (!state || !state.startsWith("/")) throw new Error("Pass an absolute checkpoint path with --state.");
+  if (!state || !state.startsWith("/"))
+    throw new Error("Pass an absolute checkpoint path with --state.");
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 18) {
     throw new Error("--limit must be an integer between 1 and 18.");
   }
-  if (maxBatches !== Number.POSITIVE_INFINITY && (!Number.isSafeInteger(maxBatches) || maxBatches < 1)) {
+  if (
+    maxBatches !== Number.POSITIVE_INFINITY &&
+    (!Number.isSafeInteger(maxBatches) || maxBatches < 1)
+  ) {
     throw new Error("--max-batches must be a positive integer.");
   }
   if (!Number.isSafeInteger(afterDropId) || afterDropId < 0) {

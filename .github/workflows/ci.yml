@@ -30,7 +30,9 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm ci --prefix frontend-astro
 
       - name: Verify generated Cloudflare types
         run: npm run cf-typegen && git diff --exit-code -- worker-configuration.d.ts
