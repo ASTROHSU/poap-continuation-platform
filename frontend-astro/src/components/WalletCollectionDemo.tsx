@@ -259,32 +259,37 @@ export default function WalletCollectionDemo({
           <h1 className="display-title mt-5 break-words text-5xl sm:text-6xl">
             {identityName || "POAP 收藏"}
           </h1>
-          <p className="mt-4 max-w-xl break-all font-mono text-xs text-ink/42">{resolvedAddress}</p>
-          {magicOwner ? (
-            <button
-              className="mt-4 inline-flex items-center gap-2 rounded-full border-2 border-[#7669d8]/75 bg-white/85 px-3.5 py-2 font-display text-xs font-bold text-[#514777] shadow-[3px_4px_0_#ddd9ff] transition duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[3px_5px_0_#c9c2ff] focus-visible:outline-4 focus-visible:outline-offset-3 focus-visible:outline-[#a89cff]"
-              type="button"
-              onClick={() => {
-                setKeyExportError("");
-                setShowKeyExport(true);
-              }}
-            >
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          <div className="mt-4 flex max-w-xl items-start gap-2">
+            <p className="min-w-0 break-all font-mono text-xs leading-8 text-ink/42">
+              {resolvedAddress}
+            </p>
+            {magicOwner ? (
+              <button
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-[#7669d8]/65 bg-white/80 text-[#514777] shadow-[2px_3px_0_#ddd9ff] transition duration-200 hover:-translate-y-0.5 hover:border-[#7669d8] hover:bg-white hover:shadow-[2px_4px_0_#c9c2ff] focus-visible:outline-4 focus-visible:outline-offset-3 focus-visible:outline-[#a89cff]"
+                type="button"
+                aria-label="匯出私鑰"
+                title="匯出私鑰"
+                onClick={() => {
+                  setKeyExportError("");
+                  setShowKeyExport(true);
+                }}
               >
-                <circle cx="8" cy="15" r="3" />
-                <path d="m10.2 12.8 7.3-7.3 2 2-1.6 1.6 1.2 1.2-2.1 2.1-1.2-1.2-3.4 3.4" />
-              </svg>
-              匯出私鑰
-            </button>
-          ) : null}
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="8" cy="15" r="3" />
+                  <path d="m10.2 12.8 7.3-7.3 2 2-1.6 1.6 1.2 1.2-2.1 2.1-1.2-1.2-3.4 3.4" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
         </div>
         <span className="self-start rounded-full border-2 border-[#7669d8] bg-white px-5 py-2.5 font-display text-sm font-bold text-[#4f457c] shadow-[4px_5px_0_#ddd9ff] sm:self-auto">
           {total.toLocaleString("zh-TW")} 枚 POAP
