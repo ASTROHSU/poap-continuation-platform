@@ -235,7 +235,11 @@ app.get("/api/app-config", (context) => {
 app.post("/api/admin/archive-media/mirror", async (context) => {
   const secret = context.env.ARCHIVE_MEDIA_MIRROR_SECRET;
   if (!isAuthorizedArchiveMediaMirrorRequest(context.req.raw, secret)) {
-    throw new ApiError(401, "Archive media mirror authorization is required.", "mirror_unauthorized");
+    throw new ApiError(
+      401,
+      "Archive media mirror authorization is required.",
+      "mirror_unauthorized",
+    );
   }
   const body = await parseJsonObject(context.req.raw, "Archive media mirror request");
   const { afterDropId, limit, untilDropId } = parseArchiveMediaMirrorRequest(body);
@@ -469,7 +473,8 @@ app.get(
       ["avif", "image/avif"],
       ["heic", "image/heic"],
     ]).get(match[2]);
-    if (!expectedContentType) throw new ApiError(404, "Archive artwork not found.", "media_not_found");
+    if (!expectedContentType)
+      throw new ApiError(404, "Archive artwork not found.", "media_not_found");
 
     const objectKey = segments.join("/");
     const mirrored = await context.env.ARCHIVE_MEDIA_BUCKET.get(objectKey);
@@ -485,7 +490,7 @@ app.get(
         "Cache-Control": "public, max-age=31536000, immutable",
         "Content-Type": expectedContentType,
         "Cross-Origin-Resource-Policy": "cross-origin",
-        "ETag": mirrored.httpEtag,
+        ETag: mirrored.httpEtag,
         "X-Content-Type-Options": "nosniff",
       });
       return new Response(mirrored.body, { headers });
@@ -2531,7 +2536,10 @@ function normalizeLiveMediaFilename(value: string): string {
   throw new ApiError(404, "Media not found.", "media_not_found");
 }
 
-function isAuthorizedArchiveMediaMirrorRequest(request: Request, secret: string | undefined): boolean {
+function isAuthorizedArchiveMediaMirrorRequest(
+  request: Request,
+  secret: string | undefined,
+): boolean {
   if (!secret || secret.length < 32) return false;
   const authorization = request.headers.get("Authorization");
   const expected = `Bearer ${secret}`;
