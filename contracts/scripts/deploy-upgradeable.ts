@@ -7,7 +7,9 @@ import { getAddress } from "ethers";
 const claimSigner = requiredAddress("CLAIM_SIGNER_ADDRESS");
 const contractMetadataUri = requiredHttpsUrl("CONTRACT_METADATA_URI");
 
-console.log("現在請輸入 Hardhat keystore 密碼並按 Enter；輸入時不會顯示字元。");
+if (!process.env.BASE_MAINNET_PRIVATE_KEY && !process.env.BASE_SEPOLIA_PRIVATE_KEY) {
+  console.log("現在請輸入 Hardhat keystore 密碼並按 Enter；輸入時不會顯示字元。");
+}
 const connection = await hre.network.create();
 const { ethers, networkName } = connection;
 assertSupportedNetwork(networkName);

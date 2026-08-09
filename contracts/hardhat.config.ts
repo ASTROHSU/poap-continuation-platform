@@ -30,14 +30,18 @@ export default defineConfig({
       chainType: "op",
       chainId: 84532,
       url: process.env.BASE_SEPOLIA_RPC_URL ?? "https://sepolia.base.org",
-      accounts: [configVariable("BASE_SEPOLIA_PRIVATE_KEY")],
+      accounts: process.env.BASE_SEPOLIA_PRIVATE_KEY
+        ? [process.env.BASE_SEPOLIA_PRIVATE_KEY]
+        : [configVariable("BASE_SEPOLIA_PRIVATE_KEY")],
     },
     baseMainnet: {
       type: "http",
       chainType: "op",
       chainId: 8453,
       url: process.env.BASE_MAINNET_RPC_URL ?? "https://mainnet.base.org",
-      accounts: [configVariable("BASE_MAINNET_PRIVATE_KEY")],
+      accounts: process.env.BASE_MAINNET_PRIVATE_KEY
+        ? [process.env.BASE_MAINNET_PRIVATE_KEY]
+        : [configVariable("BASE_MAINNET_PRIVATE_KEY")],
     },
   },
 });

@@ -16,6 +16,7 @@
     "verify:base-sepolia": "hardhat verify --network baseSepolia",
     "deploy:proxy:base-sepolia": "hardhat run --build-profile production scripts/deploy-upgradeable.ts --network baseSepolia",
     "deploy:proxy:base-mainnet": "hardhat run --build-profile production scripts/deploy-upgradeable.ts --network baseMainnet",
+    "deploy:proxy:base-mainnet:direct": "zsh scripts/deploy-upgradeable-mainnet-interactive.zsh",
     "upgrade:proxy:base-sepolia": "hardhat run --build-profile production scripts/upgrade-proxy.ts --network baseSepolia",
     "upgrade:proxy:base-mainnet": "hardhat run --build-profile production scripts/upgrade-proxy.ts --network baseMainnet"
   },

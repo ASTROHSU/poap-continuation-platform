@@ -1,0 +1,18 @@
+{
+  "network": "baseMainnet",
+  "chainId": 8453,
+  "proxyKind": "uups",
+  "proxyAddress": "0x9375B610859B1a5fEeA3C7c7C45FC20712F506cB",
+  "implementationAddress": "0xCb9ae7E1f3C82fca3867E7823F18CDC41a1aa655",
+  "proxyTransactionHash": "0x407d65e446f9903b69c303637ece36c9e6d83c41901ae9bc08d8fe24f101bdf9",
+  "implementationTransactionHash": "0x63948b3a8424e4b0f777d526e5ee241c0b0dc3163225bec17bc7d0bb7bee0ee6",
+  "deployer": "0xB3492740f78C046b5BD6c6d4c188623BceCc36aC",
+  "owner": "0xB3492740f78C046b5BD6c6d4c188623BceCc36aC",
+  "claimSigner": "0xAa76b5D0eCBF525F7Fe651110999DE53f5E74057",
+  "contractName": "兆量富足教育協會數位紀念",
+  "contractSymbol": "STEVE",
+  "contractMetadataUri": "https://association-poap-pilot.mingnhsu.workers.dev/media/live/events/association-badges/metadata.json",
+  "implementationVersion": "1",
+  "deploymentGasCostWei": "20943750000000",
+  "deployedAt": "2026-08-09T15:24:55.000Z"
+}
