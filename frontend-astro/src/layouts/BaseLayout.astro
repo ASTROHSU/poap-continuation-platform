@@ -9,11 +9,12 @@ interface Props {
 }
 
 const {
-  title = "POAP 留存＋新收藏",
-  description = "保存過去的 POAP 記錄，讓新的共同記憶繼續被收藏。",
+  title = "底加｜把做伙的時刻留在這裡",
+  description = "底加保存過去的 POAP 記錄，也讓新的共同記憶繼續被收藏。",
   robots = "index,follow",
   referrer = "strict-origin-when-cross-origin",
 } = Astro.props;
+const socialImage = new URL("/brand/titsia-app-icon-512.png", Astro.url).href;
 ---
 
 <!doctype html>
@@ -24,25 +25,27 @@ const {
     <meta name="description" content={description} />
     <meta name="robots" content={robots} />
     <meta name="referrer" content={referrer} />
-    <meta name="theme-color" content="#5E58A5" />
+    <meta name="theme-color" content="#7C72E2" />
     <meta name="base:app_id" content="6a79bfdcd198f685bc61e2f7" />
-    <link rel="icon" href="/brand/blocktrend-favicon.ico" sizes="any" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/brand/blocktrend-favicon-32.png" />
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="/brand/blocktrend-apple-touch-icon.png"
-    />
+    <meta property="og:site_name" content="底加" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content={socialImage} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:image" content={socialImage} />
+    <link rel="icon" type="image/svg+xml" href="/brand/vector/titsia-brand-logo.svg" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/brand/titsia-app-icon-512.png" />
     <title>{title}</title>
   </head>
   <body class="paper-grid">
     <header class="sticky top-0 z-50 border-b border-white/70 bg-paper/86 backdrop-blur-xl">
       <div class="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-10">
-        <a href="/" class="flex items-center gap-3" aria-label="收藏首頁">
-          <span class="brand-orbit" aria-hidden="true"><span>P</span></span>
+        <a href="/" class="flex min-w-0 items-center gap-3" aria-label="底加首頁">
+          <img class="brand-logo" src="/brand/vector/titsia-brand-logo.svg" alt="" width="52" height="52" />
           <span>
-            <strong class="block text-sm tracking-[.04em]">POAP 留存計畫</strong>
-            <small class="block text-[10px] font-bold tracking-[.06em] text-ink/48">歷史 Archive＋新收藏</small>
+            <strong class="block text-base tracking-[.08em]">底加</strong>
+            <small class="block whitespace-nowrap text-[10px] font-bold tracking-[.04em] text-ink/48">歷史 POAP＋新收藏</small>
           </span>
         </a>
         <nav class="hidden items-center gap-7 text-sm font-bold lg:flex" aria-label="主要導覽">
@@ -57,8 +60,8 @@ const {
     <footer class="overflow-hidden bg-leaf-dark px-5 py-12 text-white/72">
       <div class="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,auto)] lg:items-end lg:px-5">
         <div>
-          <p class="text-xl font-bold text-white">記憶留下，故事繼續。</p>
-          <p class="mt-3 max-w-xl text-sm leading-6 text-white/58">查詢歷史 POAP，也收藏兆量富足教育協會的新活動紀念。</p>
+          <p class="text-xl font-bold text-white">底加｜把做伙的時刻，留底加。</p>
+          <p class="mt-3 max-w-xl text-sm leading-6 text-white/58">查詢歷史 POAP，也收藏未來的活動紀念。</p>
         </div>
         <div class="border-t border-white/14 pt-7 lg:border-t-0 lg:border-l lg:py-1 lg:pl-9">
           <p class="text-[11px] font-black tracking-[.18em] text-mint">OPEN SOURCE</p>
@@ -81,7 +84,7 @@ const {
               Built on POAPin Archive by Glory Lab ↗
             </a>
           </div>
-          <p class="mt-4 text-xs text-white/42">社群延續實驗 · 非 POAP 官方服務</p>
+          <p class="mt-4 text-xs text-white/42">保存歷史 POAP，也延續新的活動記憶 · 非 POAP 官方服務</p>
         </div>
       </div>
     </footer>
