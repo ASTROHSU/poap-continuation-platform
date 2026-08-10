@@ -1,19 +1,27 @@
-# POAP 留存計畫
+<p align="center">
+  <img src="frontend-astro/public/brand/vector/titsia-brand-logo.svg" width="156" alt="底加 Logo" />
+</p>
+
+# 底加（TITSIA）
+
+> 把做伙的時刻，留底加。
 
 [![公開網站](https://img.shields.io/badge/公開網站-poap.blocktrend.today-7869df?style=flat-square)](https://poap.blocktrend.today)
 [![Base](https://img.shields.io/badge/Network-Base-0052ff?style=flat-square)](https://base.org/)
 [![License: MIT](https://img.shields.io/badge/Code-MIT-4f457c?style=flat-square)](LICENSE)
 [![Built on POAPin Archive](https://img.shields.io/badge/Built%20on-POAPin%20Archive-f0a6c1?style=flat-square)](https://github.com/glorylab/poapin-archive)
 
-一套可自行維運的數位活動紀念平臺：保留過去的 POAP 收藏，也讓社群能在 Base
-上繼續發行新的活動紀念。歷史資料與新憑證來自不同系統，但會呈現在同一個收藏介面中。
+**底加**來自臺語「佇遮」（tī-tsia，在這裡）。這是一套可自行維運的數位活動紀念平臺：保留過去的 POAP 收藏，也讓社群能在 Base 上繼續發行新的活動紀念。歷史資料與新憑證來自不同系統，但會呈現在同一個收藏介面中。
+
+專案以 Glory Lab 開源的 [POAPin Archive](https://github.com/glorylab/poapin-archive)
+為歷史資料與瀏覽架構基礎，再加上底加的新發行、領取、Gas 代付與多鏈收藏整合。
 
 **[開啟公開網站](https://poap.blocktrend.today)** ·
 **[閱讀技術架構](docs/PLATFORM-ARCHITECTURE.zh-TW.md)** ·
 **[參與貢獻](CONTRIBUTING.md)**
 
 > [!IMPORTANT]
-> 這是獨立的社群延續專案，不是 POAP 官方服務。過去的 POAP 仍由原本的 POAP
+> 底加是獨立的社群延續專案，不是 POAP 官方服務。過去的 POAP 仍由原本的 POAP
 > 智慧合約定義；本專案新發行的是另一套 ERC-1155 活動紀念，因此不會自動出現在只支援
 > POAP 官方合約的第三方 App 中。
 
@@ -50,6 +58,16 @@ flowchart LR
 - 已登入的 Magic 使用者可以透過 Magic 的安全介面匯出自己的私鑰；本平臺不會讀取或保存私鑰。
 - 自行架設 Cloudflare Worker、D1、R2 與前端，不必依賴本專案的正式環境。
 
+## 品牌資產
+
+| 資產                                                                  | 用途                       |
+| --------------------------------------------------------------------- | -------------------------- |
+| [SVG Logo](frontend-astro/public/brand/vector/titsia-brand-logo.svg)  | 網站、Favicon 與可縮放場景 |
+| [512px App Icon](frontend-astro/public/brand/titsia-app-icon-512.png) | Magic、App Icon 與社群預覽 |
+| [品牌視覺規範 PDF](docs/brand/底加-TITSIA-品牌視覺規範-v0.1.pdf)      | Logo、配色、字體與使用原則 |
+
+網站中的歷史 POAP 名稱、圖像與其他第三方素材仍屬於各自權利人；「底加」品牌資產與專案程式碼的授權範圍請分別確認。
+
 ## 收藏者的使用流程
 
 1. 取得主辦單位現場提供的 QR Code 或領取連結。
@@ -83,7 +101,7 @@ flowchart LR
 | 合約               | Base 地址                                                                                                               | 用途                     |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | 第一版不可升級合約 | [`0x09567074611047B24f31bcfc33092fC99B3893e5`](https://basescan.org/address/0x09567074611047B24f31bcfc33092fC99B3893e5) | 第一場 Base 正式活動     |
-| `STEVE` UUPS Proxy | [`0x9375B610859B1a5fEeA3C7c7C45FC20712F506cB`](https://basescan.org/address/0x9375B610859B1a5fEeA3C7c7C45FC20712F506cB) | 後續可升級的活動紀念合約 |
+| `TW` UUPS Proxy    | [`0x9375B610859B1a5fEeA3C7c7C45FC20712F506cB`](https://basescan.org/address/0x9375B610859B1a5fEeA3C7c7C45FC20712F506cB) | 後續可升級的活動紀念合約 |
 
 Proxy 的 implementation、部署交易與 metadata 記錄在
 [`contracts/deployments/base-mainnet.json`](contracts/deployments/base-mainnet.json)。合約設計與升級限制請見

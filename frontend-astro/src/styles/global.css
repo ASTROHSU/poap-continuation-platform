@@ -993,31 +993,20 @@ svg {
   }
 }
 
-.brand-orbit {
-  position: relative;
-  display: grid;
-  width: 2.75rem;
-  aspect-ratio: 1;
-  place-items: center;
-  border: 2px dashed #b5aeff;
-  border-radius: 0.82rem;
-  background: #f5f4ff;
-  box-shadow: 0.2rem 0.25rem 0 #dddaff;
+.brand-logo {
+  display: block;
+  width: 3.15rem;
+  height: 3.15rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: drop-shadow(0.16rem 0.2rem 0 #dddaff);
 }
-.brand-orbit::after {
-  content: none;
-}
-.brand-orbit span {
-  display: grid;
-  width: 1.85rem;
-  aspect-ratio: 1;
-  place-items: center;
-  border-radius: 0.5rem;
-  background: transparent;
-  color: var(--color-poap);
-  font-family: "Rubik", sans-serif;
-  font-size: 1.08rem;
-  font-weight: 900;
+
+@media (max-width: 420px) {
+  .brand-logo {
+    width: 2.85rem;
+    height: 2.85rem;
+  }
 }
 
 .nav-claim {
