@@ -22,7 +22,7 @@
     "upgrade:proxy:base-mainnet:direct": "zsh scripts/upgrade-proxy-mainnet-interactive.zsh"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^4.0.4",
+    "@nomicfoundation/hardhat-ethers": "^4.0.15",
     "@nomicfoundation/hardhat-toolbox-viem": "5.0.7",
     "@openzeppelin/contracts": "5.6.1",
     "@openzeppelin/contracts-upgradeable": "5.6.1",
