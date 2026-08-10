@@ -6,7 +6,7 @@ import { getAddress } from "ethers";
 
 const proxyAddress = getAddress(required("PROXY_ADDRESS"));
 const implementationContract =
-  process.env.UPGRADE_CONTRACT_NAME?.trim() || "AssociationBadgesUpgradeable";
+  process.env.UPGRADE_CONTRACT_NAME?.trim() || "AssociationBadgesUpgradeableV2";
 
 console.log("現在請輸入 Hardhat keystore 密碼並按 Enter；輸入時不會顯示字元。");
 const connection = await hre.network.create();
@@ -17,6 +17,13 @@ confirmMainnet(networkName);
 const [upgrader] = await ethers.getSigners();
 const upgradesApi = await upgrades(hre, connection);
 const previousImplementation = await upgradesApi.erc1967.getImplementationAddress(proxyAddress);
+const current = await ethers.getContractAt("AssociationBadgesUpgradeable", proxyAddress, upgrader);
+const owner = await current.owner();
+if (owner.toLowerCase() !== upgrader.address.toLowerCase()) {
+  throw new Error(
+    `Connected upgrader ${upgrader.address} is not proxy owner ${owner}. No transaction was sent.`,
+  );
+}
 const factory = await ethers.getContractFactory(implementationContract, upgrader);
 const upgraded = await upgradesApi.upgradeProxy(proxyAddress, factory, {
   kind: "uups",
@@ -25,6 +32,12 @@ await upgraded.waitForDeployment();
 const implementationAddress = await upgradesApi.erc1967.getImplementationAddress(proxyAddress);
 if (implementationAddress.toLowerCase() === previousImplementation.toLowerCase()) {
   throw new Error("Proxy implementation address did not change.");
+}
+const contractName = await upgraded.name();
+const contractSymbol = await upgraded.symbol();
+const implementationVersion = String(await upgraded.implementationVersion());
+if (contractSymbol !== "TW" || implementationVersion !== "2") {
+  throw new Error("Proxy upgrade completed but its TW collection identity is not active.");
 }
 
 const network = await ethers.provider.getNetwork();
@@ -39,6 +52,10 @@ const output = {
   implementationAddress,
   implementationContract,
   upgrader: upgrader.address,
+  owner,
+  contractName,
+  contractSymbol,
+  implementationVersion,
   upgradedAt: new Date().toISOString(),
 };
 const path = resolve(outputDir, `${networkName}-upgrade-${Date.now()}.json`);

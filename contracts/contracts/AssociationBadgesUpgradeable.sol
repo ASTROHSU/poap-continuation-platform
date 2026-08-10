@@ -207,7 +207,7 @@ contract AssociationBadgesUpgradeable is
     }
 
     /// @notice Short collection identifier for explorer and wallet compatibility.
-    function symbol() external pure returns (string memory) {
+    function symbol() external pure virtual returns (string memory) {
         return _COLLECTION_SYMBOL;
     }
 

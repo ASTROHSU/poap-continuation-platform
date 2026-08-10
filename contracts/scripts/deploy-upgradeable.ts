@@ -20,7 +20,7 @@ const owner = process.env.CONTRACT_OWNER_ADDRESS
   ? getAddress(process.env.CONTRACT_OWNER_ADDRESS)
   : deployer.address;
 const upgradesApi = await upgrades(hre, connection);
-const factory = await ethers.getContractFactory("AssociationBadgesUpgradeable", deployer);
+const factory = await ethers.getContractFactory("AssociationBadgesUpgradeableV2", deployer);
 const contract = await upgradesApi.deployProxy(factory, [owner, claimSigner, contractMetadataUri], {
   kind: "uups",
 });

@@ -160,17 +160,13 @@ describe("AssociationBadgesUpgradeable", () => {
     await assert.rejects(upgradesApi.upgradeProxy(proxyAddress, nonOwnerFactory, { kind: "uups" }));
 
     const ownerFactory = await ethers.getContractFactory("AssociationBadgesUpgradeableV2", owner);
-    const upgraded = await upgradesApi.upgradeProxy(proxyAddress, ownerFactory, {
-      kind: "uups",
-      call: { fn: "setV2Marker", args: [42n] },
-    });
+    const upgraded = await upgradesApi.upgradeProxy(proxyAddress, ownerFactory, { kind: "uups" });
     await upgraded.waitForDeployment();
     assert.equal(await upgraded.implementationVersion(), 2n);
-    assert.equal(await upgraded.v2Marker(), 42n);
     assert.equal(await upgraded.owner(), owner.address);
     assert.equal(await upgraded.claimSigner(), signer.address);
     assert.equal(await upgraded.name(), "兆量富足教育協會數位紀念");
-    assert.equal(await upgraded.symbol(), "STEVE");
+    assert.equal(await upgraded.symbol(), "TW");
     assert.equal(await upgraded.uri(1n), eventMetadataUri);
   });
 });
