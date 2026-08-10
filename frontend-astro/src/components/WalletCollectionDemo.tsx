@@ -216,6 +216,13 @@ export default function WalletCollectionDemo({
   const unavailable = Boolean(error && archiveError && legacyError);
   const collectionName = looksLikeEnsName(displayName) ? displayName.trim() : "";
   const identityName = magicOwner?.email || collectionName;
+  const identityTitleSize = magicOwner?.email
+    ? identityName.length > 28
+      ? "text-[1.45rem]"
+      : identityName.length > 20
+        ? "text-[1.75rem]"
+        : "text-[2.2rem]"
+    : "text-5xl";
   const monthGroups = useMemo(
     () =>
       groupCollectionByMonth(
@@ -257,7 +264,9 @@ export default function WalletCollectionDemo({
       <div className="flex flex-col gap-5 border-b border-ink/10 pb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="eyebrow">COLLECTORS</span>
-          <h1 className="display-title mt-5 break-words text-5xl sm:text-6xl">
+          <h1
+            className={`display-title mt-5 max-w-full [overflow-wrap:anywhere] [text-wrap:balance] leading-[1.05] ${identityTitleSize} sm:text-6xl`}
+          >
             {identityName || "POAP 收藏"}
           </h1>
           <div className="mt-4 flex max-w-xl items-start gap-2">
