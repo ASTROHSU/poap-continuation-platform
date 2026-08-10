@@ -597,6 +597,7 @@ export function asLiveClaimRecord(reservation: EmailReservationRecord): LiveClai
     mintNonce: reservation.mintNonce,
     mintAuthorizationDeadline: reservation.mintAuthorizationDeadline,
     mintedTxHash: reservation.mintedTxHash,
+    mintedAt: reservation.mintedAt,
     relayStartedAt: reservation.relayStartedAt,
     relayTxHash: reservation.relayTxHash,
   };

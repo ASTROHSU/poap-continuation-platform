@@ -15,7 +15,7 @@ const liveFixture = await readFile("fixtures/live.sql", "utf8");
 export default defineWorkersConfig({
   test: {
     include: ["test/**/*.spec.ts"],
-    exclude: ["test/browser/**"],
+    exclude: ["test/browser/**", "test/browser-astro/**"],
     poolOptions: {
       workers: {
         miniflare: {

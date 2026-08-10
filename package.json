@@ -69,6 +69,7 @@
     "preview": "npm run build && vite preview",
     "test": "npm run test:worker && npm run test:tools",
     "test:browser": "playwright test",
+    "test:browser:astro": "playwright test --config playwright.astro.config.ts",
     "test:media-upload": "node --test tools/r2-media-upload/test/*.test.mjs",
     "test:tools": "node --test tools/*/test/*.test.mjs",
     "test:worker": "vitest run",

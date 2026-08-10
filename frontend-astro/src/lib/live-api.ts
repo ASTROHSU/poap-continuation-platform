@@ -141,6 +141,9 @@ export interface LiveClaimResponse {
   claimedAt: string;
   mintStatus: "reserved" | "ready" | "minted";
   mintedTxHash: `0x${string}` | null;
+  mintedAt: string | null;
+  explorerUrl: string | null;
+  alreadyClaimed: boolean;
 }
 
 export interface LiveRelayResponse {

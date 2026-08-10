@@ -80,6 +80,7 @@ export interface LiveClaimRecord {
   mintNonce: Hash;
   mintAuthorizationDeadline: number;
   mintedTxHash: Hash | null;
+  mintedAt: string | null;
   relayStartedAt: string | null;
   relayTxHash: Hash | null;
 }
@@ -91,6 +92,7 @@ interface LiveClaimRow {
   mint_nonce: Hash;
   mint_authorization_deadline: number;
   minted_tx_hash: Hash | null;
+  minted_at: string | null;
   relay_started_at: string | null;
   relay_tx_hash: Hash | null;
 }
@@ -161,6 +163,7 @@ export async function fetchLiveClaim(
          mint_nonce,
          mint_authorization_deadline,
          minted_tx_hash,
+         minted_at,
          relay_started_at,
          relay_tx_hash
        FROM live_claim_codes
@@ -222,6 +225,7 @@ export async function reserveLiveClaim(
          mint_nonce,
          mint_authorization_deadline,
          minted_tx_hash,
+         minted_at,
          relay_started_at,
          relay_tx_hash`,
     )
@@ -264,6 +268,7 @@ export async function refreshLiveClaimAuthorization(
          mint_nonce,
          mint_authorization_deadline,
          minted_tx_hash,
+         minted_at,
          relay_started_at,
          relay_tx_hash`,
     )
@@ -551,6 +556,7 @@ function mapClaim(row: LiveClaimRow): LiveClaimRecord {
     mintNonce: row.mint_nonce,
     mintAuthorizationDeadline: row.mint_authorization_deadline,
     mintedTxHash: row.minted_tx_hash,
+    mintedAt: row.minted_at,
     relayStartedAt: row.relay_started_at,
     relayTxHash: row.relay_tx_hash,
   };

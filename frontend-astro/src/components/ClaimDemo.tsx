@@ -28,6 +28,7 @@ export default function ClaimDemo({ slug }: { slug: string }) {
   const [recipient, setRecipient] = useState("");
   const [address, setAddress] = useState<`0x${string}` | null>(null);
   const [mint, setMint] = useState<LiveMintResponse | null>(null);
+  const [alreadyClaimed, setAlreadyClaimed] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
 
@@ -81,6 +82,7 @@ export default function ClaimDemo({ slug }: { slug: string }) {
       return;
     }
     setError("");
+    setAlreadyClaimed(false);
     try {
       let walletAddress: `0x${string}`;
       if (value.includes("@")) {
@@ -111,11 +113,24 @@ export default function ClaimDemo({ slug }: { slug: string }) {
       setProgress("minting");
       const claim = await claimToWallet(slug, code, walletAddress);
       if (claim.mintStatus === "minted" && claim.mintedTxHash) {
-        setMint(
-          await waitForMintConfirmation(() =>
-            confirmWalletMint(slug, code, walletAddress, claim.mintedTxHash!),
-          ),
-        );
+        if (claim.alreadyClaimed && claim.explorerUrl) {
+          setAlreadyClaimed(true);
+          setMint({
+            eventId: claim.eventId,
+            slug: claim.slug,
+            address: claim.address,
+            mintStatus: "minted",
+            mintedAt: claim.mintedAt ?? claim.claimedAt,
+            transactionHash: claim.mintedTxHash,
+            explorerUrl: claim.explorerUrl,
+          });
+        } else {
+          setMint(
+            await waitForMintConfirmation(() =>
+              confirmWalletMint(slug, code, walletAddress, claim.mintedTxHash!),
+            ),
+          );
+        }
       } else {
         const relayed = await relayWalletMintWithRetry(slug, code, walletAddress);
         if (relayed.jobId) {
@@ -230,10 +245,29 @@ export default function ClaimDemo({ slug }: { slug: string }) {
               <span className="mx-auto grid size-12 place-items-center rounded-full bg-leaf text-2xl text-white">
                 ✓
               </span>
-              <h2 className="mt-4 text-xl font-bold">{mintProgressLabel("minted")}</h2>
+              <h2 className="mt-4 text-xl font-bold">
+                {alreadyClaimed ? "已經領過了" : mintProgressLabel("minted")}
+              </h2>
               <p className="mt-2 text-sm text-ink/58">
-                這份數位紀念已送到你的錢包，Gas 由協會支付。
+                {alreadyClaimed
+                  ? "你的數位紀念已經在這邊了。"
+                  : "這份數位紀念已送到你的錢包，Gas 由協會支付。"}
               </p>
+              {alreadyClaimed && (
+                <div className="mt-5 flex items-center gap-4 rounded-[1rem] bg-white/80 p-4 text-left">
+                  <img
+                    className="size-16 shrink-0 rounded-full object-cover shadow-md"
+                    src={event.imageUrl}
+                    alt=""
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold uppercase tracking-[.1em] text-leaf">
+                      你的收藏
+                    </p>
+                    <p className="mt-1 truncate font-bold text-ink">{event.title}</p>
+                  </div>
+                </div>
+              )}
               <a className="btn-primary mt-6 w-full" href={`/address/${address}`}>
                 查看我的收藏
               </a>

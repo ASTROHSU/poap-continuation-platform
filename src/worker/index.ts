@@ -1094,6 +1094,11 @@ app.post("/api/live/events/:slug/claims", async (context) => {
       claimedAt: claim.claimedAt,
       mintStatus: claim.mintedTxHash ? "minted" : mintAuthorization ? "ready" : "reserved",
       mintedTxHash: claim.mintedTxHash,
+      mintedAt: claim.mintedAt,
+      explorerUrl: claim.mintedTxHash
+        ? transactionExplorerUrl(event.chainId, claim.mintedTxHash)
+        : null,
+      alreadyClaimed: wasReserved && claim.mintedTxHash !== null,
       mintAuthorization,
     },
     wasReserved ? 200 : 201,

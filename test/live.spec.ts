@@ -345,6 +345,19 @@ describe("continuation claim API", () => {
       .bind(relayHash, body.eventId, mintAddress)
       .run();
 
+    const alreadyClaimed = await request();
+    expect(alreadyClaimed.status).toBe(200);
+    await expect(alreadyClaimed.json()).resolves.toMatchObject({
+      eventId: body.eventId,
+      address: mintAddress,
+      mintStatus: "minted",
+      mintedTxHash: relayHash,
+      mintedAt: "2026-08-02T00:04:00.000Z",
+      explorerUrl: `https://sepolia.basescan.org/tx/${relayHash}`,
+      alreadyClaimed: true,
+      mintAuthorization: null,
+    });
+
     const beforeIndex = await SELF.fetch(`https://example.test/api/live/owners/${mintAddress}`);
     await expect(beforeIndex.json()).resolves.toMatchObject({
       items: [
