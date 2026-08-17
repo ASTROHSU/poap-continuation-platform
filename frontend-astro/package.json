@@ -18,7 +18,7 @@
     "@fontsource/rubik-mono-one": "^5.3.0",
     "@tailwindcss/vite": "latest",
     "astro": "latest",
-    "magic-sdk": "^33.10.0",
+    "magic-sdk": "^33.10.2",
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "latest"
