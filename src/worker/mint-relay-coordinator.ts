@@ -7,6 +7,7 @@ import {
   markMintJobSubmitting,
   mintJobAuthorization,
   nextMintJobDueAt,
+  nextMintJobNetworkNonce,
   renewExpiredMintJobAuthorization,
   rescheduleMintJob,
 } from "./mint-jobs";
@@ -23,6 +24,8 @@ import type { Bindings } from "./types";
 
 const RECEIPT_POLL_MS = 2_000;
 const RECEIPT_TIMEOUT_MS = 120_000;
+const MAX_IN_FLIGHT_MINTS = 8;
+const NEXT_NETWORK_NONCE_STORAGE_KEY = "nextNetworkNonce";
 
 export class MintRelayCoordinator extends DurableObject<Bindings> {
   async wake(shardKey: string): Promise<void> {
@@ -49,7 +52,12 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
   }
 
   private async processOne(shardKey: string): Promise<void> {
-    const job = await fetchNextMintJob(this.env.LIVE_DB.withSession("first-primary"), shardKey);
+    const job = await fetchNextMintJob(
+      this.env.LIVE_DB.withSession("first-primary"),
+      shardKey,
+      Date.now(),
+      MAX_IN_FLIGHT_MINTS,
+    );
     if (!job) return;
     const rpcUrls = liveRpcUrls(this.env, job.chainId);
     const event = {
@@ -82,6 +90,7 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
         job,
         new Error("Mint receipt timed out or reverted."),
       );
+      await this.ctx.storage.delete(NEXT_NETWORK_NONCE_STORAGE_KEY);
       return;
     }
 
@@ -90,11 +99,20 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
         await markMintJobConfirmed(this.env.LIVE_DB, job, job.transactionHash);
         return;
       }
+      const cachedNonce = await this.ctx.storage.get<number>(NEXT_NETWORK_NONCE_STORAGE_KEY);
       const nonce =
         job.networkNonce ??
-        (await pendingTransactionNonce(rpcUrls, job.chainId, job.relayerAddress));
+        (await nextMintJobNetworkNonce(
+          this.env.LIVE_DB.withSession("first-primary"),
+          shardKey,
+          cachedNonce ?? (await pendingTransactionNonce(rpcUrls, job.chainId, job.relayerAddress)),
+        ));
       const acquired = await markMintJobSubmitting(this.env.LIVE_DB, job, nonce);
       if (!acquired) return;
+      await this.ctx.storage.put(
+        NEXT_NETWORK_NONCE_STORAGE_KEY,
+        Math.max(cachedNonce ?? 0, nonce + 1),
+      );
       const transactionHash = await relayMintAuthorization(
         rpcUrls,
         event,
@@ -140,6 +158,7 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
         }
       }
       await markMintJobRetry(this.env.LIVE_DB, job, error);
+      await this.ctx.storage.delete(NEXT_NETWORK_NONCE_STORAGE_KEY);
       console.warn("Sponsored mint will be retried", {
         jobId: job.jobId,
         shardKey,
@@ -150,8 +169,16 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
   }
 
   private async scheduleNext(shardKey: string): Promise<void> {
-    const dueAt = await nextMintJobDueAt(this.env.LIVE_DB.withSession("first-primary"), shardKey);
-    if (dueAt !== null) await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, dueAt));
+    const dueAt = await nextMintJobDueAt(
+      this.env.LIVE_DB.withSession("first-primary"),
+      shardKey,
+      MAX_IN_FLIGHT_MINTS,
+    );
+    if (dueAt !== null) {
+      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, dueAt));
+      return;
+    }
+    await this.ctx.storage.delete(NEXT_NETWORK_NONCE_STORAGE_KEY);
   }
 }
 

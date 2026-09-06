@@ -12,6 +12,8 @@ import {
   markMintJobSubmitted,
   mintJobPublicStatus,
   mintRelayShardKey,
+  nextMintJobDueAt,
+  nextMintJobNetworkNonce,
   renewExpiredMintJobAuthorization,
 } from "../src/worker/mint-jobs";
 import type { MintAuthorization } from "../src/worker/minting";
@@ -67,6 +69,74 @@ describe("durable sponsored mint jobs", () => {
     expect(next?.jobId).toBe(first.jobId);
   });
 
+  it("submits new jobs before polling older receipts while capacity remains", async () => {
+    const first = await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput(recipient, `0x${"45".repeat(32)}`),
+    );
+    expect(await markMintJobSubmitting(bindings.LIVE_DB, first, 71)).toBe(true);
+    await markMintJobSubmitted(bindings.LIVE_DB, first, `0x${"46".repeat(32)}`);
+    const second = await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput("0x6666666666666666666666666666666666666666", `0x${"47".repeat(32)}`),
+    );
+
+    const next = await fetchNextMintJob(
+      bindings.LIVE_DB.withSession("first-primary"),
+      first.shardKey,
+      Date.now() + 3_000,
+      8,
+    );
+    expect(next?.jobId).toBe(second.jobId);
+  });
+
+  it("polls submitted receipts instead of exceeding the in-flight limit", async () => {
+    const first = await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput(recipient, `0x${"48".repeat(32)}`),
+    );
+    const second = await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput("0x7777777777777777777777777777777777777777", `0x${"49".repeat(32)}`),
+    );
+    await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput("0x8888888888888888888888888888888888888888", `0x${"4a".repeat(32)}`),
+    );
+    expect(await markMintJobSubmitting(bindings.LIVE_DB, first, 71)).toBe(true);
+    await markMintJobSubmitted(bindings.LIVE_DB, first, `0x${"4b".repeat(32)}`);
+    expect(await markMintJobSubmitting(bindings.LIVE_DB, second, 72)).toBe(true);
+    await markMintJobSubmitted(bindings.LIVE_DB, second, `0x${"4c".repeat(32)}`);
+
+    const next = await fetchNextMintJob(
+      bindings.LIVE_DB.withSession("first-primary"),
+      first.shardKey,
+      Date.now() + 3_000,
+      2,
+    );
+    expect(next?.status).toBe("submitted");
+    const dueAt = await nextMintJobDueAt(
+      bindings.LIVE_DB.withSession("first-primary"),
+      first.shardKey,
+      2,
+    );
+    expect(dueAt).toBeGreaterThan(Date.now() + 1_000);
+  });
+
+  it("allocates the next nonce above both the chain and persisted active jobs", async () => {
+    const created = await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput(recipient, `0x${"4d".repeat(32)}`),
+    );
+    expect(await markMintJobSubmitting(bindings.LIVE_DB, created, 71)).toBe(true);
+    await expect(
+      nextMintJobNetworkNonce(bindings.LIVE_DB.withSession("first-primary"), created.shardKey, 70),
+    ).resolves.toBe(72);
+    await expect(
+      nextMintJobNetworkNonce(bindings.LIVE_DB.withSession("first-primary"), created.shardKey, 80),
+    ).resolves.toBe(80);
+  });
+
   it("persists retry diagnostics internally and exposes only the minting state", async () => {
     const created = await createOrReuseMintJob(
       bindings.LIVE_DB,
@@ -94,6 +164,25 @@ describe("durable sponsored mint jobs", () => {
       transactionHash: null,
     });
     expect(JSON.stringify(mintJobPublicStatus(retried!))).not.toContain("nonce");
+  });
+
+  it("recognizes a nonce error even when verbose RPC diagnostics exceed storage limits", async () => {
+    const created = await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput(recipient, `0x${"56".repeat(32)}`),
+    );
+    expect(await markMintJobSubmitting(bindings.LIVE_DB, created, 71)).toBe(true);
+    await markMintJobRetry(
+      bindings.LIVE_DB,
+      created,
+      new Error(`${"verbose transport diagnostics ".repeat(100)}nonce too low`),
+    );
+    const retried = await fetchMintJob(
+      bindings.LIVE_DB.withSession("first-primary"),
+      created.jobId,
+    );
+    expect(retried?.networkNonce).toBeNull();
+    expect(retried?.lastError).toHaveLength(2_000);
   });
 
   it("exposes terminal failure without leaking its internal diagnostic", async () => {
