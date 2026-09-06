@@ -16,8 +16,8 @@ test("accepts a worker configuration with the mint coordinator binding and migra
         bindings: [{ name: "MINT_RELAY_COORDINATOR", class_name: "MintRelayCoordinator" }],
       },
       vars: {
-        BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
-        BASE_MAINNET_FALLBACK_RPC_URL: "https://base-rpc.publicnode.com",
+        BASE_MAINNET_RPC_URL: "https://base-rpc.publicnode.com",
+        BASE_MAINNET_FALLBACK_RPC_URL: "https://mainnet.base.org",
       },
     }),
   );
@@ -36,13 +36,13 @@ test("rejects replacing the production RPC used by live mint operations", async 
       },
       vars: {
         BASE_MAINNET_RPC_URL: "https://replacement.example",
-        BASE_MAINNET_FALLBACK_RPC_URL: "https://base-rpc.publicnode.com",
+        BASE_MAINNET_FALLBACK_RPC_URL: "https://mainnet.base.org",
       },
     }),
   );
   await assert.rejects(
     verifyMintRelayCoordinatorConfig(path),
-    /original Base mainnet RPC endpoint/,
+    /production Base mainnet RPC endpoint/,
   );
 });
 
@@ -56,7 +56,7 @@ test("rejects removing the live mint fallback RPC", async () => {
       durable_objects: {
         bindings: [{ name: "MINT_RELAY_COORDINATOR", class_name: "MintRelayCoordinator" }],
       },
-      vars: { BASE_MAINNET_RPC_URL: "https://mainnet.base.org" },
+      vars: { BASE_MAINNET_RPC_URL: "https://base-rpc.publicnode.com" },
     }),
   );
   await assert.rejects(
