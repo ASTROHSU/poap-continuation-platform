@@ -416,12 +416,13 @@ export async function wakeMintRelay(env: Bindings, shardKey: string): Promise<vo
 
 export function mintJobPublicStatus(job: MintJobRecord): {
   jobId: string;
-  mintStatus: "minting" | "minted";
+  mintStatus: "minting" | "minted" | "failed";
   transactionHash: Hash | null;
 } {
   return {
     jobId: job.jobId,
-    mintStatus: job.status === "confirmed" ? "minted" : "minting",
+    mintStatus:
+      job.status === "confirmed" ? "minted" : job.status === "failed" ? "failed" : "minting",
     transactionHash: job.status === "confirmed" ? job.transactionHash : null,
   };
 }

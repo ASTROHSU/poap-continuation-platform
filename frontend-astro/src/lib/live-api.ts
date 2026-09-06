@@ -151,14 +151,14 @@ export interface LiveRelayResponse {
   slug: string;
   address: `0x${string}`;
   jobId: string | null;
-  mintStatus: "minting" | "minted";
+  mintStatus: "minting" | "minted" | "failed";
   transactionHash: `0x${string}` | null;
   explorerUrl: string | null;
 }
 
 export interface MintJobResponse {
   jobId: string;
-  mintStatus: "minting" | "minted";
+  mintStatus: "minting" | "minted" | "failed";
   transactionHash: `0x${string}` | null;
   explorerUrl: string | null;
 }
@@ -297,7 +297,15 @@ export function relayWalletMint(slug: string, code: string, address: string) {
 }
 
 export async function relayWalletMintWithRetry(slug: string, code: string, address: string) {
-  return relayWalletMint(slug, code, address);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await relayWalletMint(slug, code, address);
+    } catch (error) {
+      if (!(error instanceof TypeError) || attempt === 2) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 800 * (attempt + 1)));
+    }
+  }
+  throw new TypeError("網路連線不穩，請再按一次領取。");
 }
 
 export function getMintJob(jobId: string) {
@@ -306,8 +314,12 @@ export function getMintJob(jobId: string) {
 
 export async function waitForMintJob(jobId: string): Promise<MintJobResponse> {
   for (let attempt = 0; attempt < 90; attempt += 1) {
-    const job = await getMintJob(jobId);
-    if (job.mintStatus === "minted") return job;
+    try {
+      const job = await getMintJob(jobId);
+      if (job.mintStatus === "minted" || job.mintStatus === "failed") return job;
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+    }
     await new Promise((resolve) => window.setTimeout(resolve, 2_000));
   }
   return getMintJob(jobId);

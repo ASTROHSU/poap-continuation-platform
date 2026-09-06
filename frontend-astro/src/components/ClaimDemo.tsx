@@ -135,6 +135,9 @@ export default function ClaimDemo({ slug }: { slug: string }) {
         const relayed = await relayWalletMintWithRetry(slug, code, walletAddress);
         if (relayed.jobId) {
           const completed = await waitForMintJob(relayed.jobId);
+          if (completed.mintStatus === "failed") {
+            throw new Error("鑄造暫時失敗，請再按一次領取。");
+          }
           if (completed.mintStatus !== "minted") {
             throw new Error("正在鑄造，完成後會自動出現在收藏頁。");
           }

@@ -17,7 +17,7 @@ import {
 import { ethereumRpcUrl, parseEnsNameQuery, resolveEnsAddress, withEnsCache } from "./ens";
 import { fetchChainIndexerStatus, runLiveChainIndexer } from "./chain-indexer";
 import { fetchLegacyPoapHoldings } from "./legacy-poap";
-import { baseMainnetRpcUrl } from "./rpc-config";
+import { baseMainnetLiveRpcUrls } from "./rpc-config";
 import {
   assertSameOrigin,
   decryptEmail,
@@ -1159,7 +1159,7 @@ app.post("/api/live/email/reservations/:reservationId/mints", async (context) =>
     );
   }
   const verification = await verifyMintTransaction(
-    liveRpcUrl(context.env, reservation.event.chainId),
+    liveRpcUrls(context.env, reservation.event.chainId),
     body.transactionHash,
     reservation.event,
     address,
@@ -1405,7 +1405,7 @@ app.post("/api/live/events/:slug/mints", async (context) => {
   }
 
   const verification = await verifyMintTransaction(
-    liveRpcUrl(context.env, event.chainId),
+    liveRpcUrls(context.env, event.chainId),
     body.transactionHash,
     event,
     address,
@@ -2970,12 +2970,12 @@ function isUniqueConstraintError(error: unknown): boolean {
   );
 }
 
-function liveRpcUrl(
-  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL">,
+function liveRpcUrls(
+  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL" | "BASE_MAINNET_FALLBACK_RPC_URL">,
   chainId: number,
-): string {
-  if (chainId === 84532) return env.BASE_RPC_URL;
-  if (chainId === 8453) return baseMainnetRpcUrl(env);
+): readonly string[] {
+  if (chainId === 84532) return [env.BASE_RPC_URL];
+  if (chainId === 8453) return baseMainnetLiveRpcUrls(env);
   throw new ApiError(409, "This event uses an unsupported chain.", "live_chain_unsupported");
 }
 

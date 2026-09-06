@@ -18,7 +18,7 @@ import {
   signMintAuthorization,
   verifyMintTransaction,
 } from "./minting";
-import { baseMainnetRpcUrl } from "./rpc-config";
+import { baseMainnetLiveRpcUrls } from "./rpc-config";
 import type { Bindings } from "./types";
 
 const RECEIPT_POLL_MS = 2_000;
@@ -51,7 +51,7 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
   private async processOne(shardKey: string): Promise<void> {
     const job = await fetchNextMintJob(this.env.LIVE_DB.withSession("first-primary"), shardKey);
     if (!job) return;
-    const rpcUrl = liveRpcUrl(this.env, job.chainId);
+    const rpcUrls = liveRpcUrls(this.env, job.chainId);
     const event = {
       chainId: job.chainId,
       contractAddress: job.contractAddress,
@@ -60,7 +60,7 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
 
     if (job.status === "submitted" && job.transactionHash) {
       const verification = await verifyMintTransaction(
-        rpcUrl,
+        rpcUrls,
         job.transactionHash,
         event,
         job.recipient,
@@ -73,7 +73,7 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
         await rescheduleMintJob(this.env.LIVE_DB, job.jobId, RECEIPT_POLL_MS);
         return;
       }
-      if (await hasMintedBadge(rpcUrl, event, job.recipient)) {
+      if (await hasMintedBadge(rpcUrls, event, job.recipient)) {
         await markMintJobConfirmed(this.env.LIVE_DB, job, job.transactionHash);
         return;
       }
@@ -86,17 +86,17 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
     }
 
     try {
-      if (await hasMintedBadge(rpcUrl, event, job.recipient)) {
+      if (await hasMintedBadge(rpcUrls, event, job.recipient)) {
         await markMintJobConfirmed(this.env.LIVE_DB, job, job.transactionHash);
         return;
       }
       const nonce =
         job.networkNonce ??
-        (await pendingTransactionNonce(rpcUrl, job.chainId, job.relayerAddress));
+        (await pendingTransactionNonce(rpcUrls, job.chainId, job.relayerAddress));
       const acquired = await markMintJobSubmitting(this.env.LIVE_DB, job, nonce);
       if (!acquired) return;
       const transactionHash = await relayMintAuthorization(
-        rpcUrl,
+        rpcUrls,
         event,
         mintJobAuthorization(job),
         this.env.MINT_RELAYER_PRIVATE_KEY,
@@ -112,7 +112,7 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
       });
     } catch (error) {
       try {
-        if (await hasMintedBadge(rpcUrl, event, job.recipient)) {
+        if (await hasMintedBadge(rpcUrls, event, job.recipient)) {
           await markMintJobConfirmed(this.env.LIVE_DB, job, job.transactionHash);
           return;
         }
@@ -160,8 +160,11 @@ function receiptTimedOut(submittedAt: string | null): boolean {
   return Date.now() - Date.parse(submittedAt) >= RECEIPT_TIMEOUT_MS;
 }
 
-function liveRpcUrl(env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL">, chainId: number) {
-  if (chainId === 84532) return env.BASE_RPC_URL;
-  if (chainId === 8453) return baseMainnetRpcUrl(env);
+function liveRpcUrls(
+  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL" | "BASE_MAINNET_FALLBACK_RPC_URL">,
+  chainId: number,
+): readonly string[] {
+  if (chainId === 84532) return [env.BASE_RPC_URL];
+  if (chainId === 8453) return baseMainnetLiveRpcUrls(env);
   throw new Error(`Unsupported live chain: ${chainId}`);
 }

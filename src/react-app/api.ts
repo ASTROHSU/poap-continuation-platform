@@ -217,8 +217,12 @@ export function getLiveMintJob(jobId: string, signal?: AbortSignal) {
 
 export async function waitForLiveMintJob(jobId: string, signal?: AbortSignal) {
   for (let attempt = 0; attempt < 90; attempt += 1) {
-    const job = await getLiveMintJob(jobId, signal);
-    if (job.mintStatus === "minted") return job;
+    try {
+      const job = await getLiveMintJob(jobId, signal);
+      if (job.mintStatus === "minted" || job.mintStatus === "failed") return job;
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+    }
     await new Promise((resolve) => window.setTimeout(resolve, 2_000));
   }
   return getLiveMintJob(jobId, signal);

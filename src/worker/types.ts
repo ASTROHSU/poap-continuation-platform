@@ -42,6 +42,7 @@ export interface Bindings {
   MAGIC_PUBLISHABLE_API_KEY: string;
   MAGIC_SECRET_KEY?: string;
   BASE_MAINNET_INDEXER_RPC_URL?: string;
+  BASE_MAINNET_FALLBACK_RPC_URL?: string;
   GAS_MONITOR_ENABLED?: string;
   GAS_MONITOR_LOW_ETH?: string;
   GAS_MONITOR_CRITICAL_ETH?: string;

@@ -147,6 +147,9 @@ export function ClaimPage({ slug, search }: { slug: string; search: string }) {
       if (relayed.jobId) {
         setProgress("正在鑄造");
         const completed = await waitForLiveMintJob(relayed.jobId);
+        if (completed.mintStatus === "failed") {
+          throw new Error("鑄造暫時失敗，請再按一次領取。");
+        }
         if (
           completed.mintStatus !== "minted" ||
           !completed.transactionHash ||
