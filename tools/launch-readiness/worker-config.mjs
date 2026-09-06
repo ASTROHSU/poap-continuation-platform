@@ -13,6 +13,9 @@ export async function verifyMintRelayCoordinatorConfig(configPath) {
   if (!/"new_sqlite_classes"\s*:\s*\[[^\]]*"MintRelayCoordinator"[^\]]*\]/s.test(source)) {
     missing.push("MintRelayCoordinator SQLite migration");
   }
+  if (!/"BASE_MAINNET_RPC_URL"\s*:\s*"https:\/\/mainnet\.base\.org"/.test(source)) {
+    missing.push("original Base mainnet RPC endpoint");
+  }
 
   if (missing.length > 0) {
     throw new Error(
