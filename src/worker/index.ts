@@ -103,6 +103,7 @@ import {
   updateIssuerEvent,
 } from "./issuer-admin";
 import { requireAccessAdmin } from "./access-auth";
+import { runGasMonitor, gasCaption, gasCsv } from "./gas-monitor";
 import {
   mirrorArchiveMediaBatch,
   parseArchiveMediaMirrorRequest,
@@ -406,6 +407,29 @@ app.post("/api/admin/issuer/session", async (context) => {
       authenticated: true,
       email: identity.email,
       address: identity.address,
+    },
+    200,
+    { "Cache-Control": "private, no-store" },
+  );
+});
+
+app.get("/api/admin/issuer/gas", async (context) => {
+  assertNoQuery(new URL(context.req.url));
+  await requireIssuerAdmin(context.env, context.req.raw);
+  const rows = await context.env.LIVE_DB.prepare(
+    "SELECT report_json, last_error_at FROM gas_monitor_state WHERE chain_id = 8453 ORDER BY relayer",
+  ).all<{ report_json: string | null; last_error_at: number | null }>();
+  return context.json(
+    {
+      notificationsConfigured: Boolean(
+        context.env.TELEGRAM_GAS_BOT_TOKEN && context.env.TELEGRAM_GAS_CHAT_ID,
+      ),
+      items: rows.results.map((row) => ({
+        report: row.report_json ? JSON.parse(row.report_json) : null,
+        summary: row.report_json ? gasCaption(JSON.parse(row.report_json), false) : null,
+        csv: row.report_json ? gasCsv(JSON.parse(row.report_json)) : null,
+        lastErrorAt: row.last_error_at,
+      })),
     },
     200,
     { "Cache-Control": "private, no-store" },
@@ -3035,6 +3059,7 @@ export default {
       emailPrune,
       archiveMediaMirror,
       mintRelayRecovery,
+      gasMonitor,
       holdingsArtwork,
       liveArtwork,
     ] = await Promise.all([
@@ -3042,6 +3067,10 @@ export default {
       pruneExpiredEmailAuthArtifacts(env.LIVE_DB),
       runScheduledArchiveMediaMirror(env),
       recoverMintRelays(env),
+      runGasMonitor(env).catch(() => {
+        console.error("Gas monitoring failed independently of mint recovery.");
+        return { status: "error" };
+      }),
       fetchHoldingsArtworkReadiness(
         env.HOLDINGS_DB.withSession("first-primary"),
         env.HOLDINGS_SNAPSHOT_ID,
@@ -3061,6 +3090,7 @@ export default {
       emailPrune,
       archiveMediaMirror,
       mintRelayRecovery,
+      gasMonitor,
       holdingsArtwork,
       liveArtwork,
     });

@@ -76,6 +76,7 @@ describe("production admin release contract", () => {
   it.each([
     ["session", "POST"],
     ["events", "GET"],
+    ["gas", "GET"],
     ["events/example", "GET"],
     ["events/example", "PUT"],
     ["events/example/status", "POST"],
@@ -94,6 +95,9 @@ describe("production admin release contract", () => {
       email: "admin@example.test",
     });
     expect(session.status).toBe(200);
+    const gas = await request("gas", "GET", true);
+    expect(gas.status).toBe(200);
+    expect(await gas.json()).toMatchObject({ notificationsConfigured: false, items: [] });
     const listing = await request("events", "GET", true);
     expect(await listing.json()).toEqual({ items: [] });
     expect(listing.status).toBe(200);

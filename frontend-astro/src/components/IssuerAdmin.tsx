@@ -57,6 +57,11 @@ export default function IssuerAdmin() {
   const [preview, setPreview] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(blankMessage);
+  const [gasReport, setGasReport] = useState<{
+    summary: string;
+    csv: string;
+    warning: string;
+  } | null>(null);
   const [savedResult, setSavedResult] = useState<SavedResult | null>(null);
 
   const statusLabel = useMemo(() => {
@@ -96,10 +101,42 @@ export default function IssuerAdmin() {
     });
   }
 
+  async function showGasReport() {
+    if (!session) return;
+    await run(async () => {
+      const active = await freshSession(session);
+      const data = await adminRequest<{
+        notificationsConfigured: boolean;
+        items: Array<{ summary: string | null; csv: string | null; lastErrorAt: number | null }>;
+      }>("/api/admin/issuer/gas", active);
+      const item = data.items[0];
+      setGasReport({
+        summary: item?.summary || "正在建立首次使用報表，請稍後重新整理。",
+        csv: item?.csv || "",
+        warning: item?.lastErrorAt
+          ? "最近一次檢查未完成，下方是最後成功的報表。"
+          : !data.notificationsConfigured
+            ? "Telegram 收件設定尚未完成，目前不會發送提醒。"
+            : "",
+      });
+    });
+  }
+
+  function downloadGasReport() {
+    if (!gasReport?.csv) return;
+    const url = URL.createObjectURL(new Blob([gasReport.csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "gas-usage.csv";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function signOut() {
     await run(async () => {
       await logoutMagicEmailSession(publishableKey);
       setSession(null);
+      setGasReport(null);
       setEvents([]);
       setSelectedSlug("");
       setEvent(null);
@@ -284,6 +321,13 @@ export default function IssuerAdmin() {
         <p className="mt-2 truncate whitespace-nowrap font-bold" title={session.email}>
           {session.email}
         </p>
+        <button
+          className="btn-primary mt-5 w-full justify-center"
+          disabled={busy}
+          onClick={() => void showGasReport()}
+        >
+          Gas 餘額與使用報表
+        </button>
         <label className="mt-7 block text-sm font-black" htmlFor="issuer-event-select">
           正式活動
         </label>
@@ -315,6 +359,20 @@ export default function IssuerAdmin() {
       </aside>
 
       <section>
+        {gasReport && (
+          <div className="soft-card mb-6 rounded-[2rem] p-6" aria-live="polite">
+            <h2 className="text-xl font-black">Gas 餘額與使用報表</h2>
+            {gasReport.warning && <p className="mt-3 font-bold text-purple">{gasReport.warning}</p>}
+            <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">
+              {gasReport.summary}
+            </p>
+            {gasReport.csv && (
+              <button className="btn-primary mt-4" onClick={downloadGasReport}>
+                下載活動與日期明細 CSV
+              </button>
+            )}
+          </div>
+        )}
         {savedResult ? (
           <div
             className="soft-card rounded-[2rem] px-7 py-12 text-center sm:px-14 sm:py-16"

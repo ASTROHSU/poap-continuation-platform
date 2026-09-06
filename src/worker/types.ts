@@ -42,6 +42,12 @@ export interface Bindings {
   WALLET_PROVISIONING_MODE: "disabled" | "magic-pregen";
   MAGIC_PUBLISHABLE_API_KEY: string;
   MAGIC_SECRET_KEY?: string;
+  BASE_MAINNET_INDEXER_RPC_URL?: string;
+  GAS_MONITOR_ENABLED?: string;
+  GAS_MONITOR_LOW_ETH?: string;
+  GAS_MONITOR_CRITICAL_ETH?: string;
+  TELEGRAM_GAS_BOT_TOKEN?: string;
+  TELEGRAM_GAS_CHAT_ID?: string;
   MAGIC_EMAIL_TEMPLATE_NAME?: string;
   ISSUER_ADMIN_EMAILS?: string;
   ACCESS_TEAM_DOMAIN?: string;

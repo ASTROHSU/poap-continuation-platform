@@ -241,6 +241,17 @@ export async function markMintJobSubmitted(
   await db.batch([
     db
       .prepare(
+        `INSERT OR IGNORE INTO gas_receipts (chain_id, transaction_hash, payer, discovered_at)
+      VALUES (?, ?, ?, ?)`,
+      )
+      .bind(
+        job.chainId,
+        transactionHash.toLowerCase(),
+        job.relayerAddress.toLowerCase(),
+        Date.now(),
+      ),
+    db
+      .prepare(
         `UPDATE live_mint_jobs
          SET status = 'submitted', transaction_hash = ?, submitted_at = COALESCE(submitted_at, ?),
              next_attempt_at = ?, updated_at = ?, last_error = NULL
