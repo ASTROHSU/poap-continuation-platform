@@ -8,6 +8,22 @@ const SNAPSHOT_ID_SQL = `
   SELECT value
   FROM archive_meta
   WHERE key = 'snapshot_id'`;
+const ARTWORK_RELEASE_SQL = `
+  SELECT key, value
+  FROM archive_meta
+  WHERE key IN (
+    'artwork_release_id',
+    'artwork_release_collections_snapshot_id',
+    'artwork_release_sha256',
+    'artwork_release_complete',
+    'artwork_release_referenced_drops',
+    'artwork_release_archive_direct',
+    'artwork_release_activated_rows',
+    'artwork_release_terminal_unavailable'
+  )`;
+const ARTWORK_COUNT_SQL = `
+  SELECT COUNT(*) AS artwork_rows
+  FROM holding_drop_artwork`;
 const DROP_COLUMNS = `
   d.drop_id,
   d.fancy_id,
@@ -37,8 +53,65 @@ type SnapshotIdRow = {
   value: string;
 };
 
+type ArtworkReleaseRow = {
+  key: string;
+  value: string;
+};
+
+type ArtworkCountRow = {
+  artwork_rows: number;
+};
+
+export interface HoldingsArtworkReadiness {
+  ready: boolean;
+  snapshotId: string;
+  configuredReleaseId: string;
+  configuredCollectionsSnapshotId: string;
+  activeReleaseId: string | null;
+  activeCollectionsSnapshotId: string | null;
+  releaseSha256: string | null;
+  referencedDrops: number | null;
+  archiveDirect: number | null;
+  activatedRows: number | null;
+  terminalUnavailable: number | null;
+  storedRows: number;
+}
+
 export type ExactHoldingDropLookup =
   { state: "available"; drop: DropDetail } | { state: "missing" };
+
+export async function fetchHoldingsArtworkReadiness(
+  db: D1ReadClient,
+  snapshotId: string,
+  configuredReleaseId: string,
+  configuredCollectionsSnapshotId: string,
+): Promise<HoldingsArtworkReadiness> {
+  const [snapshot, release, count] = await db.batch<
+    SnapshotIdRow | ArtworkReleaseRow | ArtworkCountRow
+  >([db.prepare(SNAPSHOT_ID_SQL), db.prepare(ARTWORK_RELEASE_SQL), db.prepare(ARTWORK_COUNT_SQL)]);
+  assertSnapshot(snapshot.results[0] as SnapshotIdRow | undefined, snapshotId);
+  const rows = release.results as ArtworkReleaseRow[];
+  const values = artworkReleaseValues(rows);
+  const storedRows = numberValue((count.results[0] as ArtworkCountRow | undefined)?.artwork_rows);
+  const activatedRows = nonNegativeInteger(values.get("artwork_release_activated_rows"));
+  return {
+    ready:
+      isArtworkReleaseActive(rows, configuredReleaseId, configuredCollectionsSnapshotId) &&
+      activatedRows !== null &&
+      storedRows === activatedRows,
+    snapshotId,
+    configuredReleaseId,
+    configuredCollectionsSnapshotId,
+    activeReleaseId: values.get("artwork_release_id") ?? null,
+    activeCollectionsSnapshotId: values.get("artwork_release_collections_snapshot_id") ?? null,
+    releaseSha256: values.get("artwork_release_sha256") ?? null,
+    referencedDrops: positiveInteger(values.get("artwork_release_referenced_drops")),
+    archiveDirect: nonNegativeInteger(values.get("artwork_release_archive_direct")),
+    activatedRows,
+    terminalUnavailable: nonNegativeInteger(values.get("artwork_release_terminal_unavailable")),
+    storedRows,
+  };
+}
 
 /**
  * Resolves one explicitly requested ID. Private and hidden metadata is
@@ -49,15 +122,19 @@ export async function fetchExactHoldingDropDetail(
   db: D1ReadClient,
   dropId: number,
   snapshotId: string,
+  artworkReleaseId: string,
   mediaBaseUrl: string,
   archiveSnapshotId: string,
-  collectionsSnapshotId: string,
+  artworkCollectionsSnapshotId: string,
 ): Promise<ExactHoldingDropLookup> {
   if (!Number.isSafeInteger(dropId) || dropId <= 0) {
     throw new ApiError(400, "Drop ID must be a positive integer.");
   }
-  const [snapshot, detail] = await db.batch<SnapshotIdRow | HoldingDropRow>([
+  const [snapshot, artworkRelease, detail] = await db.batch<
+    SnapshotIdRow | ArtworkReleaseRow | HoldingDropRow
+  >([
     db.prepare(SNAPSHOT_ID_SQL),
+    db.prepare(ARTWORK_RELEASE_SQL),
     db
       .prepare(
         `SELECT ${DROP_COLUMNS}
@@ -78,7 +155,12 @@ export async function fetchExactHoldingDropDetail(
       mediaBaseUrl,
       archiveSnapshotId,
       snapshotId,
-      collectionsSnapshotId,
+      artworkCollectionsSnapshotId,
+      isArtworkReleaseActive(
+        artworkRelease.results as ArtworkReleaseRow[],
+        artworkReleaseId,
+        artworkCollectionsSnapshotId,
+      ),
     ),
   };
 }
@@ -91,9 +173,10 @@ export async function fetchHeldDropDetails(
   db: D1ReadClient,
   dropIds: number[],
   snapshotId: string,
+  artworkReleaseId: string,
   mediaBaseUrl: string,
   archiveSnapshotId: string,
-  collectionsSnapshotId: string,
+  artworkCollectionsSnapshotId: string,
 ): Promise<Map<number, DropDetail>> {
   const uniqueIds = [
     ...new Set(dropIds.filter((dropId) => Number.isSafeInteger(dropId) && dropId > 0)),
@@ -102,7 +185,10 @@ export async function fetchHeldDropDetails(
   if (uniqueIds.length > MAX_LOOKUP_IDS) {
     throw new ApiError(400, `Held-Drop lookups are limited to ${MAX_LOOKUP_IDS} IDs.`);
   }
-  const statements: D1PreparedStatement[] = [db.prepare(SNAPSHOT_ID_SQL)];
+  const statements: D1PreparedStatement[] = [
+    db.prepare(SNAPSHOT_ID_SQL),
+    db.prepare(ARTWORK_RELEASE_SQL),
+  ];
   for (let offset = 0; offset < uniqueIds.length; offset += LOOKUP_SIZE) {
     const chunk = uniqueIds.slice(offset, offset + LOOKUP_SIZE);
     const placeholders = chunk.map((_, index) => `?${index + 1}`).join(", ");
@@ -118,8 +204,15 @@ export async function fetchHeldDropDetails(
         .bind(...chunk),
     );
   }
-  const [snapshot, ...results] = await db.batch<SnapshotIdRow | HoldingDropRow>(statements);
+  const [snapshot, artworkRelease, ...results] = await db.batch<
+    SnapshotIdRow | ArtworkReleaseRow | HoldingDropRow
+  >(statements);
   assertSnapshot(snapshot.results[0] as SnapshotIdRow | undefined, snapshotId);
+  const artworkEnabled = isArtworkReleaseActive(
+    artworkRelease.results as ArtworkReleaseRow[],
+    artworkReleaseId,
+    artworkCollectionsSnapshotId,
+  );
   const allowed = new Set(uniqueIds);
   const drops = new Map<number, DropDetail>();
   for (const row of results.flatMap((result) => result.results as HoldingDropRow[])) {
@@ -129,7 +222,14 @@ export async function fetchHeldDropDetails(
     }
     drops.set(
       dropId,
-      toHoldingDropDetail(row, mediaBaseUrl, archiveSnapshotId, snapshotId, collectionsSnapshotId),
+      toHoldingDropDetail(
+        row,
+        mediaBaseUrl,
+        archiveSnapshotId,
+        snapshotId,
+        artworkCollectionsSnapshotId,
+        artworkEnabled,
+      ),
     );
   }
   return drops;
@@ -157,11 +257,12 @@ function toHoldingDropDetail(
   archiveSnapshotId: string,
   holdingsSnapshotId: string,
   collectionsSnapshotId: string,
+  artworkEnabled: boolean,
 ): DropDetail {
   const dropId = numberValue(row.drop_id);
   const imageUrl = holdingDropArtworkUrl(
     mediaBaseUrl,
-    row.image_object_key,
+    artworkEnabled ? row.image_object_key : null,
     archiveSnapshotId,
     holdingsSnapshotId,
     collectionsSnapshotId,
@@ -188,7 +289,7 @@ function toHoldingDropDetail(
     createdAt: row.created_at ?? "",
     // Source media URLs remain preserved in the private backup/D1. Responses
     // expose only a verified immutable R2 object from an active snapshot.
-    imageUrl: imageUrl ?? "",
+    imageUrl,
     hasArtwork: imageUrl !== null,
     tokenCount: numberValue(row.token_count),
     dropTransferCount: numberValue(row.transfer_count),
@@ -200,6 +301,47 @@ function toHoldingDropDetail(
     ...(numberValue(row.is_private) === 1 ? { isPrivate: true as const } : {}),
     ...(numberValue(row.is_hidden) === 1 ? { isHidden: true as const } : {}),
   };
+}
+
+function isArtworkReleaseActive(
+  rows: ArtworkReleaseRow[],
+  expectedReleaseId: string,
+  expectedCollectionsSnapshotId: string,
+): boolean {
+  if (!expectedReleaseId || !expectedCollectionsSnapshotId) return false;
+  const values = artworkReleaseValues(rows);
+  const referencedDrops = positiveInteger(values.get("artwork_release_referenced_drops"));
+  const archiveDirect = nonNegativeInteger(values.get("artwork_release_archive_direct"));
+  const activatedRows = nonNegativeInteger(values.get("artwork_release_activated_rows"));
+  const terminalUnavailable = nonNegativeInteger(
+    values.get("artwork_release_terminal_unavailable"),
+  );
+  return (
+    values.get("artwork_release_id") === expectedReleaseId &&
+    values.get("artwork_release_collections_snapshot_id") === expectedCollectionsSnapshotId &&
+    /^[0-9a-f]{64}$/.test(values.get("artwork_release_sha256") ?? "") &&
+    values.get("artwork_release_complete") === "1" &&
+    referencedDrops !== null &&
+    archiveDirect !== null &&
+    activatedRows !== null &&
+    terminalUnavailable !== null &&
+    archiveDirect + activatedRows + terminalUnavailable === referencedDrops
+  );
+}
+
+function artworkReleaseValues(rows: ArtworkReleaseRow[]): Map<string, string> {
+  return new Map(rows.map((row) => [row.key, row.value]));
+}
+
+function nonNegativeInteger(value: string | undefined): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function positiveInteger(value: string | undefined): number | null {
+  const parsed = nonNegativeInteger(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
 }
 
 function assertSnapshot(row: SnapshotIdRow | undefined, expected: string): void {

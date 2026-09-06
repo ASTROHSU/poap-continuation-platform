@@ -8,10 +8,12 @@ import {
   type Hex,
 } from "viem";
 import { associationBadgesAbi } from "../shared/association-badges";
+import { baseMainnetHistoryRpcUrl } from "./rpc-config";
 import type { Bindings, D1ReadClient } from "./types";
 
-const BLOCKS_PER_CHUNK = 1_900n;
-const MAX_CHUNKS_PER_TARGET = 3;
+const BLOCKS_PER_CHUNK = 1_000n;
+const ALCHEMY_FREE_BLOCKS_PER_CHUNK = 10n;
+const MAX_CHUNKS_PER_TARGET = 30;
 const MAX_TRANSFERS_PER_CHUNK = 400;
 
 export interface ChainIndexerTarget {
@@ -32,6 +34,7 @@ export interface RawChainLog {
 }
 
 export interface ChainIndexerRpc {
+  maxBlockRange?: bigint;
   getChainId(): Promise<number>;
   getFinalizedBlockNumber(): Promise<bigint>;
   getLogs(input: { address: Address; fromBlock: bigint; toBlock: bigint }): Promise<RawChainLog[]>;
@@ -90,9 +93,23 @@ export interface ChainIndexerStatus {
 }
 
 export async function runLiveChainIndexer(
-  env: Pick<Bindings, "LIVE_DB" | "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL">,
+  env: Pick<
+    Bindings,
+    | "LIVE_DB"
+    | "BASE_RPC_URL"
+    | "BASE_MAINNET_RPC_URL"
+    | "BASE_MAINNET_ALCHEMY_RPC_URL"
+    | "BASE_MAINNET_INDEXER_RPC_URL"
+  >,
   rpcFactory: (target: ChainIndexerTarget) => ChainIndexerRpc = (target) =>
-    createChainIndexerRpc(rpcUrlForChain(env, target.chainId)),
+    createChainIndexerRpc(
+      rpcUrlForChain(env, target.chainId),
+      target.chainId === 8453 &&
+        !env.BASE_MAINNET_INDEXER_RPC_URL?.trim() &&
+        env.BASE_MAINNET_ALCHEMY_RPC_URL?.trim()
+        ? ALCHEMY_FREE_BLOCKS_PER_CHUNK
+        : undefined,
+    ),
 ): Promise<ChainIndexerRunResult> {
   const targets = await fetchChainIndexerTargets(env.LIVE_DB.withSession("first-primary"));
   let chunks = 0;
@@ -117,10 +134,19 @@ export async function runLiveChainIndexer(
         chainId: target.chainId,
         contractAddress: target.contractAddress,
         name: error instanceof Error ? error.name : "UnknownError",
+        detail: safeRpcDiagnostic(error),
       });
     }
   }
   return { targets: targets.length, chunks, transfers, failures };
+}
+
+function safeRpcDiagnostic(error: unknown): string {
+  if (!(error instanceof Error)) return "Unknown RPC failure";
+  return error.message
+    .replace(/https?:\/\/[^\s)]+/g, "[rpc-endpoint]")
+    .replace(/(api[_-]?key|token|authorization)=[^\s&]+/gi, "$1=[redacted]")
+    .slice(0, 500);
 }
 
 export async function fetchChainIndexerTargets(db: D1ReadClient): Promise<ChainIndexerTarget[]> {
@@ -150,9 +176,10 @@ export async function syncChainIndexerChunk(
   }
   const finalizedBlock = await rpc.getFinalizedBlockNumber();
   if (target.nextBlock > finalizedBlock) return null;
+  const blocksPerChunk = rpc.maxBlockRange ?? BLOCKS_PER_CHUNK;
   const toBlock =
-    target.nextBlock + BLOCKS_PER_CHUNK - 1n < finalizedBlock
-      ? target.nextBlock + BLOCKS_PER_CHUNK - 1n
+    target.nextBlock + blocksPerChunk - 1n < finalizedBlock
+      ? target.nextBlock + blocksPerChunk - 1n
       : finalizedBlock;
   const [logs, trackedTokenIds] = await Promise.all([
     rpc.getLogs({
@@ -334,9 +361,10 @@ export async function fetchChainIndexerStatus(db: D1ReadClient): Promise<ChainIn
   }));
 }
 
-function createChainIndexerRpc(rpcUrl: string): ChainIndexerRpc {
+function createChainIndexerRpc(rpcUrl: string, maxBlockRange?: bigint): ChainIndexerRpc {
   const client = createPublicClient({ transport: http(rpcUrl) });
   return {
+    maxBlockRange,
     getChainId: () => client.getChainId(),
     async getFinalizedBlockNumber() {
       const block = await client.getBlock({ blockTag: "finalized" });
@@ -365,11 +393,17 @@ async function fetchTrackedTokenIds(
 }
 
 function rpcUrlForChain(
-  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL">,
+  env: Pick<
+    Bindings,
+    | "BASE_RPC_URL"
+    | "BASE_MAINNET_RPC_URL"
+    | "BASE_MAINNET_ALCHEMY_RPC_URL"
+    | "BASE_MAINNET_INDEXER_RPC_URL"
+  >,
   chainId: number,
 ): string {
   if (chainId === 84532) return env.BASE_RPC_URL;
-  if (chainId === 8453) return env.BASE_MAINNET_RPC_URL;
+  if (chainId === 8453) return baseMainnetHistoryRpcUrl(env);
   throw new Error(`Unsupported chain ID ${chainId}.`);
 }
 

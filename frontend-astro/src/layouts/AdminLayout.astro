@@ -1,0 +1,43 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "活動管理｜底加",
+  description = "底加活動管理者介面",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#7C72E2" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/brand/titsia-app-icon-512.png?v=2" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/brand/titsia-app-icon-512.png?v=2" />
+    <title>{title}</title>
+  </head>
+  <body class="paper-grid min-h-screen">
+    <header class="border-b border-white/70 bg-paper/92 backdrop-blur-xl">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-10">
+        <div class="flex min-w-0 items-center gap-3" aria-label="底加活動管理">
+          <img class="brand-logo" src="/brand/vector/titsia-brand-logo.svg" alt="" width="52" height="52" />
+          <span>
+            <strong class="block text-base tracking-[.08em]">底加活動管理</strong>
+            <small class="block text-[10px] font-bold tracking-[.04em] text-ink/48">受保護的管理工作臺</small>
+          </span>
+        </div>
+        <span class="rounded-full border-2 border-purple/20 bg-white px-3 py-2 text-[11px] font-black tracking-[.12em] text-purple sm:px-4">PRIVATE</span>
+      </div>
+    </header>
+    <main><slot /></main>
+  </body>
+</html>

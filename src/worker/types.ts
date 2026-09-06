@@ -9,11 +9,14 @@ export interface Bindings {
   >;
   ARCHIVE_BUCKET: R2Bucket;
   ARCHIVE_MEDIA_BUCKET: R2Bucket;
+  CF_VERSION_METADATA: WorkerVersionMetadata;
   BROWSE_RATE_LIMITER: RateLimit;
   OWNER_RATE_LIMITER: RateLimit;
   EXPORT_RATE_LIMITER: RateLimit;
   SNAPSHOT_ID: string;
   HOLDINGS_SNAPSHOT_ID: string;
+  HOLDINGS_MEDIA_RELEASE_ID: string;
+  HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID: string;
   COLLECTIONS_SNAPSHOT_ID: string;
   COLLECTIONS_RELEASE_ID: string;
   MOMENTS_SNAPSHOT_ID: string;
@@ -25,6 +28,7 @@ export interface Bindings {
   ETHEREUM_RPC_URL: string;
   BASE_RPC_URL: string;
   BASE_MAINNET_RPC_URL: string;
+  BASE_MAINNET_ALCHEMY_RPC_URL?: string;
   ARBITRUM_MAINNET_RPC_URL: string;
   GNOSIS_MAINNET_RPC_URL: string;
   MINT_SIGNER_PRIVATE_KEY: string;
@@ -38,7 +42,17 @@ export interface Bindings {
   WALLET_PROVISIONING_MODE: "disabled" | "magic-pregen";
   MAGIC_PUBLISHABLE_API_KEY: string;
   MAGIC_SECRET_KEY?: string;
+  BASE_MAINNET_INDEXER_RPC_URL?: string;
+  GAS_MONITOR_ENABLED?: string;
+  GAS_MONITOR_LOW_ETH?: string;
+  GAS_MONITOR_CRITICAL_ETH?: string;
+  TELEGRAM_GAS_BOT_TOKEN?: string;
+  TELEGRAM_GAS_CHAT_ID?: string;
   MAGIC_EMAIL_TEMPLATE_NAME?: string;
+  ISSUER_ADMIN_EMAILS?: string;
+  ACCESS_TEAM_DOMAIN?: string;
+  ACCESS_POLICY_AUD?: string;
+  ACCESS_ADMIN_EMAILS?: string;
   ARCHIVE_MEDIA_MIRROR_SECRET?: string;
   ARCHIVE_MEDIA_MIRROR_ENABLED?: string;
   APP_MODE: "combined" | "live-only";
@@ -325,7 +339,7 @@ export interface DropSummary {
   country: string | null;
   year: number;
   isVirtual: boolean | null;
-  imageUrl: string;
+  imageUrl: string | null;
   hasArtwork: boolean;
   tokenCount: number;
   /**

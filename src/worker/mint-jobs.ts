@@ -241,6 +241,17 @@ export async function markMintJobSubmitted(
   await db.batch([
     db
       .prepare(
+        `INSERT OR IGNORE INTO gas_receipts (chain_id, transaction_hash, payer, discovered_at)
+      VALUES (?, ?, ?, ?)`,
+      )
+      .bind(
+        job.chainId,
+        transactionHash.toLowerCase(),
+        job.relayerAddress.toLowerCase(),
+        Date.now(),
+      ),
+    db
+      .prepare(
         `UPDATE live_mint_jobs
          SET status = 'submitted', transaction_hash = ?, submitted_at = COALESCE(submitted_at, ?),
              next_attempt_at = ?, updated_at = ?, last_error = NULL
@@ -360,6 +371,31 @@ async function refreshMintJobAuthorization(
     )
     .bind(authorization.deadline, authorization.signature, new Date().toISOString(), jobId)
     .run();
+}
+
+export async function renewExpiredMintJobAuthorization(
+  db: D1Database,
+  job: MintJobRecord,
+  authorization: MintAuthorization,
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE live_mint_jobs
+         SET authorization_deadline = ?, authorization_signature = ?, status = 'retry',
+             next_attempt_at = ?, updated_at = ?, last_error = NULL
+         WHERE job_id = ? AND status != 'confirmed'`,
+      )
+      .bind(authorization.deadline, authorization.signature, Date.now(), now, job.jobId),
+    db
+      .prepare(
+        `UPDATE live_claim_codes
+         SET mint_authorization_deadline = ?
+         WHERE code_hash = ? AND claimed_by = ? AND minted_tx_hash IS NULL`,
+      )
+      .bind(authorization.deadline, job.claimCodeHash, job.recipient.toLowerCase()),
+  ]);
 }
 
 export async function activeMintRelayShards(db: D1Database): Promise<string[]> {

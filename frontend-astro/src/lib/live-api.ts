@@ -37,7 +37,7 @@ export interface ArchiveHolding {
   country: string | null;
   year: number;
   isVirtual: boolean | null;
-  imageUrl: string;
+  imageUrl: string | null;
   hasArtwork: boolean;
   tokenCount: number;
   sourceUid: string;
@@ -96,7 +96,7 @@ export interface ArchiveDropDetail {
   eventUrl: string | null;
   year: number;
   isVirtual: boolean | null;
-  imageUrl: string;
+  imageUrl: string | null;
   hasArtwork: boolean;
   tokenCount: number;
 }
@@ -249,6 +249,9 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
       typeof errorBody?.error === "string" ? errorBody.error : `請求失敗（${response.status}）`;
     const code = typeof errorBody?.code === "string" ? errorBody.code : null;
     throw new ApiError(response.status, message, code);
+  }
+  if (body === null) {
+    throw new ApiError(502, "伺服器回傳了無法解析的資料，請稍後再試。", "invalid_api_response");
   }
   return body as T;
 }

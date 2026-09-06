@@ -34,7 +34,7 @@ export interface MintAuthorization {
 
 export async function signMintAuthorization(
   event: LiveEventRecord,
-  claim: LiveClaimRecord,
+  claim: Pick<LiveClaimRecord, "claimedBy" | "mintAuthorizationDeadline" | "mintNonce">,
   privateKey: string,
 ): Promise<MintAuthorization | null> {
   if (!event.contractAddress || event.tokenId === null) return null;
@@ -71,6 +71,11 @@ export async function signMintAuthorization(
     nonce: claim.mintNonce,
     signature,
   };
+}
+
+export function isExpiredMintAuthorizationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("AuthorizationExpired") || message.includes("0x3d91b05f");
 }
 
 export async function relayMintAuthorization(

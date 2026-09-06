@@ -21,6 +21,8 @@ export default defineWorkersConfig({
         miniflare: {
           bindings: {
             APP_MODE: "live-only",
+            HOLDINGS_MEDIA_RELEASE_ID: "2026-07-02-v1-artwork-full",
+            HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID: "collections-2026-07-22-v1",
             TEST_CATALOG_FIXTURE: catalogFixture,
             TEST_CATALOG_MIGRATIONS: catalogMigrations,
             TEST_HOLDINGS_FIXTURE: holdingsFixture,
@@ -31,7 +33,7 @@ export default defineWorkersConfig({
             TEST_MOMENTS_MIGRATIONS: momentsMigrations,
             TEST_LIVE_FIXTURE: liveFixture,
             TEST_LIVE_MIGRATIONS: liveMigrations,
-            HOLDINGS_SNAPSHOT_ID: "2026-07-02-v1",
+            HOLDINGS_SNAPSHOT_ID: "compass-holdings-2026-07-28-v1",
             MOMENTS_SNAPSHOT_ID: "moments-2026-07-23-v1",
             MOMENTS_RELEASE_ID: "moments-test-release",
             MOMENTS_SOURCE_DATABASE_SHA256: "a".repeat(64),
@@ -49,6 +51,9 @@ export default defineWorkersConfig({
             WALLET_PROVISIONING_MODE: "disabled",
             MAGIC_PUBLISHABLE_API_KEY: "",
             MAGIC_SECRET_KEY: "",
+            ACCESS_TEAM_DOMAIN: "https://titsia-test.cloudflareaccess.com",
+            ACCESS_POLICY_AUD: "test-admin-audience",
+            ACCESS_ADMIN_EMAILS: "admin@example.test",
             RESEND_API_KEY: "",
             EMAIL_LOOKUP_SECRET: "test-only-email-lookup-secret-32-bytes-minimum",
             EMAIL_DATA_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",

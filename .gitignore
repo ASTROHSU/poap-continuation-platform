@@ -17,7 +17,6 @@ test-results/
 tools/collections-backup/bridge/wrangler.local.jsonc
 tools/moments-media/bridge/wrangler.local.jsonc
 wrangler.*.local.jsonc
-wrangler.pilot.jsonc
 .env*
 !.env.example
 
@@ -47,3 +46,6 @@ firepit-log.txt
 *.icloud-placeholder
 **/.astro/
 **/.vercel/
+
+# Local dependency symlinks are never release sources.
+node_modules

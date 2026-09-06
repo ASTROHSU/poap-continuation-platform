@@ -52,6 +52,7 @@ interface EmailReservationRow {
   event_id: string;
   slug: string;
   title: string;
+  issuer: string;
   description: string;
   image_url: string;
   event_url: string | null;
@@ -84,6 +85,7 @@ const EMAIL_RESERVATION_SELECT = `
     events.event_id,
     events.slug,
     events.title,
+    events.issuer,
     events.description,
     events.image_url,
     events.event_url,
@@ -563,6 +565,7 @@ function mapEmailReservation(row: EmailReservationRow): EmailReservationRecord {
       eventId: row.event_id,
       slug: row.slug,
       title: row.title,
+      issuer: row.issuer,
       description: row.description,
       imageUrl: row.image_url,
       eventUrl: row.event_url,

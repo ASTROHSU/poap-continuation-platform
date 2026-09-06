@@ -17,6 +17,7 @@ import {
 import { ethereumRpcUrl, parseEnsNameQuery, resolveEnsAddress, withEnsCache } from "./ens";
 import { fetchChainIndexerStatus, runLiveChainIndexer } from "./chain-indexer";
 import { fetchLegacyPoapHoldings } from "./legacy-poap";
+import { baseMainnetRpcUrl } from "./rpc-config";
 import {
   assertSameOrigin,
   decryptEmail,
@@ -77,6 +78,7 @@ import {
   refreshLiveClaimAuthorization,
   reserveLiveClaim,
 } from "./live";
+import { fetchLiveMediaReadiness, normalizeLiveMediaFilename } from "./live-media";
 import { mintRelayerAddress, signMintAuthorization, verifyMintTransaction } from "./minting";
 import {
   activeMintRelayShards,
@@ -93,6 +95,15 @@ import {
 } from "./wallet-provisioning";
 import { transactionExplorerUrl } from "../shared/live-chains";
 import { publicMagicEmbeddedWalletConfig, verifyMagicIdentity } from "./magic-auth";
+import {
+  listIssuerEvents,
+  loadIssuerEvent,
+  requireIssuerAdmin,
+  transitionIssuerEvent,
+  updateIssuerEvent,
+} from "./issuer-admin";
+import { requireAccessAdmin } from "./access-auth";
+import { runGasMonitor, gasCaption, gasCsv } from "./gas-monitor";
 import {
   mirrorArchiveMediaBatch,
   parseArchiveMediaMirrorRequest,
@@ -111,7 +122,7 @@ import {
   fetchOwnerTotal,
   fetchSnapshotAt,
 } from "./repository";
-import { fetchExactHoldingDropDetail } from "./holding-drops";
+import { fetchExactHoldingDropDetail, fetchHoldingsArtworkReadiness } from "./holding-drops";
 import { fetchExactCollectionDropDetail } from "./private-held-drops";
 import type { AppEnv, Bindings, DropDetail } from "./types";
 import {
@@ -145,7 +156,8 @@ export const app = new Hono<AppEnv>();
 const COLLECTIONS_CACHE_SCHEMA = "collections-v3";
 const MOMENTS_CACHE_SCHEMA = "moments-v2";
 const MOMENTS_META_CACHE_SCHEMA = "public-meta-v2";
-const OWNER_CACHE_SCHEMA = "owner-v6";
+const HOLDINGS_MEDIA_CACHE_SCHEMA = "holdings-media-v1";
+const OWNER_CACHE_SCHEMA = "owner-v7";
 const PERSONAL_EXPORT_CACHE_SCHEMA = "personal-export-v5";
 const DROP_DETAIL_CACHE_SCHEMA = "drop-detail-v7";
 const DROP_DETAIL_BATCH_CACHE_SCHEMA = "drop-detail-batch-v1";
@@ -163,6 +175,27 @@ export function collectionsApiVersion(
     );
   }
   return `${bindings.API_CACHE_VERSION}.${COLLECTIONS_CACHE_SCHEMA}.${bindings.COLLECTIONS_RELEASE_ID}`;
+}
+
+export function holdingsMediaApiVersion(
+  bindings: Pick<
+    Bindings,
+    "API_CACHE_VERSION" | "HOLDINGS_MEDIA_RELEASE_ID" | "HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID"
+  >,
+): string {
+  if (!bindings.HOLDINGS_MEDIA_RELEASE_ID || !bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID) {
+    throw new ApiError(
+      503,
+      "The Holdings media release identifier is not configured.",
+      "holdings_media_release_unavailable",
+    );
+  }
+  return [
+    bindings.API_CACHE_VERSION,
+    HOLDINGS_MEDIA_CACHE_SCHEMA,
+    bindings.HOLDINGS_MEDIA_RELEASE_ID,
+    bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
+  ].join(".");
 }
 
 export function momentsApiVersion(
@@ -199,6 +232,7 @@ function personalExportCacheIdentity(bindings: Bindings): {
   return {
     snapshotId: [
       bindings.HOLDINGS_SNAPSHOT_ID,
+      bindings.HOLDINGS_MEDIA_RELEASE_ID,
       bindings.SNAPSHOT_ID,
       bindings.COLLECTIONS_SNAPSHOT_ID,
       bindings.MOMENTS_SNAPSHOT_ID,
@@ -206,6 +240,7 @@ function personalExportCacheIdentity(bindings: Bindings): {
     apiVersion: [
       bindings.API_CACHE_VERSION,
       PERSONAL_EXPORT_CACHE_SCHEMA,
+      holdingsMediaApiVersion(bindings),
       collectionsApiVersion(bindings),
       momentsApiVersion(bindings),
     ].join("."),
@@ -227,6 +262,67 @@ app.get("/api/app-config", (context) => {
     walletProvisioning: publicWalletProvisioningConfig(context.env),
     embeddedWallet: publicMagicEmbeddedWalletConfig(context.env),
   });
+});
+
+app.get("/api/version", (context) => {
+  assertNoQuery(new URL(context.req.url));
+  const worker = context.env.CF_VERSION_METADATA;
+  return context.json(
+    {
+      schemaVersion: "poapin-deployment-identity-v1",
+      worker: {
+        id: worker.id,
+        tag: worker.tag,
+        timestamp: worker.timestamp,
+      },
+      releases: {
+        catalogSnapshotId: context.env.SNAPSHOT_ID,
+        holdingsSnapshotId: context.env.HOLDINGS_SNAPSHOT_ID,
+        holdingsMediaReleaseId: context.env.HOLDINGS_MEDIA_RELEASE_ID,
+        holdingsMediaCollectionsSnapshotId: context.env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
+        collectionsSnapshotId: context.env.COLLECTIONS_SNAPSHOT_ID,
+        collectionsReleaseId: context.env.COLLECTIONS_RELEASE_ID,
+        momentsSnapshotId: context.env.MOMENTS_SNAPSHOT_ID,
+        momentsReleaseId: context.env.MOMENTS_RELEASE_ID,
+      },
+    },
+    200,
+    { "Cache-Control": "no-store" },
+  );
+});
+
+app.get("/api/ready", async (context) => {
+  assertNoQuery(new URL(context.req.url));
+  holdingsMediaApiVersion(context.env);
+  const [catalog, holdingsArtwork, liveArtwork] = await Promise.all([
+    fetchMeta(context.env.CATALOG_DB.withSession("first-primary"), context.env.SNAPSHOT_ID),
+    fetchHoldingsArtworkReadiness(
+      context.env.HOLDINGS_DB.withSession("first-primary"),
+      context.env.HOLDINGS_SNAPSHOT_ID,
+      context.env.HOLDINGS_MEDIA_RELEASE_ID,
+      context.env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
+    ),
+    fetchLiveMediaReadiness(
+      context.env.LIVE_DB.withSession("first-primary"),
+      context.env.ARCHIVE_BUCKET,
+    ),
+  ]);
+  const ready = holdingsArtwork.ready && liveArtwork.ready;
+  return context.json(
+    {
+      schemaVersion: "poapin-readiness-v1",
+      ready,
+      catalog: {
+        snapshotId: catalog.snapshotId,
+        drops: catalog.counts.drops,
+        artworks: catalog.counts.artworks,
+      },
+      holdingsArtwork,
+      liveArtwork,
+    },
+    ready ? 200 : 503,
+    { "Cache-Control": "private, no-store" },
+  );
 });
 
 /**
@@ -289,6 +385,97 @@ app.post("/api/live/magic/session", async (context) => {
   });
 });
 
+app.use("/api/admin/issuer/*", async (context, next) => {
+  const accessIdentity = await requireAccessAdmin(context.env, context.req.raw);
+  const limited = await enforceRateLimitKey(
+    context.env.OWNER_RATE_LIMITER,
+    `issuer-admin:${accessIdentity.subject}`,
+  );
+  if (limited) return limited;
+  await next();
+});
+
+app.post("/api/admin/issuer/session", async (context) => {
+  assertSameOrigin(context.req.raw);
+  const body = await parseJsonObject(context.req.raw, "Issuer admin session");
+  const identity = await requireIssuerAdmin(context.env, context.req.raw, {
+    didToken: body.didToken,
+    email: body.email,
+  });
+  return context.json(
+    {
+      authenticated: true,
+      email: identity.email,
+      address: identity.address,
+    },
+    200,
+    { "Cache-Control": "private, no-store" },
+  );
+});
+
+app.get("/api/admin/issuer/gas", async (context) => {
+  assertNoQuery(new URL(context.req.url));
+  await requireIssuerAdmin(context.env, context.req.raw);
+  const rows = await context.env.LIVE_DB.prepare(
+    "SELECT report_json, last_error_at FROM gas_monitor_state WHERE chain_id = 8453 ORDER BY relayer",
+  ).all<{ report_json: string | null; last_error_at: number | null }>();
+  return context.json(
+    {
+      notificationsConfigured: Boolean(
+        context.env.TELEGRAM_GAS_BOT_TOKEN && context.env.TELEGRAM_GAS_CHAT_ID,
+      ),
+      items: rows.results.map((row) => ({
+        report: row.report_json ? JSON.parse(row.report_json) : null,
+        summary: row.report_json ? gasCaption(JSON.parse(row.report_json), false) : null,
+        csv: row.report_json ? gasCsv(JSON.parse(row.report_json)) : null,
+        lastErrorAt: row.last_error_at,
+      })),
+    },
+    200,
+    { "Cache-Control": "private, no-store" },
+  );
+});
+
+app.get("/api/admin/issuer/events", async (context) => {
+  assertNoQuery(new URL(context.req.url));
+  await requireIssuerAdmin(context.env, context.req.raw);
+  return context.json({ items: await listIssuerEvents(context.env.LIVE_DB) }, 200, {
+    "Cache-Control": "private, no-store",
+  });
+});
+
+app.get("/api/admin/issuer/events/:slug", async (context) => {
+  assertNoQuery(new URL(context.req.url));
+  await requireIssuerAdmin(context.env, context.req.raw);
+  const slug = normalizeLiveSlug(context.req.param("slug"));
+  const event = await loadIssuerEvent(context.env, slug);
+  if (!event) throw new ApiError(404, "找不到這個正式活動。", "issuer_event_not_found");
+  return context.json({ event }, 200, { "Cache-Control": "private, no-store" });
+});
+
+app.put("/api/admin/issuer/events/:slug", async (context) => {
+  assertSameOrigin(context.req.raw);
+  const identity = await requireIssuerAdmin(context.env, context.req.raw);
+  const slug = normalizeLiveSlug(context.req.param("slug"));
+  const body = await parseJsonObject(context.req.raw, "Issuer event update");
+  if (body.slug !== undefined && body.slug !== slug) {
+    throw new ApiError(400, "活動代號不可修改。", "issuer_event_immutable_field");
+  }
+  return context.json(await updateIssuerEvent(context.env, identity, { ...body, slug }), 200, {
+    "Cache-Control": "private, no-store",
+  });
+});
+
+app.post("/api/admin/issuer/events/:slug/status", async (context) => {
+  assertSameOrigin(context.req.raw);
+  const identity = await requireIssuerAdmin(context.env, context.req.raw);
+  const slug = normalizeLiveSlug(context.req.param("slug"));
+  const body = await parseJsonObject(context.req.raw, "Issuer event status update");
+  return context.json(await transitionIssuerEvent(context.env, identity, { ...body, slug }), 200, {
+    "Cache-Control": "private, no-store",
+  });
+});
+
 app.get("/api/meta", async (context) => {
   const url = new URL(context.req.url);
   assertNoQuery(url);
@@ -296,8 +483,8 @@ app.get("/api/meta", async (context) => {
     {
       requestUrl: context.req.url,
       canonicalPath: "/api/meta",
-      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}`,
-      apiVersion: context.env.API_CACHE_VERSION,
+      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}`,
+      apiVersion: holdingsMediaApiVersion(context.env),
       edgeTtlSeconds: 2_592_000,
       browserTtlSeconds: 300,
       executionCtx: context.executionCtx,
@@ -313,6 +500,7 @@ app.get("/api/meta", async (context) => {
         ...catalog,
         holdingsSnapshotId: holdings.snapshotId,
         holdingsSnapshotAt: holdings.snapshotAt,
+        holdingsMediaReleaseId: context.env.HOLDINGS_MEDIA_RELEASE_ID,
         counts: {
           ...catalog.counts,
           tokens: holdings.tokens,
@@ -397,6 +585,9 @@ app.get("/media/live/events/:slug/:filename", async (context) => {
   assertNoQuery(new URL(context.req.url));
   const slug = normalizeLiveSlug(context.req.param("slug"));
   const filename = normalizeLiveMediaFilename(context.req.param("filename"));
+  if (!filename) {
+    throw new ApiError(404, "Media not found.", "media_not_found");
+  }
   const object = await context.env.ARCHIVE_BUCKET.get(`live/events/${slug}/${filename}`);
   if (!object) {
     return context.json({ error: "Media not found.", code: "media_not_found" }, 404, {
@@ -453,7 +644,11 @@ app.get(
     const filename = context.req.param("filename");
     const match = /^([0-9a-f]{64})\.(png|jpg|gif|webp|avif|heic)$/.exec(filename);
     const activeSnapshot =
-      (namespace === "collections" && snapshotId === context.env.COLLECTIONS_SNAPSHOT_ID) ||
+      (namespace === "collections" &&
+        [
+          context.env.COLLECTIONS_SNAPSHOT_ID,
+          context.env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
+        ].includes(snapshotId)) ||
       (namespace === "holdings" && snapshotId === context.env.HOLDINGS_SNAPSHOT_ID);
     if (!activeSnapshot || !match || prefix !== match[1].slice(0, 2)) {
       throw new ApiError(404, "Archive artwork not found.", "media_not_found");
@@ -1251,13 +1446,17 @@ app.post("/api/live/events/:slug/mints", async (context) => {
 });
 
 app.get("/api/live/mint-jobs/:jobId", async (context) => {
-  const limited = await enforceRateLimit(context.env.OWNER_RATE_LIMITER, context.req.raw);
-  if (limited) return limited;
   assertNoQuery(new URL(context.req.url));
   const jobId = context.req.param("jobId").trim().toLowerCase();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(jobId)) {
     throw new ApiError(404, "Mint progress was not found.", "mint_job_not_found");
   }
+  // Vercel proxies API requests to this Worker, so CF-Connecting-IP identifies
+  // a Vercel egress rather than an individual collector. Scope frequent status
+  // polling to the unguessable job ID instead of making unrelated collectors
+  // share one 60-request bucket.
+  const limited = await enforceRateLimitKey(context.env.OWNER_RATE_LIMITER, `mint-job:${jobId}`);
+  if (limited) return limited;
   const job = await fetchMintJob(context.env.LIVE_DB.withSession("first-primary"), jobId);
   if (!job) throw new ApiError(404, "Mint progress was not found.", "mint_job_not_found");
   const status = mintJobPublicStatus(job);
@@ -1279,7 +1478,9 @@ app.get("/api/live/owners/:address", async (context) => {
   assertNoQuery(new URL(context.req.url));
   const address = normalizeAddress(context.req.param("address"));
   const items = await fetchLiveHoldings(context.env.LIVE_DB.withSession("first-primary"), address);
-  return context.json({ address, items }, 200, { "Cache-Control": "private, no-store" });
+  return context.json({ address, items }, 200, {
+    "Cache-Control": "public, max-age=15, s-maxage=30",
+  });
 });
 
 app.get("/api/legacy/owners/:address", async (context) => {
@@ -1627,10 +1828,11 @@ app.get("/api/drops/:id/collectors", async (context) => {
       requestUrl: context.req.url,
       canonicalPath: `/api/drops/${query.dropId}/collectors`,
       canonicalSearch: query.canonicalSearch,
-      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}`,
+      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}`,
       apiVersion: [
         context.env.API_CACHE_VERSION,
         DROP_COLLECTORS_CACHE_SCHEMA,
+        holdingsMediaApiVersion(context.env),
         collectionsApiVersion(context.env),
       ].join("."),
       edgeTtlSeconds: 604_800,
@@ -1657,8 +1859,8 @@ app.get("/api/drops/:id", async (context) => {
     {
       requestUrl: context.req.url,
       canonicalPath: `/api/drops/${dropId}`,
-      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}`,
-      apiVersion: `${collectionsApiVersion(context.env)}.${DROP_DETAIL_CACHE_SCHEMA}`,
+      snapshotId: `${context.env.SNAPSHOT_ID}.${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}`,
+      apiVersion: `${collectionsApiVersion(context.env)}.${holdingsMediaApiVersion(context.env)}.${DROP_DETAIL_CACHE_SCHEMA}`,
       edgeTtlSeconds: 2_592_000,
       browserTtlSeconds: 300,
       executionCtx: context.executionCtx,
@@ -2165,6 +2367,7 @@ app.get("/api/owners/:address/export/manifest", async (context) => {
           },
           holdings: {
             snapshotId: context.env.HOLDINGS_SNAPSHOT_ID,
+            releaseId: context.env.HOLDINGS_MEDIA_RELEASE_ID,
           },
           collections: {
             snapshotId: context.env.COLLECTIONS_SNAPSHOT_ID,
@@ -2224,11 +2427,12 @@ app.get("/api/owners/:address/export/holdings", async (context) => {
       requestUrl: context.req.url,
       canonicalPath: `/api/owners/${query.address}/export/holdings`,
       canonicalSearch: query.canonicalSearch,
-      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.SNAPSHOT_ID}`,
+      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}.${context.env.SNAPSHOT_ID}`,
       apiVersion: [
         context.env.API_CACHE_VERSION,
         PERSONAL_EXPORT_CACHE_SCHEMA,
         "holdings",
+        holdingsMediaApiVersion(context.env),
         collectionsApiVersion(context.env),
       ].join("."),
       edgeTtlSeconds: 86_400,
@@ -2246,6 +2450,8 @@ app.get("/api/owners/:address/export/holdings", async (context) => {
           collectionsDb,
           query,
           context.env.HOLDINGS_SNAPSHOT_ID,
+          context.env.HOLDINGS_MEDIA_RELEASE_ID,
+          context.env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
           context.env.SNAPSHOT_ID,
           context.env.COLLECTIONS_SNAPSHOT_ID,
           context.env.COLLECTIONS_RELEASE_ID,
@@ -2269,10 +2475,11 @@ app.get("/api/owners/:address", async (context) => {
       requestUrl: context.req.url,
       canonicalPath: `/api/owners/${query.address}`,
       canonicalSearch: query.canonicalSearch,
-      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.SNAPSHOT_ID}`,
+      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}.${context.env.SNAPSHOT_ID}`,
       apiVersion: [
         context.env.API_CACHE_VERSION,
         OWNER_CACHE_SCHEMA,
+        holdingsMediaApiVersion(context.env),
         collectionsApiVersion(context.env),
       ].join("."),
       edgeTtlSeconds: 86_400,
@@ -2290,6 +2497,8 @@ app.get("/api/owners/:address", async (context) => {
           collectionsDb,
           query,
           context.env.HOLDINGS_SNAPSHOT_ID,
+          context.env.HOLDINGS_MEDIA_RELEASE_ID,
+          context.env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
           context.env.SNAPSHOT_ID,
           context.env.COLLECTIONS_SNAPSHOT_ID,
           context.env.MEDIA_BASE_URL,
@@ -2300,9 +2509,9 @@ app.get("/api/owners/:address", async (context) => {
 });
 
 /**
- * Core ZIP archive view used by the association frontend. It intentionally
- * depends only on the official catalog + holdings snapshot; the separate
- * Glory Lab Collections and Moments releases are not required.
+ * Core ZIP archive view used by the continuation frontend. Holdings provides
+ * ownership while the official catalog restores presentation metadata. The
+ * separate Collections and Moments releases are intentionally not required.
  */
 app.get("/api/archive/owners/:address", async (context) => {
   const limited = await enforceRateLimit(context.env.OWNER_RATE_LIMITER, context.req.raw);
@@ -2317,10 +2526,10 @@ app.get("/api/archive/owners/:address", async (context) => {
       requestUrl: context.req.url,
       canonicalPath: `/api/archive/owners/${query.address}`,
       canonicalSearch: query.canonicalSearch,
-      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.SNAPSHOT_ID}`,
-      apiVersion: `${context.env.API_CACHE_VERSION}.archive-core.${OWNER_CACHE_SCHEMA}`,
+      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}.${context.env.SNAPSHOT_ID}`,
+      apiVersion: `${context.env.API_CACHE_VERSION}.archive-core.${OWNER_CACHE_SCHEMA}.${holdingsMediaApiVersion(context.env)}`,
       edgeTtlSeconds: 86_400,
-      browserTtlSeconds: 0,
+      browserTtlSeconds: 300,
       executionCtx: context.executionCtx,
     },
     async () => {
@@ -2333,6 +2542,8 @@ app.get("/api/archive/owners/:address", async (context) => {
           null,
           query,
           context.env.HOLDINGS_SNAPSHOT_ID,
+          context.env.HOLDINGS_MEDIA_RELEASE_ID,
+          context.env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
           context.env.SNAPSHOT_ID,
           context.env.COLLECTIONS_SNAPSHOT_ID,
           context.env.MEDIA_BASE_URL,
@@ -2365,7 +2576,9 @@ app.get("/api/archive/drops/:id", async (context) => {
         context.env.MEDIA_BASE_URL,
         context.env.SNAPSHOT_ID,
       );
-      if (!drop) throw new ApiError(404, "Archive Drop not found.", "drop_not_found");
+      if (!drop) {
+        throw new ApiError(404, "Archive Drop not found.", "drop_not_found");
+      }
       return context.json(drop);
     },
   );
@@ -2396,6 +2609,8 @@ for (const format of ["csv", "json"] as const) {
       address,
       total,
       snapshotId: context.env.HOLDINGS_SNAPSHOT_ID,
+      holdingsMediaReleaseId: context.env.HOLDINGS_MEDIA_RELEASE_ID,
+      holdingsMediaCollectionsSnapshotId: context.env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
       catalogSnapshotId: context.env.SNAPSHOT_ID,
       snapshotAt,
       holdingsDb,
@@ -2425,7 +2640,11 @@ app.onError((error, context) => {
 
 async function enforceRateLimit(limiter: RateLimit, request: Request): Promise<Response | null> {
   const actor = request.headers.get("CF-Connecting-IP") ?? "local-or-unknown";
-  const { success } = await limiter.limit({ key: actor });
+  return enforceRateLimitKey(limiter, `ip:${actor}`);
+}
+
+async function enforceRateLimitKey(limiter: RateLimit, key: string): Promise<Response | null> {
+  const { success } = await limiter.limit({ key });
   if (success) return null;
   return Response.json(
     { error: "Too many requests. Try again in a minute.", code: "rate_limited" },
@@ -2454,13 +2673,6 @@ function normalizeLiveSlug(value: string): string {
     throw new ApiError(400, "Claim event slug is invalid.", "invalid_live_event_slug");
   }
   return slug;
-}
-
-function normalizeLiveMediaFilename(value: string): string {
-  if (value === "metadata.json" || /^artwork\.(?:png|jpg|webp|gif|svg)$/.test(value)) {
-    return value;
-  }
-  throw new ApiError(404, "Media not found.", "media_not_found");
 }
 
 function isAuthorizedArchiveMediaMirrorRequest(
@@ -2759,11 +2971,11 @@ function isUniqueConstraintError(error: unknown): boolean {
 }
 
 function liveRpcUrl(
-  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL">,
+  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL" | "BASE_MAINNET_ALCHEMY_RPC_URL">,
   chainId: number,
 ): string {
   if (chainId === 84532) return env.BASE_RPC_URL;
-  if (chainId === 8453) return env.BASE_MAINNET_RPC_URL;
+  if (chainId === 8453) return baseMainnetRpcUrl(env);
   throw new ApiError(409, "This event uses an unsupported chain.", "live_chain_unsupported");
 }
 
@@ -2793,9 +3005,10 @@ async function resolveExactDrop(bindings: Bindings, dropId: number): Promise<Dro
     holdingsDb,
     dropId,
     bindings.HOLDINGS_SNAPSHOT_ID,
+    bindings.HOLDINGS_MEDIA_RELEASE_ID,
     bindings.MEDIA_BASE_URL,
     bindings.SNAPSHOT_ID,
-    bindings.COLLECTIONS_SNAPSHOT_ID,
+    bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
   );
   const drop =
     holdingDrop.state === "available"
@@ -2839,17 +3052,45 @@ export default {
     env: Bindings,
     _context: ExecutionContext,
   ): Promise<void> {
-    const [indexer, emailPrune, archiveMediaMirror, mintRelayRecovery] = await Promise.all([
+    const [
+      indexer,
+      emailPrune,
+      archiveMediaMirror,
+      mintRelayRecovery,
+      gasMonitor,
+      holdingsArtwork,
+      liveArtwork,
+    ] = await Promise.all([
       runLiveChainIndexer(env),
       pruneExpiredEmailAuthArtifacts(env.LIVE_DB),
       runScheduledArchiveMediaMirror(env),
       recoverMintRelays(env),
+      runGasMonitor(env).catch(() => {
+        console.error("Gas monitoring failed independently of mint recovery.");
+        return { status: "error" };
+      }),
+      fetchHoldingsArtworkReadiness(
+        env.HOLDINGS_DB.withSession("first-primary"),
+        env.HOLDINGS_SNAPSHOT_ID,
+        env.HOLDINGS_MEDIA_RELEASE_ID,
+        env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
+      ),
+      fetchLiveMediaReadiness(env.LIVE_DB.withSession("first-primary"), env.ARCHIVE_BUCKET),
     ]);
+    if (!holdingsArtwork.ready) {
+      console.error("Holdings artwork release is not ready", holdingsArtwork);
+    }
+    if (!liveArtwork.ready) {
+      console.error("Live artwork is not ready", liveArtwork);
+    }
     console.log("Scheduled continuation maintenance completed", {
       indexer,
       emailPrune,
       archiveMediaMirror,
       mintRelayRecovery,
+      gasMonitor,
+      holdingsArtwork,
+      liveArtwork,
     });
   },
 };

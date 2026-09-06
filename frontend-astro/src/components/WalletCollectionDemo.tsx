@@ -350,7 +350,7 @@ export default function WalletCollectionDemo({
                         aria-label={`查看 ${item.title} 的收藏詳情`}
                         onClick={() => setSelected(item)}
                       >
-                        <img
+                        <ArtworkImage
                           className="h-full w-full rounded-full object-cover"
                           src={item.imageUrl}
                           alt={`${item.title}，${item.fullDate}`}
@@ -461,7 +461,7 @@ export default function WalletCollectionDemo({
 interface GalleryItem {
   key: string;
   title: string;
-  imageUrl: string;
+  imageUrl: string | null;
   date: Date;
   fullDate: string;
   source: "archive" | "legacy" | "live";
@@ -488,6 +488,49 @@ interface MonthGroup {
   key: string;
   label: string;
   items: GalleryItem[];
+}
+
+const ARTWORK_FALLBACK = "/brand/vector/titsia-brand-logo.svg";
+
+function ArtworkImage({
+  src,
+  className,
+  alt,
+  loading = "lazy",
+}: {
+  src: string | null;
+  className: string;
+  alt: string;
+  loading?: "eager" | "lazy";
+}) {
+  const artworkUrl = safeArtworkUrl(src);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => setFailed(false), [artworkUrl]);
+
+  return (
+    <img
+      className={className}
+      src={!failed && artworkUrl ? artworkUrl : ARTWORK_FALLBACK}
+      alt={alt}
+      loading={loading}
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function safeArtworkUrl(value: string | null): string | null {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  if (candidate.startsWith("/") && !candidate.startsWith("//")) return candidate;
+  try {
+    const url = new URL(candidate);
+    if (url.username || url.password) return null;
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function groupCollectionByMonth(
@@ -600,7 +643,7 @@ function groupCollectionByMonth(
 
 function toGalleryItem(
   key: string,
-  item: { title: string; imageUrl: string; startsAt: string },
+  item: { title: string; imageUrl: string | null; startsAt: string },
   metadata: Omit<GalleryItem, "key" | "title" | "imageUrl" | "date" | "fullDate">,
 ): GalleryItem {
   const date = new Date(item.startsAt);
@@ -713,10 +756,11 @@ function CollectionDetail({
             <div className="absolute -left-12 top-12 h-28 w-28 rounded-full bg-[#ffc6d7]/65" />
             <div className="absolute -right-14 bottom-6 h-36 w-36 rounded-full bg-[#ccecc0]/70" />
             <div className="relative mx-auto aspect-square w-[min(72vw,22rem)] rounded-full border-[4px] border-[#a89cff] bg-white p-2 shadow-[0_12px_0_rgba(193,186,255,.55)]">
-              <img
+              <ArtworkImage
                 className="h-full w-full rounded-full object-cover"
                 src={item.imageUrl}
                 alt={item.title}
+                loading="eager"
               />
             </div>
           </section>

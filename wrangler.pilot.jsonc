@@ -1,0 +1,147 @@
+{
+  "name": "association-poap-pilot",
+  "account_id": "1847680308a50bee067822bdf66cb4d2",
+  "compatibility_date": "2026-03-10",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "routes": [],
+  "triggers": {
+    "crons": ["* * * * *"],
+  },
+  "migrations": [
+    {
+      "tag": "mint-relay-coordinator-v1",
+      "new_sqlite_classes": ["MintRelayCoordinator"],
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MINT_RELAY_COORDINATOR",
+        "class_name": "MintRelayCoordinator",
+      },
+    ],
+  },
+  "secrets": {
+    "required": [
+      "BASE_MAINNET_ALCHEMY_RPC_URL",
+      "MAGIC_SECRET_KEY",
+      "ISSUER_ADMIN_EMAILS",
+      "ACCESS_TEAM_DOMAIN",
+      "ACCESS_POLICY_AUD",
+      "ACCESS_ADMIN_EMAILS",
+      "MINT_SIGNER_PRIVATE_KEY",
+      "MINT_RELAYER_PRIVATE_KEY",
+      "EMAIL_LOOKUP_SECRET",
+      "EMAIL_DATA_KEY",
+      "RESEND_API_KEY",
+    ],
+  },
+  "d1_databases": [
+    {
+      "binding": "CATALOG_DB",
+      "database_id": "e75c1d40-b078-408d-8026-eb9d1f363469",
+    },
+    {
+      "binding": "HOLDINGS_DB",
+      "database_id": "efa33911-cc4b-4443-a963-e9fa96e80981",
+    },
+    {
+      "binding": "LIVE_DB",
+      "database_id": "95b93ad1-e024-46fe-8899-6d244e7ad19a",
+      "database_name": "association-poap-live-pilot",
+      "migrations_dir": "migrations/live",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARCHIVE_BUCKET",
+      "bucket_name": "association-poap-live-media-pilot",
+    },
+    {
+      "binding": "ARCHIVE_MEDIA_BUCKET",
+      "bucket_name": "association-poap-archive-media",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "BROWSE_RATE_LIMITER",
+      "namespace_id": "72022001",
+      "simple": {
+        "limit": 120,
+        "period": 60,
+      },
+    },
+    {
+      "name": "OWNER_RATE_LIMITER",
+      "namespace_id": "72022002",
+      "simple": {
+        "limit": 60,
+        "period": 60,
+      },
+    },
+    {
+      "name": "EXPORT_RATE_LIMITER",
+      "namespace_id": "72022003",
+      "simple": {
+        "limit": 3,
+        "period": 60,
+      },
+    },
+  ],
+  "vars": {
+    "GAS_MONITOR_ENABLED": "true",
+    "BASE_MAINNET_INDEXER_RPC_URL": "https://base.gateway.tenderly.co",
+    "GAS_MONITOR_LOW_ETH": "0.0002",
+    "GAS_MONITOR_CRITICAL_ETH": "0.00002",
+    "APP_MODE": "live-only",
+    "SNAPSHOT_ID": "2026-07-02-v1",
+    "HOLDINGS_SNAPSHOT_ID": "compass-holdings-2026-07-28-v1",
+    "COLLECTIONS_SNAPSHOT_ID": "pilot-no-archive",
+    "COLLECTIONS_RELEASE_ID": "pilot-no-archive",
+    "MOMENTS_SNAPSHOT_ID": "pilot-no-archive",
+    "MOMENTS_RELEASE_ID": "pilot-no-archive",
+    "MOMENTS_SOURCE_DATABASE_SHA256": "pilot-no-archive",
+    "MOMENTS_BUILD_MANIFEST_SHA256": "pilot-no-archive",
+    "API_CACHE_VERSION": "pilot-v4-holdings-media-release",
+    "MEDIA_BASE_URL": "https://association-poap-pilot.mingnhsu.workers.dev/media/archive",
+    "ETHEREUM_RPC_URL": "https://ethereum-rpc.publicnode.com",
+    "BASE_RPC_URL": "https://sepolia.base.org",
+    "BASE_MAINNET_RPC_URL": "https://base-rpc.publicnode.com",
+    "ARBITRUM_MAINNET_RPC_URL": "https://arb1.arbitrum.io/rpc",
+    "GNOSIS_MAINNET_RPC_URL": "https://gnosis-rpc.publicnode.com",
+    "PUBLIC_APP_URL": "https://poap.blocktrend.today",
+    "EMAIL_PROVIDER": "resend",
+    "EMAIL_FROM": "\u5146\u91cf\u5bcc\u8db3\u6559\u80b2\u5354\u6703 <poap@stevechoice.org>",
+    "WALLET_PROVISIONING_MODE": "disabled",
+    "MAGIC_PUBLISHABLE_API_KEY": "pk_live_0A6AD86500ED1660",
+    "HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID": "collections-2026-07-22-v1",
+    "HOLDINGS_MEDIA_RELEASE_ID": "compass-holdings-2026-07-28-v1-artwork-full",
+    "ISSUER_ADMIN_AUDIT_ADDRESS": "0x336a3fb6ac5e50096644589254cd6c6f96aec97a",
+    "ISSUER_ADMIN_ORIGIN": "https://admin.poap.blocktrend.today",
+    "ISSUER_ADMIN_RP_ID": "admin.poap.blocktrend.today",
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true,
+    },
+    "traces": {
+      "enabled": false,
+    },
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA",
+  },
+  "main": "src/worker/index.ts",
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/media/*"],
+  },
+}
