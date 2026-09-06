@@ -90,7 +90,9 @@ async function proxyFrontend(
   // for the public collection site. Keep the clean root URL while rendering
   // the private issuer manager after Cloudflare Access has authorized it.
   const frontendPath = incoming.pathname === "/" ? "/issuer/manage" : incoming.pathname;
-  const target = new URL(`${frontendPath}${incoming.search}`, frontend);
+  const target = new URL(frontend);
+  target.pathname = frontendPath;
+  target.search = incoming.search;
   const headers = new Headers(request.headers);
   for (const name of [
     "cf-connecting-ip",

@@ -111,4 +111,22 @@ describe("issuer admin gateway", () => {
     );
     expect(response.status).toBe(404);
   });
+  it("keeps network-path requests on the trusted frontend origin", async () => {
+    const mockedFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok"));
+    try {
+      await gateway.fetch(
+        new Request("https://admin.example.test//untrusted.example/path", {
+          headers: {
+            "cf-access-jwt-assertion": `${"a".repeat(32)}.${"b".repeat(32)}.${"c".repeat(32)}`,
+          },
+        }),
+        env(),
+      );
+      const target = new URL(String(mockedFetch.mock.calls[0][0]));
+      expect(target.origin).toBe("https://frontend.example.test");
+      expect(target.pathname).toBe("//untrusted.example/path");
+    } finally {
+      mockedFetch.mockRestore();
+    }
+  });
 });
