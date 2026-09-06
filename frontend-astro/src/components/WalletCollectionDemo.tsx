@@ -4,6 +4,7 @@ import {
   getArchiveDrop,
   getArchiveHoldings,
   getAppConfig,
+  getLegacyPoapHoldings,
   getLiveCollectors,
   getLiveHoldings,
   readableError,
@@ -11,6 +12,7 @@ import {
   type ArchiveCollector,
   type ArchiveDropDetail,
   type ArchiveHolding,
+  type LegacyPoapHolding,
   type LiveCollector,
   type LiveHolding,
 } from "../lib/live-api";
@@ -32,12 +34,15 @@ export default function WalletCollectionDemo({
 }) {
   const [items, setItems] = useState<LiveHolding[] | null>(null);
   const [archiveItems, setArchiveItems] = useState<ArchiveHolding[] | null>(null);
+  const [legacyItems, setLegacyItems] = useState<LegacyPoapHolding[] | null>(null);
+  const [legacyComplete, setLegacyComplete] = useState(false);
   const [archiveTotal, setArchiveTotal] = useState(0);
   const [archiveCursor, setArchiveCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [resolvedAddress, setResolvedAddress] = useState(address);
   const [error, setError] = useState("");
   const [archiveError, setArchiveError] = useState("");
+  const [legacyError, setLegacyError] = useState("");
   const [selected, setSelected] = useState<GalleryItem | null>(null);
   const [archiveDetail, setArchiveDetail] = useState<ArchiveDropDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -51,31 +56,45 @@ export default function WalletCollectionDemo({
     let active = true;
     setItems(null);
     setArchiveItems(null);
+    setLegacyItems(null);
     setError("");
     setArchiveError("");
-    Promise.allSettled([getLiveHoldings(address), getArchiveHoldings(address)]).then(
-      ([liveResult, archiveResult]) => {
-        if (!active) return;
-        if (liveResult.status === "fulfilled") {
-          setResolvedAddress(liveResult.value.address);
-          setItems(liveResult.value.items);
-        } else {
-          setError(readableError(liveResult.reason));
-          setItems([]);
-        }
-        if (archiveResult.status === "fulfilled") {
-          setResolvedAddress(archiveResult.value.address);
-          setArchiveItems(archiveResult.value.items);
-          setArchiveTotal(archiveResult.value.total);
-          setArchiveCursor(archiveResult.value.nextCursor);
-        } else {
-          setArchiveError(readableError(archiveResult.reason));
-          setArchiveItems([]);
-          setArchiveTotal(0);
-          setArchiveCursor(null);
-        }
-      },
-    );
+    setLegacyError("");
+    setLegacyComplete(false);
+    Promise.allSettled([
+      getLiveHoldings(address),
+      getArchiveHoldings(address),
+      getLegacyPoapHoldings(address),
+    ]).then(([liveResult, archiveResult, legacyResult]) => {
+      if (!active) return;
+      if (liveResult.status === "fulfilled") {
+        setResolvedAddress(liveResult.value.address);
+        setItems(liveResult.value.items);
+      } else {
+        setError(readableError(liveResult.reason));
+        setItems([]);
+      }
+      if (archiveResult.status === "fulfilled") {
+        setResolvedAddress(archiveResult.value.address);
+        setArchiveItems(archiveResult.value.items);
+        setArchiveTotal(archiveResult.value.total);
+        setArchiveCursor(archiveResult.value.nextCursor);
+      } else {
+        setArchiveError(readableError(archiveResult.reason));
+        setArchiveItems([]);
+        setArchiveTotal(0);
+        setArchiveCursor(null);
+      }
+      if (legacyResult.status === "fulfilled") {
+        setResolvedAddress(legacyResult.value.address);
+        setLegacyItems(legacyResult.value.items);
+        setLegacyComplete(legacyResult.value.complete);
+      } else {
+        setLegacyError(readableError(legacyResult.reason));
+        setLegacyItems([]);
+        setLegacyComplete(false);
+      }
+    });
     return () => {
       active = false;
     };
@@ -188,10 +207,13 @@ export default function WalletCollectionDemo({
     }
   };
 
-  const loading = items === null || archiveItems === null;
-  const total = (items?.length ?? 0) + archiveTotal;
-  const hasAny = (items?.length ?? 0) > 0 || (archiveItems?.length ?? 0) > 0;
-  const unavailable = Boolean(error && archiveError);
+  const loading = items === null || archiveItems === null || legacyItems === null;
+  const legacyDisplayCount = legacyComplete ? (legacyItems?.length ?? 0) : archiveTotal;
+  const total = (items?.length ?? 0) + legacyDisplayCount;
+  const hasAny =
+    (items?.length ?? 0) > 0 ||
+    (legacyComplete ? (legacyItems?.length ?? 0) > 0 : (archiveItems?.length ?? 0) > 0);
+  const unavailable = Boolean(error && archiveError && legacyError);
   const collectionName = looksLikeEnsName(displayName) ? displayName.trim() : "";
   const identityName = magicOwner?.email || collectionName;
   const identityTitleSize = magicOwner?.email
@@ -202,8 +224,15 @@ export default function WalletCollectionDemo({
         : "text-[2.2rem]"
     : "text-5xl";
   const monthGroups = useMemo(
-    () => groupCollectionByMonth(items ?? [], archiveItems ?? [], resolvedAddress),
-    [items, archiveItems, resolvedAddress],
+    () =>
+      groupCollectionByMonth(
+        items ?? [],
+        archiveItems ?? [],
+        legacyItems ?? [],
+        legacyComplete,
+        resolvedAddress,
+      ),
+    [items, archiveItems, legacyItems, legacyComplete, resolvedAddress],
   );
 
   const exportPrivateKey = async () => {
@@ -335,7 +364,7 @@ export default function WalletCollectionDemo({
               </section>
             ))}
           </div>
-          {archiveCursor && (
+          {!legacyComplete && archiveCursor && (
             <div className="mt-9 text-center">
               <button
                 className="btn-secondary"
@@ -435,7 +464,7 @@ interface GalleryItem {
   imageUrl: string | null;
   date: Date;
   fullDate: string;
-  source: "archive" | "live";
+  source: "archive" | "legacy" | "live";
   dropId: number | null;
   eventSlug: string | null;
   tokenLabel: string;
@@ -507,33 +536,68 @@ function safeArtworkUrl(value: string | null): string | null {
 function groupCollectionByMonth(
   liveItems: LiveHolding[],
   archiveItems: ArchiveHolding[],
+  legacyItems: LegacyPoapHolding[],
+  legacyComplete: boolean,
   ownerAddress: string,
 ): MonthGroup[] {
-  const historicalItems: GalleryItem[] = archiveItems.map((item) =>
-    toGalleryItem(
-      `archive-${item.sourceUid}`,
-      {
-        title: item.title,
-        imageUrl: item.imageUrl,
-        startsAt: item.startDate,
-      },
-      {
-        source: "archive",
-        dropId: item.dropId,
-        eventSlug: null,
-        tokenLabel: `Token #${item.poapId}`,
-        ownerAddress: item.ownerAddress,
-        network: archiveNetworkName(item.network),
-        mintedDate: item.mintedOn ? formatTimestamp(item.mintedOn * 1000) : "未保存",
-        collectorCount: item.tokenCount,
-        location: [item.city, item.country].filter(Boolean).join(" · ") || "未提供",
-        description: null,
-        eventUrl: null,
-        technicalUrl: null,
-        ownerExplorerUrl: addressExplorerUrl(item.network, item.ownerAddress),
-      },
-    ),
+  const archiveByToken = new Map(
+    archiveItems.map((item) => [`${normalizeArchiveNetwork(item.network)}:${item.poapId}`, item]),
   );
+  const historicalItems: GalleryItem[] = legacyComplete
+    ? legacyItems.map((item) => {
+        const archive = archiveByToken.get(`${item.network}:${item.poapId}`);
+        return toGalleryItem(
+          `legacy-${item.chainId}-${item.poapId}`,
+          {
+            title: archive?.title ?? item.title,
+            imageUrl: archive?.imageUrl || item.imageUrl,
+            startsAt: archive?.startDate ?? item.startDate,
+          },
+          {
+            source: archive ? "archive" : "legacy",
+            dropId: archive?.dropId ?? item.dropId,
+            eventSlug: null,
+            tokenLabel: `Token #${item.poapId}`,
+            ownerAddress,
+            network: legacyNetworkName(item.network),
+            mintedDate: item.mintedAt ? formatTimestamp(item.mintedAt) : "未保存",
+            collectorCount: archive?.tokenCount ?? 0,
+            location:
+              [archive?.city ?? item.city, archive?.country ?? item.country]
+                .filter(Boolean)
+                .join(" · ") || "未提供",
+            description: item.description,
+            eventUrl: item.eventUrl,
+            technicalUrl: item.explorerUrl,
+            ownerExplorerUrl: addressExplorerUrl(item.chainId, ownerAddress),
+          },
+        );
+      })
+    : archiveItems.map((item) =>
+        toGalleryItem(
+          `archive-${item.sourceUid}`,
+          {
+            title: item.title,
+            imageUrl: item.imageUrl,
+            startsAt: item.startDate,
+          },
+          {
+            source: "archive",
+            dropId: item.dropId,
+            eventSlug: null,
+            tokenLabel: `Token #${item.poapId}`,
+            ownerAddress: item.ownerAddress,
+            network: archiveNetworkName(item.network),
+            mintedDate: item.mintedOn ? formatTimestamp(item.mintedOn * 1000) : "未保存",
+            collectorCount: item.tokenCount,
+            location: [item.city, item.country].filter(Boolean).join(" · ") || "未提供",
+            description: null,
+            eventUrl: null,
+            technicalUrl: null,
+            ownerExplorerUrl: addressExplorerUrl(item.network, item.ownerAddress),
+          },
+        ),
+      );
   const galleryItems: GalleryItem[] = [
     ...liveItems.map((item) =>
       toGalleryItem(`live-${item.eventId}-${item.tokenId}`, item, {
@@ -922,6 +986,22 @@ function mergeCollectors(items: CollectorListItem[]) {
   const unique = new Map<string, CollectorListItem>();
   for (const item of items) unique.set(item.ownerAddress.toLowerCase(), item);
   return [...unique.values()];
+}
+
+function normalizeArchiveNetwork(value: string) {
+  const network = value.toLowerCase();
+  if (network === "arbitrum" || network === "arbitrum-one") return "arbitrum-one";
+  if (network === "xdai" || network === "gnosis") return "gnosis";
+  if (network === "eth" || network === "ethereum") return "ethereum";
+  if (network === "base") return "base";
+  return network;
+}
+
+function legacyNetworkName(value: LegacyPoapHolding["network"]) {
+  if (value === "arbitrum-one") return "Arbitrum";
+  if (value === "gnosis") return "Gnosis";
+  if (value === "ethereum") return "Ethereum";
+  return "Base";
 }
 
 function chainName(chainId: number) {

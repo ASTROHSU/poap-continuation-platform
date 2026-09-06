@@ -101,6 +101,39 @@ export interface ArchiveDropDetail {
   tokenCount: number;
 }
 
+export interface LegacyPoapHolding {
+  chainId: 1 | 100 | 8453 | 42161;
+  network: "ethereum" | "gnosis" | "base" | "arbitrum-one";
+  contractAddress: `0x${string}`;
+  poapId: number;
+  dropId: number | null;
+  title: string;
+  description: string | null;
+  imageUrl: string;
+  startDate: string;
+  city: string | null;
+  country: string | null;
+  eventUrl: string | null;
+  year: number | null;
+  mintedAt: string | null;
+  transactionHash: string | null;
+  explorerUrl: string;
+}
+
+export interface LegacyPoapHoldingsResponse {
+  address: `0x${string}`;
+  total: number;
+  complete: boolean;
+  items: LegacyPoapHolding[];
+  networks: Array<{
+    chainId: 1 | 100 | 8453 | 42161;
+    network: "ethereum" | "gnosis" | "base" | "arbitrum-one";
+    expectedBalance: number;
+    discoveredCount: number;
+    complete: boolean;
+  }>;
+}
+
 export interface LiveClaimResponse {
   eventId: string;
   slug: string;
@@ -204,6 +237,7 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers,
+    cache: "no-store",
     credentials: "same-origin",
   });
 
@@ -375,6 +409,12 @@ export function getArchiveHoldings(address: string, cursor: string | null = null
   if (cursor) query.set("cursor", cursor);
   return apiRequest<ArchiveHoldingsResponse>(
     `/api/archive/owners/${encodeURIComponent(address)}?${query}`,
+  );
+}
+
+export function getLegacyPoapHoldings(address: string) {
+  return apiRequest<LegacyPoapHoldingsResponse>(
+    `/api/legacy/owners/${encodeURIComponent(address)}`,
   );
 }
 

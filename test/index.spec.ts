@@ -605,12 +605,12 @@ describe("archive API", () => {
     expect(nextPage.nextCursor).toBeNull();
   });
 
-  it("serves archive holdings and presentation metadata from Compass only", async () => {
+  it("serves archive ownership from Holdings with presentation from the catalog", async () => {
     const response = await SELF.fetch(`https://poap.in/api/archive/owners/${ADDRESS}?limit=1`);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("public, max-age=300, s-maxage=86400");
     expect(response.headers.get("x-archive-api-version")).toBe(
-      `v1.compass-archive.owner-v7.v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}`,
+      `v1.archive-core.owner-v7.v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}`,
     );
     await expect(response.json()).resolves.toMatchObject({
       address: ADDRESS,
@@ -620,7 +620,8 @@ describe("archive API", () => {
         expect.objectContaining({
           poapId: 2,
           dropId: 2,
-          title: "Updated Drop Two",
+          title: "#DeFi Summit",
+          imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/artwork/2.webp`,
         }),
       ],
     });
@@ -662,17 +663,16 @@ describe("archive API", () => {
     }
   });
 
-  it("serves Compass Drop metadata for the collection detail view", async () => {
+  it("serves catalog Drop metadata for the collection detail view", async () => {
     const response = await SELF.fetch("https://poap.in/api/archive/drops/2");
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-archive-api-version")).toBe(
-      `v1.compass-archive.drop-detail-v1.v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}`,
-    );
+    expect(response.headers.get("x-archive-api-version")).toBe("v1.archive-core.drop-detail-v1");
     await expect(response.json()).resolves.toMatchObject({
       dropId: 2,
-      title: "Updated Drop Two",
-      description: "Newer Graph metadata",
-      tokenCount: 3,
+      title: "#DeFi Summit",
+      description: expect.any(String),
+      tokenCount: 1,
+      imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/artwork/2.webp`,
     });
   });
 

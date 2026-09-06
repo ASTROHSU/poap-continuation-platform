@@ -2509,9 +2509,9 @@ app.get("/api/owners/:address", async (context) => {
 });
 
 /**
- * Public Archive view used by the continuation frontend. Compass Holdings is
- * the sole historical source here: do not fall back to the smaller official
- * ZIP catalog, association subsets, Collections, or Moments.
+ * Core ZIP archive view used by the continuation frontend. Holdings provides
+ * ownership while the official catalog restores presentation metadata. The
+ * separate Collections and Moments releases are intentionally not required.
  */
 app.get("/api/archive/owners/:address", async (context) => {
   const limited = await enforceRateLimit(context.env.OWNER_RATE_LIMITER, context.req.raw);
@@ -2526,18 +2526,19 @@ app.get("/api/archive/owners/:address", async (context) => {
       requestUrl: context.req.url,
       canonicalPath: `/api/archive/owners/${query.address}`,
       canonicalSearch: query.canonicalSearch,
-      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}`,
-      apiVersion: `${context.env.API_CACHE_VERSION}.compass-archive.${OWNER_CACHE_SCHEMA}.${holdingsMediaApiVersion(context.env)}`,
+      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}.${context.env.SNAPSHOT_ID}`,
+      apiVersion: `${context.env.API_CACHE_VERSION}.archive-core.${OWNER_CACHE_SCHEMA}.${holdingsMediaApiVersion(context.env)}`,
       edgeTtlSeconds: 86_400,
       browserTtlSeconds: 300,
       executionCtx: context.executionCtx,
     },
     async () => {
       const holdingsDb = context.env.HOLDINGS_DB.withSession("first-primary");
+      const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
       return context.json(
         await fetchOwner(
           holdingsDb,
-          null,
+          catalogDb,
           null,
           query,
           context.env.HOLDINGS_SNAPSHOT_ID,
@@ -2561,27 +2562,24 @@ app.get("/api/archive/drops/:id", async (context) => {
     {
       requestUrl: context.req.url,
       canonicalPath: `/api/archive/drops/${dropId}`,
-      snapshotId: `${context.env.HOLDINGS_SNAPSHOT_ID}.${context.env.HOLDINGS_MEDIA_RELEASE_ID}`,
-      apiVersion: `${context.env.API_CACHE_VERSION}.compass-archive.drop-detail-v1.${holdingsMediaApiVersion(context.env)}`,
+      snapshotId: context.env.SNAPSHOT_ID,
+      apiVersion: `${context.env.API_CACHE_VERSION}.archive-core.drop-detail-v1`,
       edgeTtlSeconds: 2_592_000,
       browserTtlSeconds: 300,
       executionCtx: context.executionCtx,
     },
     async () => {
-      const holdingsDb = context.env.HOLDINGS_DB.withSession("first-primary");
-      const result = await fetchExactHoldingDropDetail(
-        holdingsDb,
+      const catalogDb = context.env.CATALOG_DB.withSession("first-primary");
+      const drop = await fetchDrop(
+        catalogDb,
         dropId,
-        context.env.HOLDINGS_SNAPSHOT_ID,
-        context.env.HOLDINGS_MEDIA_RELEASE_ID,
         context.env.MEDIA_BASE_URL,
         context.env.SNAPSHOT_ID,
-        context.env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
       );
-      if (result.state === "missing") {
+      if (!drop) {
         throw new ApiError(404, "Archive Drop not found.", "drop_not_found");
       }
-      return context.json(result.drop);
+      return context.json(drop);
     },
   );
 });
