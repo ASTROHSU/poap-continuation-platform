@@ -47,7 +47,7 @@ describe("personal export manifest", () => {
       address: ADDRESS,
       snapshots: {
         catalog: "2026-07-02-v1",
-        holdings: "2026-07-02-v1",
+        holdings: "compass-holdings-2026-07-28-v1",
         collections: "collections-2026-07-22-v1",
         moments: "moments-2026-07-23-v1",
       },
@@ -56,7 +56,8 @@ describe("personal export manifest", () => {
           snapshotId: "2026-07-02-v1",
         },
         holdings: {
-          snapshotId: "2026-07-02-v1",
+          snapshotId: "compass-holdings-2026-07-28-v1",
+          releaseId: bindings.HOLDINGS_MEDIA_RELEASE_ID,
         },
         collections: {
           snapshotId: "collections-2026-07-22-v1",
@@ -127,7 +128,7 @@ describe("paginated personal holdings", () => {
     const firstPage = await first.json<PersonalHoldingsPage>();
     expect(firstPage).toMatchObject({
       schemaVersion: "poapin-personal-holdings-page-v2",
-      snapshotId: "2026-07-02-v1",
+      snapshotId: "compass-holdings-2026-07-28-v1",
       collectionsSnapshotId: "collections-2026-07-22-v1",
       collectionsReleaseId: bindings.COLLECTIONS_RELEASE_ID,
       address: ADDRESS,
@@ -203,7 +204,7 @@ describe("paginated personal holdings", () => {
         title: "Private address-bound fixture",
         description: "Private metadata preserved in the Collections snapshot.",
         eventUrl: "https://private-holder.example.invalid/event",
-        imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+        imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
         hasArtwork: true,
         isPrivate: true,
         isHidden: true,
@@ -259,7 +260,7 @@ describe("paginated personal holdings", () => {
       title: "Private address-bound fixture",
       description: "Private metadata preserved in the Collections snapshot.",
       eventUrl: "https://private-holder.example.invalid/event",
-      imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+      imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
       hasArtwork: true,
       isPrivate: true,
       isHidden: true,
@@ -302,7 +303,7 @@ describe("paginated personal holdings", () => {
       expect.objectContaining({
         drop_id: 99,
         title: "Private address-bound fixture",
-        artwork_url: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
+        artwork_url: `${APP_MEDIA_BASE_URL}/snapshots/compass-holdings-2026-07-28-v1/holdings/drop-artwork/sha256/cd/${PRIVATE_ARTWORK_SHA}.png`,
         is_private: true,
         is_hidden: true,
       }),

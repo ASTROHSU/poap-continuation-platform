@@ -11,6 +11,7 @@ import {
   markMintJobSubmitting,
   mintJobPublicStatus,
   mintRelayShardKey,
+  renewExpiredMintJobAuthorization,
 } from "../src/worker/mint-jobs";
 import type { MintAuthorization } from "../src/worker/minting";
 import type { Bindings } from "../src/worker/types";
@@ -142,6 +143,44 @@ describe("durable sponsored mint jobs", () => {
       .first<{ minted_tx_hash: string; minted_at: string }>();
     expect(claim?.minted_tx_hash).toBe(transactionHash);
     expect(claim?.minted_at).toBeTruthy();
+  });
+
+  it("renews an expired authorization and makes the persisted job immediately retryable", async () => {
+    const event = await fetchLiveEvent(bindings.LIVE_DB.withSession("first-primary"), "mint-demo");
+    if (!event) throw new Error("mint fixture missing");
+    const codeHash = "1851cac87456be2727a62c017e4ae0d7ea21ee05e6a1b26a9d40db3084f9e2ad";
+    const nonce = `0x${"99".repeat(32)}` as const;
+    await bindings.LIVE_DB.prepare(
+      `UPDATE live_claim_codes
+       SET claimed_by = ?, claimed_at = ?, mint_nonce = ?, mint_authorization_deadline = ?
+       WHERE code_hash = ?`,
+    )
+      .bind(recipient, new Date().toISOString(), nonce, 1, codeHash)
+      .run();
+    const created = await createOrReuseMintJob(bindings.LIVE_DB, {
+      event,
+      claimCodeHash: codeHash,
+      recipient,
+      relayerAddress: relayer,
+      authorization: { ...authorization(event, recipient, nonce), deadline: 1 },
+    });
+    expect(await markMintJobSubmitting(bindings.LIVE_DB, created, 72)).toBe(true);
+    const renewed = { ...authorization(event, recipient, nonce), deadline: 4_102_444_900 };
+    await renewExpiredMintJobAuthorization(bindings.LIVE_DB, created, renewed);
+
+    const job = await fetchMintJob(bindings.LIVE_DB.withSession("first-primary"), created.jobId);
+    expect(job).toMatchObject({
+      status: "retry",
+      authorizationDeadline: 4_102_444_900,
+      attemptCount: 1,
+      lastError: null,
+    });
+    const claim = await bindings.LIVE_DB.prepare(
+      "SELECT mint_authorization_deadline FROM live_claim_codes WHERE code_hash = ?",
+    )
+      .bind(codeHash)
+      .first<{ mint_authorization_deadline: number }>();
+    expect(claim?.mint_authorization_deadline).toBe(4_102_444_900);
   });
 });
 

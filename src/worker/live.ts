@@ -5,6 +5,7 @@ export interface LiveEventRecord {
   eventId: string;
   slug: string;
   title: string;
+  issuer: string;
   description: string;
   imageUrl: string;
   eventUrl: string | null;
@@ -25,6 +26,7 @@ interface LiveEventRow {
   event_id: string;
   slug: string;
   title: string;
+  issuer: string;
   description: string;
   image_url: string;
   event_url: string | null;
@@ -102,6 +104,7 @@ const EVENT_SELECT = `
     live_events.event_id,
     live_events.slug,
     live_events.title,
+    live_events.issuer,
     live_events.description,
     live_events.image_url,
     live_events.event_url,
@@ -531,6 +534,7 @@ function mapEvent(row: LiveEventRow): LiveEventRecord {
     eventId: row.event_id,
     slug: row.slug,
     title: row.title,
+    issuer: row.issuer,
     description: row.description,
     imageUrl: row.image_url,
     eventUrl: row.event_url,

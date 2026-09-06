@@ -33,6 +33,8 @@ interface TestBindings extends Bindings {
   TEST_HOLDINGS_MIGRATIONS: D1Migration[];
   TEST_COLLECTIONS_FIXTURE: string;
   TEST_COLLECTIONS_MIGRATIONS: D1Migration[];
+  TEST_LIVE_FIXTURE: string;
+  TEST_LIVE_MIGRATIONS: D1Migration[];
 }
 const bindings = env as unknown as TestBindings;
 
@@ -40,9 +42,11 @@ beforeAll(async () => {
   await applyD1Migrations(bindings.CATALOG_DB, bindings.TEST_CATALOG_MIGRATIONS);
   await applyD1Migrations(bindings.HOLDINGS_DB, bindings.TEST_HOLDINGS_MIGRATIONS);
   await applyD1Migrations(bindings.COLLECTIONS_DB, bindings.TEST_COLLECTIONS_MIGRATIONS);
+  await applyD1Migrations(bindings.LIVE_DB, bindings.TEST_LIVE_MIGRATIONS);
   await executeSql(bindings.CATALOG_DB, bindings.TEST_CATALOG_FIXTURE);
   await executeSql(bindings.HOLDINGS_DB, bindings.TEST_HOLDINGS_FIXTURE);
   await executeSql(bindings.COLLECTIONS_DB, bindings.TEST_COLLECTIONS_FIXTURE);
+  await executeSql(bindings.LIVE_DB, bindings.TEST_LIVE_FIXTURE);
   await bindings.HOLDINGS_DB.prepare(
     `
       INSERT INTO tokens (
@@ -160,15 +164,120 @@ describe("archive API", () => {
   it("returns precomputed snapshot metadata", async () => {
     const response = await SELF.fetch("https://poap.in/api/meta");
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-archive-api-version")).toBe("v1");
+    expect(response.headers.get("x-archive-api-version")).toBe(
+      `v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}`,
+    );
     expect(await response.json()).toEqual({
       snapshotId: "2026-07-02-v1",
       snapshotAt: "2026-07-02T14:28:17.259Z",
-      holdingsSnapshotId: "2026-07-02-v1",
-      holdingsSnapshotAt: "2026-07-02T14:28:17.259Z",
+      holdingsSnapshotId: "compass-holdings-2026-07-28-v1",
+      holdingsSnapshotAt: "2026-07-28T05:04:31.465Z",
+      holdingsMediaReleaseId: bindings.HOLDINGS_MEDIA_RELEASE_ID,
       counts: { drops: 3, tokens: 3, owners: 2, artworks: 2 },
       years: [2018, 2015],
     });
+  });
+
+  it("exposes exact deployment and release identity without caching it", async () => {
+    const response = await SELF.fetch("https://poap.in/api/version");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    await expect(response.json()).resolves.toMatchObject({
+      schemaVersion: "poapin-deployment-identity-v1",
+      worker: {
+        id: expect.any(String),
+        tag: expect.any(String),
+        timestamp: expect.any(String),
+      },
+      releases: {
+        catalogSnapshotId: bindings.SNAPSHOT_ID,
+        holdingsSnapshotId: bindings.HOLDINGS_SNAPSHOT_ID,
+        holdingsMediaReleaseId: bindings.HOLDINGS_MEDIA_RELEASE_ID,
+        holdingsMediaCollectionsSnapshotId: bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
+        collectionsReleaseId: bindings.COLLECTIONS_RELEASE_ID,
+        momentsReleaseId: bindings.MOMENTS_RELEASE_ID,
+      },
+    });
+  });
+
+  it("fails readiness when the configured Holdings media release is not fully active", async () => {
+    const ready = await SELF.fetch("https://poap.in/api/ready");
+    expect(ready.status).toBe(200);
+    await expect(ready.json()).resolves.toMatchObject({
+      schemaVersion: "poapin-readiness-v1",
+      ready: true,
+      holdingsArtwork: {
+        configuredReleaseId: bindings.HOLDINGS_MEDIA_RELEASE_ID,
+        configuredCollectionsSnapshotId: bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
+        activeReleaseId: bindings.HOLDINGS_MEDIA_RELEASE_ID,
+        activeCollectionsSnapshotId: bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
+        activatedRows: 2,
+        storedRows: 2,
+      },
+      liveArtwork: {
+        ready: true,
+        publishedEvents: 4,
+        managedArtwork: 0,
+        unmanagedArtwork: 4,
+        unavailable: [],
+      },
+    });
+
+    await bindings.HOLDINGS_DB.prepare(
+      "UPDATE archive_meta SET value = '1' WHERE key = 'artwork_release_activated_rows'",
+    ).run();
+    try {
+      const unavailable = await SELF.fetch("https://poap.in/api/ready");
+      expect(unavailable.status).toBe(503);
+      expect(unavailable.headers.get("cache-control")).toBe("private, no-store");
+      await expect(unavailable.json()).resolves.toMatchObject({
+        ready: false,
+        holdingsArtwork: { activatedRows: 1, storedRows: 2 },
+      });
+    } finally {
+      await bindings.HOLDINGS_DB.prepare(
+        "UPDATE archive_meta SET value = '2' WHERE key = 'artwork_release_activated_rows'",
+      ).run();
+    }
+  });
+
+  it("fails readiness when a published live event references missing artwork", async () => {
+    const key = "live/events/mvp-demo/artwork-v3.png";
+    await bindings.LIVE_DB.prepare(
+      "UPDATE live_events SET image_url = '/media/live/events/mvp-demo/artwork-v3.png' WHERE slug = 'mvp-demo'",
+    ).run();
+    try {
+      const missing = await SELF.fetch("https://poap.in/api/ready");
+      expect(missing.status).toBe(503);
+      await expect(missing.json()).resolves.toMatchObject({
+        ready: false,
+        liveArtwork: {
+          ready: false,
+          managedArtwork: 1,
+          unavailable: [
+            {
+              slug: "mvp-demo",
+              reason: "missing_object",
+            },
+          ],
+        },
+      });
+
+      await bindings.ARCHIVE_BUCKET.put(key, "png", {
+        httpMetadata: { contentType: "image/png" },
+      });
+      const restored = await SELF.fetch("https://poap.in/api/ready");
+      expect(restored.status).toBe(200);
+      await expect(restored.json()).resolves.toMatchObject({
+        ready: true,
+        liveArtwork: { ready: true, managedArtwork: 1, unavailable: [] },
+      });
+    } finally {
+      await bindings.ARCHIVE_BUCKET.delete(key);
+      await bindings.LIVE_DB.prepare(
+        "UPDATE live_events SET image_url = '/brand/logo_poap.svg' WHERE slug = 'mvp-demo'",
+      ).run();
+    }
   });
 
   it("returns precomputed, release-bound Collections metadata", async () => {
@@ -236,7 +345,7 @@ describe("archive API", () => {
     const response = await SELF.fetch("https://poap.in/api/drops/2");
     expect(response.status).toBe(200);
     expect(response.headers.get("x-archive-api-version")).toBe(
-      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.drop-detail-v7`,
+      `v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}.v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}.drop-detail-v7`,
     );
     expect(await response.json()).toMatchObject({
       dropId: 2,
@@ -256,7 +365,7 @@ describe("archive API", () => {
       city: "Cannes",
       tokenCount: 1,
       isPrivate: true,
-      imageUrl: "",
+      imageUrl: null,
       hasArtwork: false,
     });
 
@@ -311,6 +420,33 @@ describe("archive API", () => {
     });
   });
 
+  it("never exposes supplemental artwork from an inactive Holdings media release", async () => {
+    await bindings.HOLDINGS_DB.prepare(
+      "UPDATE archive_meta SET value = 'partial-release' WHERE key = 'artwork_release_id'",
+    ).run();
+    try {
+      const response = await SELF.fetch(
+        "https://poap.in/api/archive/owners/0x3333333333333333333333333333333333333333?limit=48",
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        items: [
+          expect.objectContaining({
+            dropId: 3,
+            imageUrl: null,
+            hasArtwork: false,
+          }),
+        ],
+      });
+    } finally {
+      await bindings.HOLDINGS_DB.prepare(
+        "UPDATE archive_meta SET value = ?1 WHERE key = 'artwork_release_id'",
+      )
+        .bind(bindings.HOLDINGS_MEDIA_RELEASE_ID)
+        .run();
+    }
+  });
+
   it("returns private or hidden Drops only when an exact ID is requested", async () => {
     const response = await SELF.fetch("https://poap.in/api/drops/1002");
     expect(response.status).toBe(200);
@@ -328,7 +464,7 @@ describe("archive API", () => {
       dropTransferCount: 91,
       featuredOn: "2026-07-11T00:00:00.000Z",
       momentsUploaded: 7,
-      imageUrl: "",
+      imageUrl: null,
       hasArtwork: false,
       isPrivate: true,
     });
@@ -347,7 +483,7 @@ describe("archive API", () => {
     const first = await SELF.fetch("https://poap.in/api/drops/2/collectors?limit=1");
     expect(first.status).toBe(200);
     expect(first.headers.get("x-archive-api-version")).toBe(
-      `v1.drop-collectors-v2.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
+      `v1.drop-collectors-v2.v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
     );
     const firstPage = await first.json<{
       snapshotId: string;
@@ -362,7 +498,7 @@ describe("archive API", () => {
       nextCursor: string;
     }>();
     expect(firstPage).toMatchObject({
-      snapshotId: "2026-07-02-v1",
+      snapshotId: "compass-holdings-2026-07-28-v1",
       dropId: 2,
       items: [
         {
@@ -446,7 +582,7 @@ describe("archive API", () => {
     const first = await SELF.fetch(`https://poap.in/api/owners/${ADDRESS}?limit=1`);
     expect(first.status).toBe(200);
     expect(first.headers.get("x-archive-api-version")).toBe(
-      `v1.owner-v6.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
+      `v1.owner-v7.v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}.v1.collections-v3.${bindings.COLLECTIONS_RELEASE_ID}`,
     );
     const page = await first.json<{
       address: string;
@@ -469,10 +605,13 @@ describe("archive API", () => {
     expect(nextPage.nextCursor).toBeNull();
   });
 
-  it("serves core ZIP holdings without requiring Collections or Moments", async () => {
+  it("serves archive holdings and presentation metadata from Compass only", async () => {
     const response = await SELF.fetch(`https://poap.in/api/archive/owners/${ADDRESS}?limit=1`);
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-archive-api-version")).toBe("v1.archive-core.owner-v6");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=300, s-maxage=86400");
+    expect(response.headers.get("x-archive-api-version")).toBe(
+      `v1.compass-archive.owner-v7.v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}`,
+    );
     await expect(response.json()).resolves.toMatchObject({
       address: ADDRESS,
       total: 2,
@@ -481,7 +620,7 @@ describe("archive API", () => {
         expect.objectContaining({
           poapId: 2,
           dropId: 2,
-          imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/artwork/2.webp`,
+          title: "Updated Drop Two",
         }),
       ],
     });
@@ -523,16 +662,17 @@ describe("archive API", () => {
     }
   });
 
-  it("serves core ZIP Drop metadata for the collection detail view", async () => {
+  it("serves Compass Drop metadata for the collection detail view", async () => {
     const response = await SELF.fetch("https://poap.in/api/archive/drops/2");
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-archive-api-version")).toBe("v1.archive-core.drop-detail-v1");
+    expect(response.headers.get("x-archive-api-version")).toBe(
+      `v1.compass-archive.drop-detail-v1.v1.holdings-media-v1.${bindings.HOLDINGS_MEDIA_RELEASE_ID}.${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}`,
+    );
     await expect(response.json()).resolves.toMatchObject({
       dropId: 2,
-      title: "#DeFi Summit",
-      description: expect.any(String),
-      tokenCount: 1,
-      imageUrl: `${APP_MEDIA_BASE_URL}/snapshots/2026-07-02-v1/artwork/2.webp`,
+      title: "Updated Drop Two",
+      description: "Newer Graph metadata",
+      tokenCount: 3,
     });
   });
 
@@ -565,6 +705,20 @@ describe("archive API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(response.headers.get("cross-origin-resource-policy")).toBe("cross-origin");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
+  });
+
+  it("serves Collections artwork reused by the active Holdings media release", async () => {
+    const key = `snapshots/${bindings.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID}/collections/drop-artwork/sha256/ab/${HOLDING_ARTWORK_SHA}.png`;
+    const bytes = new Uint8Array([137, 80, 78, 71]);
+    await bindings.ARCHIVE_MEDIA_BUCKET.put(key, bytes, {
+      httpMetadata: { contentType: "image/png" },
+      customMetadata: { sha256: HOLDING_ARTWORK_SHA },
+    });
+
+    const response = await SELF.fetch(`https://poap.in/media/archive/${key}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
   });
 
@@ -655,7 +809,7 @@ describe("archive API", () => {
       snapshot_id: string;
       tokens: Array<{ artwork_url: string | null }>;
     }>();
-    expect(body.snapshot_id).toBe("2026-07-02-v1");
+    expect(body.snapshot_id).toBe("compass-holdings-2026-07-28-v1");
     expect(body.tokens[0]?.artwork_url).toBeNull();
   });
 });

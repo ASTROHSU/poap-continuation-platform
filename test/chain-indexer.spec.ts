@@ -216,6 +216,38 @@ describe("finalized Base chain indexer", () => {
     const invalid = await SELF.fetch("https://example.test/api/live/indexer/status?verbose=true");
     expect(invalid.status).toBe(400);
   });
+
+  it("honors provider-specific log range limits", async () => {
+    await bindings.LIVE_DB.prepare(
+      `UPDATE live_chain_cursors
+       SET next_block = 200
+       WHERE chain_id = 84532 AND contract_address = ?`,
+    )
+      .bind(contract.toLowerCase())
+      .run();
+    const [target] = await fetchChainIndexerTargets(bindings.LIVE_DB.withSession("first-primary"));
+    let requestedRange: { fromBlock: bigint; toBlock: bigint } | null = null;
+    const rpc: ChainIndexerRpc = {
+      maxBlockRange: 10n,
+      async getChainId() {
+        return 84532;
+      },
+      async getFinalizedBlockNumber() {
+        return 225n;
+      },
+      async getLogs({ fromBlock, toBlock }) {
+        requestedRange = { fromBlock, toBlock };
+        return [];
+      },
+    };
+
+    await expect(syncChainIndexerChunk(bindings.LIVE_DB, target, rpc)).resolves.toEqual({
+      nextBlock: 210n,
+      transfers: 0,
+      caughtUp: false,
+    });
+    expect(requestedRange).toEqual({ fromBlock: 200n, toBlock: 209n });
+  });
 });
 
 function fakeRpc(finalizedBlock: bigint, logs: RawChainLog[]): ChainIndexerRpc {

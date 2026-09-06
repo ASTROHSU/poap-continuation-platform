@@ -4,7 +4,6 @@ import {
   getArchiveDrop,
   getArchiveHoldings,
   getAppConfig,
-  getLegacyPoapHoldings,
   getLiveCollectors,
   getLiveHoldings,
   readableError,
@@ -12,7 +11,6 @@ import {
   type ArchiveCollector,
   type ArchiveDropDetail,
   type ArchiveHolding,
-  type LegacyPoapHolding,
   type LiveCollector,
   type LiveHolding,
 } from "../lib/live-api";
@@ -34,15 +32,12 @@ export default function WalletCollectionDemo({
 }) {
   const [items, setItems] = useState<LiveHolding[] | null>(null);
   const [archiveItems, setArchiveItems] = useState<ArchiveHolding[] | null>(null);
-  const [legacyItems, setLegacyItems] = useState<LegacyPoapHolding[] | null>(null);
-  const [legacyComplete, setLegacyComplete] = useState(false);
   const [archiveTotal, setArchiveTotal] = useState(0);
   const [archiveCursor, setArchiveCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [resolvedAddress, setResolvedAddress] = useState(address);
   const [error, setError] = useState("");
   const [archiveError, setArchiveError] = useState("");
-  const [legacyError, setLegacyError] = useState("");
   const [selected, setSelected] = useState<GalleryItem | null>(null);
   const [archiveDetail, setArchiveDetail] = useState<ArchiveDropDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -56,45 +51,31 @@ export default function WalletCollectionDemo({
     let active = true;
     setItems(null);
     setArchiveItems(null);
-    setLegacyItems(null);
     setError("");
     setArchiveError("");
-    setLegacyError("");
-    setLegacyComplete(false);
-    Promise.allSettled([
-      getLiveHoldings(address),
-      getArchiveHoldings(address),
-      getLegacyPoapHoldings(address),
-    ]).then(([liveResult, archiveResult, legacyResult]) => {
-      if (!active) return;
-      if (liveResult.status === "fulfilled") {
-        setResolvedAddress(liveResult.value.address);
-        setItems(liveResult.value.items);
-      } else {
-        setError(readableError(liveResult.reason));
-        setItems([]);
-      }
-      if (archiveResult.status === "fulfilled") {
-        setResolvedAddress(archiveResult.value.address);
-        setArchiveItems(archiveResult.value.items);
-        setArchiveTotal(archiveResult.value.total);
-        setArchiveCursor(archiveResult.value.nextCursor);
-      } else {
-        setArchiveError(readableError(archiveResult.reason));
-        setArchiveItems([]);
-        setArchiveTotal(0);
-        setArchiveCursor(null);
-      }
-      if (legacyResult.status === "fulfilled") {
-        setResolvedAddress(legacyResult.value.address);
-        setLegacyItems(legacyResult.value.items);
-        setLegacyComplete(legacyResult.value.complete);
-      } else {
-        setLegacyError(readableError(legacyResult.reason));
-        setLegacyItems([]);
-        setLegacyComplete(false);
-      }
-    });
+    Promise.allSettled([getLiveHoldings(address), getArchiveHoldings(address)]).then(
+      ([liveResult, archiveResult]) => {
+        if (!active) return;
+        if (liveResult.status === "fulfilled") {
+          setResolvedAddress(liveResult.value.address);
+          setItems(liveResult.value.items);
+        } else {
+          setError(readableError(liveResult.reason));
+          setItems([]);
+        }
+        if (archiveResult.status === "fulfilled") {
+          setResolvedAddress(archiveResult.value.address);
+          setArchiveItems(archiveResult.value.items);
+          setArchiveTotal(archiveResult.value.total);
+          setArchiveCursor(archiveResult.value.nextCursor);
+        } else {
+          setArchiveError(readableError(archiveResult.reason));
+          setArchiveItems([]);
+          setArchiveTotal(0);
+          setArchiveCursor(null);
+        }
+      },
+    );
     return () => {
       active = false;
     };
@@ -207,13 +188,10 @@ export default function WalletCollectionDemo({
     }
   };
 
-  const loading = items === null || archiveItems === null || legacyItems === null;
-  const legacyDisplayCount = legacyComplete ? (legacyItems?.length ?? 0) : archiveTotal;
-  const total = (items?.length ?? 0) + legacyDisplayCount;
-  const hasAny =
-    (items?.length ?? 0) > 0 ||
-    (legacyComplete ? (legacyItems?.length ?? 0) > 0 : (archiveItems?.length ?? 0) > 0);
-  const unavailable = Boolean(error && archiveError && legacyError);
+  const loading = items === null || archiveItems === null;
+  const total = (items?.length ?? 0) + archiveTotal;
+  const hasAny = (items?.length ?? 0) > 0 || (archiveItems?.length ?? 0) > 0;
+  const unavailable = Boolean(error && archiveError);
   const collectionName = looksLikeEnsName(displayName) ? displayName.trim() : "";
   const identityName = magicOwner?.email || collectionName;
   const identityTitleSize = magicOwner?.email
@@ -224,15 +202,8 @@ export default function WalletCollectionDemo({
         : "text-[2.2rem]"
     : "text-5xl";
   const monthGroups = useMemo(
-    () =>
-      groupCollectionByMonth(
-        items ?? [],
-        archiveItems ?? [],
-        legacyItems ?? [],
-        legacyComplete,
-        resolvedAddress,
-      ),
-    [items, archiveItems, legacyItems, legacyComplete, resolvedAddress],
+    () => groupCollectionByMonth(items ?? [], archiveItems ?? [], resolvedAddress),
+    [items, archiveItems, resolvedAddress],
   );
 
   const exportPrivateKey = async () => {
@@ -350,7 +321,7 @@ export default function WalletCollectionDemo({
                         aria-label={`查看 ${item.title} 的收藏詳情`}
                         onClick={() => setSelected(item)}
                       >
-                        <img
+                        <ArtworkImage
                           className="h-full w-full rounded-full object-cover"
                           src={item.imageUrl}
                           alt={`${item.title}，${item.fullDate}`}
@@ -364,7 +335,7 @@ export default function WalletCollectionDemo({
               </section>
             ))}
           </div>
-          {!legacyComplete && archiveCursor && (
+          {archiveCursor && (
             <div className="mt-9 text-center">
               <button
                 className="btn-secondary"
@@ -461,10 +432,10 @@ export default function WalletCollectionDemo({
 interface GalleryItem {
   key: string;
   title: string;
-  imageUrl: string;
+  imageUrl: string | null;
   date: Date;
   fullDate: string;
-  source: "archive" | "legacy" | "live";
+  source: "archive" | "live";
   dropId: number | null;
   eventSlug: string | null;
   tokenLabel: string;
@@ -490,71 +461,79 @@ interface MonthGroup {
   items: GalleryItem[];
 }
 
+const ARTWORK_FALLBACK = "/brand/vector/titsia-brand-logo.svg";
+
+function ArtworkImage({
+  src,
+  className,
+  alt,
+  loading = "lazy",
+}: {
+  src: string | null;
+  className: string;
+  alt: string;
+  loading?: "eager" | "lazy";
+}) {
+  const artworkUrl = safeArtworkUrl(src);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => setFailed(false), [artworkUrl]);
+
+  return (
+    <img
+      className={className}
+      src={!failed && artworkUrl ? artworkUrl : ARTWORK_FALLBACK}
+      alt={alt}
+      loading={loading}
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function safeArtworkUrl(value: string | null): string | null {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  if (candidate.startsWith("/") && !candidate.startsWith("//")) return candidate;
+  try {
+    const url = new URL(candidate);
+    if (url.username || url.password) return null;
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function groupCollectionByMonth(
   liveItems: LiveHolding[],
   archiveItems: ArchiveHolding[],
-  legacyItems: LegacyPoapHolding[],
-  legacyComplete: boolean,
   ownerAddress: string,
 ): MonthGroup[] {
-  const archiveByToken = new Map(
-    archiveItems.map((item) => [`${normalizeArchiveNetwork(item.network)}:${item.poapId}`, item]),
+  const historicalItems: GalleryItem[] = archiveItems.map((item) =>
+    toGalleryItem(
+      `archive-${item.sourceUid}`,
+      {
+        title: item.title,
+        imageUrl: item.imageUrl,
+        startsAt: item.startDate,
+      },
+      {
+        source: "archive",
+        dropId: item.dropId,
+        eventSlug: null,
+        tokenLabel: `Token #${item.poapId}`,
+        ownerAddress: item.ownerAddress,
+        network: archiveNetworkName(item.network),
+        mintedDate: item.mintedOn ? formatTimestamp(item.mintedOn * 1000) : "未保存",
+        collectorCount: item.tokenCount,
+        location: [item.city, item.country].filter(Boolean).join(" · ") || "未提供",
+        description: null,
+        eventUrl: null,
+        technicalUrl: null,
+        ownerExplorerUrl: addressExplorerUrl(item.network, item.ownerAddress),
+      },
+    ),
   );
-  const historicalItems: GalleryItem[] = legacyComplete
-    ? legacyItems.map((item) => {
-        const archive = archiveByToken.get(`${item.network}:${item.poapId}`);
-        return toGalleryItem(
-          `legacy-${item.chainId}-${item.poapId}`,
-          {
-            title: archive?.title ?? item.title,
-            imageUrl: archive?.imageUrl || item.imageUrl,
-            startsAt: archive?.startDate ?? item.startDate,
-          },
-          {
-            source: archive ? "archive" : "legacy",
-            dropId: archive?.dropId ?? item.dropId,
-            eventSlug: null,
-            tokenLabel: `Token #${item.poapId}`,
-            ownerAddress,
-            network: legacyNetworkName(item.network),
-            mintedDate: item.mintedAt ? formatTimestamp(item.mintedAt) : "未保存",
-            collectorCount: archive?.tokenCount ?? 0,
-            location:
-              [archive?.city ?? item.city, archive?.country ?? item.country]
-                .filter(Boolean)
-                .join(" · ") || "未提供",
-            description: item.description,
-            eventUrl: item.eventUrl,
-            technicalUrl: item.explorerUrl,
-            ownerExplorerUrl: addressExplorerUrl(item.chainId, ownerAddress),
-          },
-        );
-      })
-    : archiveItems.map((item) =>
-        toGalleryItem(
-          `archive-${item.sourceUid}`,
-          {
-            title: item.title,
-            imageUrl: item.imageUrl,
-            startsAt: item.startDate,
-          },
-          {
-            source: "archive",
-            dropId: item.dropId,
-            eventSlug: null,
-            tokenLabel: `Token #${item.poapId}`,
-            ownerAddress: item.ownerAddress,
-            network: archiveNetworkName(item.network),
-            mintedDate: item.mintedOn ? formatTimestamp(item.mintedOn * 1000) : "未保存",
-            collectorCount: item.tokenCount,
-            location: [item.city, item.country].filter(Boolean).join(" · ") || "未提供",
-            description: null,
-            eventUrl: null,
-            technicalUrl: null,
-            ownerExplorerUrl: addressExplorerUrl(item.network, item.ownerAddress),
-          },
-        ),
-      );
   const galleryItems: GalleryItem[] = [
     ...liveItems.map((item) =>
       toGalleryItem(`live-${item.eventId}-${item.tokenId}`, item, {
@@ -600,7 +579,7 @@ function groupCollectionByMonth(
 
 function toGalleryItem(
   key: string,
-  item: { title: string; imageUrl: string; startsAt: string },
+  item: { title: string; imageUrl: string | null; startsAt: string },
   metadata: Omit<GalleryItem, "key" | "title" | "imageUrl" | "date" | "fullDate">,
 ): GalleryItem {
   const date = new Date(item.startsAt);
@@ -713,10 +692,11 @@ function CollectionDetail({
             <div className="absolute -left-12 top-12 h-28 w-28 rounded-full bg-[#ffc6d7]/65" />
             <div className="absolute -right-14 bottom-6 h-36 w-36 rounded-full bg-[#ccecc0]/70" />
             <div className="relative mx-auto aspect-square w-[min(72vw,22rem)] rounded-full border-[4px] border-[#a89cff] bg-white p-2 shadow-[0_12px_0_rgba(193,186,255,.55)]">
-              <img
+              <ArtworkImage
                 className="h-full w-full rounded-full object-cover"
                 src={item.imageUrl}
                 alt={item.title}
+                loading="eager"
               />
             </div>
           </section>
@@ -942,22 +922,6 @@ function mergeCollectors(items: CollectorListItem[]) {
   const unique = new Map<string, CollectorListItem>();
   for (const item of items) unique.set(item.ownerAddress.toLowerCase(), item);
   return [...unique.values()];
-}
-
-function normalizeArchiveNetwork(value: string) {
-  const network = value.toLowerCase();
-  if (network === "arbitrum" || network === "arbitrum-one") return "arbitrum-one";
-  if (network === "xdai" || network === "gnosis") return "gnosis";
-  if (network === "eth" || network === "ethereum") return "ethereum";
-  if (network === "base") return "base";
-  return network;
-}
-
-function legacyNetworkName(value: LegacyPoapHolding["network"]) {
-  if (value === "arbitrum-one") return "Arbitrum";
-  if (value === "gnosis") return "Gnosis";
-  if (value === "ethereum") return "Ethereum";
-  return "Base";
 }
 
 function chainName(chainId: number) {

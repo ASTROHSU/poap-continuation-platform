@@ -39,7 +39,7 @@ type MirrorBindings = {
   HOLDINGS_DB: D1Database;
   ARCHIVE_MEDIA_BUCKET: R2Bucket;
   HOLDINGS_SNAPSHOT_ID: string;
-  COLLECTIONS_SNAPSHOT_ID: string;
+  HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID: string;
 };
 
 type ScheduledMirrorBindings = MirrorBindings & {
@@ -181,7 +181,7 @@ async function mirrorOneArchiveMediaObject(
   const expectedContentType = validateMirrorRow(
     row,
     env.HOLDINGS_SNAPSHOT_ID,
-    env.COLLECTIONS_SNAPSHOT_ID,
+    env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
   );
   const existing = await env.ARCHIVE_MEDIA_BUCKET.head(row.object_key);
   if (
@@ -228,7 +228,7 @@ async function mirrorOneArchiveMediaObject(
 export function validateMirrorRow(
   row: ArchiveMediaMirrorRow,
   holdingsSnapshotId: string,
-  collectionsSnapshotId: string,
+  holdingsMediaCollectionsSnapshotId: string,
 ): string {
   if (
     !Number.isSafeInteger(row.drop_id) ||
@@ -243,7 +243,7 @@ export function validateMirrorRow(
   const isCollectionArtwork =
     segments.length === 7 &&
     segments[0] === "snapshots" &&
-    segments[1] === collectionsSnapshotId &&
+    segments[1] === holdingsMediaCollectionsSnapshotId &&
     segments[2] === "collections" &&
     segments[3] === "drop-artwork" &&
     segments[4] === "sha256";

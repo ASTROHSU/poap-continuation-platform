@@ -1,0 +1,35 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import IssuerAdmin from "../../components/IssuerAdmin";
+
+const localHost = Astro.url.hostname === "localhost" || Astro.url.hostname === "127.0.0.1";
+const gatewaySecret = import.meta.env.ADMIN_GATEWAY_SECRET || "";
+const gatewayAuthorized =
+  gatewaySecret.length >= 32 && Astro.request.headers.get("x-titsia-admin-gateway") === gatewaySecret;
+if (!localHost && !gatewayAuthorized) {
+  return new Response("Not found.", {
+    status: 404,
+    headers: {
+      "Cache-Control": "private, no-store",
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set(
+  "Content-Security-Policy",
+  "frame-ancestors 'none'; base-uri 'none'; object-src 'none'",
+);
+Astro.response.headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("X-Content-Type-Options", "nosniff");
+Astro.response.headers.set("X-Frame-Options", "DENY");
+---
+
+<AdminLayout title="活動管理｜底加" description="底加活動管理者介面">
+  <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-10 lg:py-20">
+    <IssuerAdmin client:load />
+  </section>
+</AdminLayout>

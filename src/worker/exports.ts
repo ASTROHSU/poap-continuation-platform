@@ -18,6 +18,8 @@ interface ExportOptions {
   address: string;
   total: number;
   snapshotId: string;
+  holdingsMediaReleaseId: string;
+  holdingsMediaCollectionsSnapshotId: string;
   catalogSnapshotId: string;
   snapshotAt: string;
   holdingsDb: D1ReadClient;
@@ -136,9 +138,10 @@ function createExportStream(options: ExportOptions): ReadableStream<Uint8Array> 
                 options.holdingsDb,
                 holdingDropIds,
                 options.snapshotId,
+                options.holdingsMediaReleaseId,
                 options.mediaBaseUrl,
                 options.catalogSnapshotId,
-                options.collectionsSnapshotId,
+                options.holdingsMediaCollectionsSnapshotId,
               )
             : new Map<number, DropDetail>();
         for (const [dropId, drop] of fetchedHoldingDrops) holdingDropCache.set(dropId, drop);

@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { createProxyResponseHeaders, createUpstreamHeaders } from "../../lib/upstream-proxy";
 
 export const prerender = false;
 
@@ -8,10 +9,18 @@ const workerOrigin =
 export const ALL: APIRoute = async ({ params, request }) => {
   const incomingUrl = new URL(request.url);
   const path = params.path ?? "";
+  // Admin APIs are served only by the Access-protected gateway service binding.
+  if (path === "admin/issuer" || path.startsWith("admin/issuer/")) {
+    return Response.json(
+      { error: "Not found.", code: "not_found" },
+      {
+        status: 404,
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
+  }
   const targetUrl = new URL(`/api/${path}${incomingUrl.search}`, workerOrigin);
-  const headers = new Headers(request.headers);
-  headers.delete("host");
-  headers.delete("content-length");
+  const headers = createUpstreamHeaders(request.headers);
   headers.set("origin", new URL(workerOrigin).origin);
 
   const method = request.method.toUpperCase();
@@ -23,10 +32,7 @@ export const ALL: APIRoute = async ({ params, request }) => {
     redirect: "manual",
   });
 
-  const responseHeaders = new Headers(upstream.headers);
-  responseHeaders.delete("content-length");
-  responseHeaders.delete("content-encoding");
-  responseHeaders.set("cache-control", "private, no-store");
+  const responseHeaders = createProxyResponseHeaders(upstream.headers, method);
   responseHeaders.set("x-content-type-options", "nosniff");
 
   return new Response(upstream.body, {

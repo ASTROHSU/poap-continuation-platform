@@ -7,14 +7,18 @@ import {
   markMintJobSubmitting,
   mintJobAuthorization,
   nextMintJobDueAt,
+  renewExpiredMintJobAuthorization,
   rescheduleMintJob,
 } from "./mint-jobs";
 import {
   hasMintedBadge,
+  isExpiredMintAuthorizationError,
   pendingTransactionNonce,
   relayMintAuthorization,
+  signMintAuthorization,
   verifyMintTransaction,
 } from "./minting";
+import { baseMainnetRpcUrl } from "./rpc-config";
 import type { Bindings } from "./types";
 
 const RECEIPT_POLL_MS = 2_000;
@@ -115,6 +119,26 @@ export class MintRelayCoordinator extends DurableObject<Bindings> {
       } catch {
         // The original error remains the actionable internal diagnostic.
       }
+      if (isExpiredMintAuthorizationError(error)) {
+        const authorization = await signMintAuthorization(
+          event as Parameters<typeof signMintAuthorization>[0],
+          {
+            claimedBy: job.recipient,
+            mintNonce: job.authorizationNonce,
+            mintAuthorizationDeadline: Math.floor(Date.now() / 1_000) + 15 * 60,
+          },
+          this.env.MINT_SIGNER_PRIVATE_KEY,
+        );
+        if (authorization) {
+          await renewExpiredMintJobAuthorization(this.env.LIVE_DB, job, authorization);
+          console.warn("Expired mint authorization renewed", {
+            jobId: job.jobId,
+            shardKey,
+            attempt: job.attemptCount + 1,
+          });
+          return;
+        }
+      }
       await markMintJobRetry(this.env.LIVE_DB, job, error);
       console.warn("Sponsored mint will be retried", {
         jobId: job.jobId,
@@ -136,8 +160,11 @@ function receiptTimedOut(submittedAt: string | null): boolean {
   return Date.now() - Date.parse(submittedAt) >= RECEIPT_TIMEOUT_MS;
 }
 
-function liveRpcUrl(env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL">, chainId: number) {
+function liveRpcUrl(
+  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL" | "BASE_MAINNET_ALCHEMY_RPC_URL">,
+  chainId: number,
+) {
   if (chainId === 84532) return env.BASE_RPC_URL;
-  if (chainId === 8453) return env.BASE_MAINNET_RPC_URL;
+  if (chainId === 8453) return baseMainnetRpcUrl(env);
   throw new Error(`Unsupported live chain: ${chainId}`);
 }

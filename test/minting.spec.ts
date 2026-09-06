@@ -1,7 +1,7 @@
 import { encodeAbiParameters, encodeEventTopics, zeroAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import { associationBadgesAbi } from "../src/shared/association-badges";
-import { receiptContainsMint } from "../src/worker/minting";
+import { isExpiredMintAuthorizationError, receiptContainsMint } from "../src/worker/minting";
 
 const contract = "0x1111111111111111111111111111111111111111";
 const collector = "0x2222222222222222222222222222222222222222";
@@ -43,5 +43,16 @@ describe("mint receipt verification", () => {
         7n,
       ),
     ).toBe(false);
+  });
+});
+
+describe("mint authorization errors", () => {
+  it("recognizes the AuthorizationExpired selector even when the RPC cannot decode it", () => {
+    expect(
+      isExpiredMintAuthorizationError(
+        new Error('contract reverted with the following signature: "0x3d91b05f"'),
+      ),
+    ).toBe(true);
+    expect(isExpiredMintAuthorizationError(new Error("nonce too low"))).toBe(false);
   });
 });

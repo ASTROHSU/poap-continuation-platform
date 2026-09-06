@@ -180,7 +180,7 @@ function toCollectionDropDetail(
     timezone: row.timezone,
     integratorId: row.integrator_id,
     createdAt: row.created_date ?? "",
-    imageUrl: imageUrl ?? "",
+    imageUrl,
     hasArtwork: imageUrl !== null,
     tokenCount: numberValue(row.token_count),
     dropTransferCount: numberValue(row.transfer_count),
