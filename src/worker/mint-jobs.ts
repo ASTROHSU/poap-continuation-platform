@@ -184,6 +184,7 @@ export async function fetchNextMintJob(
   db: Pick<D1DatabaseSession, "prepare">,
   shardKey: string,
   now = Date.now(),
+  maxInFlight = 8,
 ): Promise<MintJobRecord | null> {
   const row = await db
     .prepare(
@@ -191,10 +192,24 @@ export async function fetchNextMintJob(
        WHERE shard_key = ?
          AND status IN ('pending', 'submitting', 'submitted', 'retry')
          AND next_attempt_at <= ?
-       ORDER BY created_at, job_id
+         AND (
+           status != 'pending' OR (
+             SELECT COUNT(*)
+             FROM live_mint_jobs AS in_flight
+             WHERE in_flight.shard_key = ?
+               AND in_flight.status IN ('submitting', 'submitted')
+           ) < ?
+         )
+       ORDER BY CASE status
+                  WHEN 'retry' THEN 0
+                  WHEN 'submitting' THEN 0
+                  WHEN 'pending' THEN 1
+                  ELSE 2
+                END,
+                created_at, job_id
        LIMIT 1`,
     )
-    .bind(shardKey, now)
+    .bind(shardKey, now, shardKey, maxInFlight)
     .first<MintJobRow>();
   return row ? mapMintJob(row) : null;
 }
@@ -202,16 +217,46 @@ export async function fetchNextMintJob(
 export async function nextMintJobDueAt(
   db: Pick<D1DatabaseSession, "prepare">,
   shardKey: string,
+  maxInFlight = 8,
 ): Promise<number | null> {
   const row = await db
     .prepare(
       `SELECT MIN(next_attempt_at) AS due_at
        FROM live_mint_jobs
-       WHERE shard_key = ? AND status IN ('pending', 'submitting', 'submitted', 'retry')`,
+       WHERE shard_key = ?
+         AND status IN ('pending', 'submitting', 'submitted', 'retry')
+         AND (
+           status != 'pending' OR (
+             SELECT COUNT(*)
+             FROM live_mint_jobs AS in_flight
+             WHERE in_flight.shard_key = ?
+               AND in_flight.status IN ('submitting', 'submitted')
+           ) < ?
+         )`,
     )
-    .bind(shardKey)
+    .bind(shardKey, shardKey, maxInFlight)
     .first<{ due_at: number | null }>();
   return row?.due_at ?? null;
+}
+
+export async function nextMintJobNetworkNonce(
+  db: Pick<D1DatabaseSession, "prepare">,
+  shardKey: string,
+  chainPendingNonce: number,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT MAX(network_nonce) AS max_nonce
+       FROM live_mint_jobs
+       WHERE shard_key = ?
+         AND status IN ('pending', 'submitting', 'submitted', 'retry')`,
+    )
+    .bind(shardKey)
+    .first<{ max_nonce: number | null }>();
+  const persistedNonce = row?.max_nonce;
+  return persistedNonce === null || persistedNonce === undefined
+    ? chainPendingNonce
+    : Math.max(chainPendingNonce, persistedNonce + 1);
 }
 
 export async function markMintJobSubmitting(
@@ -316,8 +361,10 @@ export async function markMintJobRetry(
   const terminal = attempts >= 8;
   const delay = Math.min(60_000, 1_000 * 2 ** Math.min(attempts, 6));
   const now = new Date().toISOString();
-  const errorMessage = internalErrorMessage(error);
-  const resetNonce = shouldRefreshNetworkNonce(errorMessage);
+  const fullErrorMessage =
+    error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const errorMessage = fullErrorMessage.slice(0, 2_000);
+  const resetNonce = shouldRefreshNetworkNonce(fullErrorMessage);
   await db
     .prepare(
       `UPDATE live_mint_jobs
@@ -465,11 +512,6 @@ function mapMintJob(row: MintJobRow): MintJobRecord {
     submittedAt: row.submitted_at,
     confirmedAt: row.confirmed_at,
   };
-}
-
-function internalErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  return message.slice(0, 2_000);
 }
 
 function shouldRefreshNetworkNonce(message: string): boolean {
