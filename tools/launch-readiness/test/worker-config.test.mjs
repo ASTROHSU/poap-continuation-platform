@@ -17,7 +17,7 @@ test("accepts a worker configuration with the mint coordinator binding and migra
       },
       vars: {
         BASE_MAINNET_RPC_URL: "https://mainnet.base.org",
-        BASE_MAINNET_FALLBACK_RPC_URL: "https://base.gateway.tenderly.co",
+        BASE_MAINNET_FALLBACK_RPC_URL: "https://base-rpc.publicnode.com",
       },
     }),
   );
@@ -36,7 +36,7 @@ test("rejects replacing the production RPC used by live mint operations", async 
       },
       vars: {
         BASE_MAINNET_RPC_URL: "https://replacement.example",
-        BASE_MAINNET_FALLBACK_RPC_URL: "https://base.gateway.tenderly.co",
+        BASE_MAINNET_FALLBACK_RPC_URL: "https://base-rpc.publicnode.com",
       },
     }),
   );

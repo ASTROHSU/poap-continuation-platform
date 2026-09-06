@@ -101,7 +101,7 @@
   "vars": {
     "GAS_MONITOR_ENABLED": "false",
     "BASE_MAINNET_INDEXER_RPC_URL": "",
-    "BASE_MAINNET_FALLBACK_RPC_URL": "https://base.gateway.tenderly.co",
+    "BASE_MAINNET_FALLBACK_RPC_URL": "https://base-rpc.publicnode.com",
     "GAS_MONITOR_LOW_ETH": "0.0002",
     "GAS_MONITOR_CRITICAL_ETH": "0.00002",
     "HOLDINGS_MEDIA_RELEASE_ID": "compass-holdings-2026-07-28-v1-artwork-full",
