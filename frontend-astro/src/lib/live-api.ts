@@ -37,7 +37,7 @@ export interface ArchiveHolding {
   country: string | null;
   year: number;
   isVirtual: boolean | null;
-  imageUrl: string;
+  imageUrl: string | null;
   hasArtwork: boolean;
   tokenCount: number;
   sourceUid: string;
@@ -96,42 +96,9 @@ export interface ArchiveDropDetail {
   eventUrl: string | null;
   year: number;
   isVirtual: boolean | null;
-  imageUrl: string;
+  imageUrl: string | null;
   hasArtwork: boolean;
   tokenCount: number;
-}
-
-export interface LegacyPoapHolding {
-  chainId: 1 | 100 | 8453 | 42161;
-  network: "ethereum" | "gnosis" | "base" | "arbitrum-one";
-  contractAddress: `0x${string}`;
-  poapId: number;
-  dropId: number | null;
-  title: string;
-  description: string | null;
-  imageUrl: string;
-  startDate: string;
-  city: string | null;
-  country: string | null;
-  eventUrl: string | null;
-  year: number | null;
-  mintedAt: string | null;
-  transactionHash: string | null;
-  explorerUrl: string;
-}
-
-export interface LegacyPoapHoldingsResponse {
-  address: `0x${string}`;
-  total: number;
-  complete: boolean;
-  items: LegacyPoapHolding[];
-  networks: Array<{
-    chainId: 1 | 100 | 8453 | 42161;
-    network: "ethereum" | "gnosis" | "base" | "arbitrum-one";
-    expectedBalance: number;
-    discoveredCount: number;
-    complete: boolean;
-  }>;
 }
 
 export interface LiveClaimResponse {
@@ -237,7 +204,6 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers,
-    cache: "no-store",
     credentials: "same-origin",
   });
 
@@ -249,6 +215,9 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
       typeof errorBody?.error === "string" ? errorBody.error : `請求失敗（${response.status}）`;
     const code = typeof errorBody?.code === "string" ? errorBody.code : null;
     throw new ApiError(response.status, message, code);
+  }
+  if (body === null) {
+    throw new ApiError(502, "伺服器回傳了無法解析的資料，請稍後再試。", "invalid_api_response");
   }
   return body as T;
 }
@@ -406,12 +375,6 @@ export function getArchiveHoldings(address: string, cursor: string | null = null
   if (cursor) query.set("cursor", cursor);
   return apiRequest<ArchiveHoldingsResponse>(
     `/api/archive/owners/${encodeURIComponent(address)}?${query}`,
-  );
-}
-
-export function getLegacyPoapHoldings(address: string) {
-  return apiRequest<LegacyPoapHoldingsResponse>(
-    `/api/legacy/owners/${encodeURIComponent(address)}`,
   );
 }
 

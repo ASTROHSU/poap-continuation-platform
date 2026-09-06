@@ -1,4 +1,5 @@
 import { decodeFunctionResult, encodeFunctionData, getAddress, type Address, type Hex } from "viem";
+import { baseMainnetRpcUrl } from "./rpc-config";
 import type { Bindings } from "./types";
 
 const POAP_CONTRACT = getAddress("0x22C1f6050E56d2876009903609a2cC3fEf83B415");
@@ -127,6 +128,7 @@ export async function fetchLegacyPoapHoldings(
     | "ETHEREUM_RPC_URL"
     | "GNOSIS_MAINNET_RPC_URL"
     | "BASE_MAINNET_RPC_URL"
+    | "BASE_MAINNET_ALCHEMY_RPC_URL"
     | "ARBITRUM_MAINNET_RPC_URL"
   >,
   owner: Address,
@@ -176,6 +178,7 @@ function networkDefinitions(
     | "ETHEREUM_RPC_URL"
     | "GNOSIS_MAINNET_RPC_URL"
     | "BASE_MAINNET_RPC_URL"
+    | "BASE_MAINNET_ALCHEMY_RPC_URL"
     | "ARBITRUM_MAINNET_RPC_URL"
   >,
 ): NetworkDefinition[] {
@@ -199,7 +202,7 @@ function networkDefinitions(
       network: "base",
       explorerApiOrigin: "https://base.blockscout.com",
       explorerOrigin: "https://base.blockscout.com",
-      rpcUrl: env.BASE_MAINNET_RPC_URL,
+      rpcUrl: baseMainnetRpcUrl(env),
     },
     {
       chainId: 42161,

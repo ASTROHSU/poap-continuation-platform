@@ -2,10 +2,18 @@
 -- Never apply this file as a production migration.
 
 INSERT INTO archive_meta (key, value) VALUES
-  ('snapshot_id', '2026-07-02-v1'),
-  ('snapshot_at', '2026-07-02T14:28:17.259Z'),
+  ('snapshot_id', 'compass-holdings-2026-07-28-v1'),
+  ('snapshot_at', '2026-07-28T05:04:31.465Z'),
   ('schema_version', '1'),
   ('importer_version', 'development-fixture'),
+  ('artwork_release_id', '2026-07-02-v1-artwork-full'),
+  ('artwork_release_collections_snapshot_id', 'collections-2026-07-22-v1'),
+  ('artwork_release_sha256', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+  ('artwork_release_complete', '1'),
+  ('artwork_release_referenced_drops', '3'),
+  ('artwork_release_archive_direct', '1'),
+  ('artwork_release_activated_rows', '2'),
+  ('artwork_release_terminal_unavailable', '0'),
   ('tokens_count', '3'),
   ('owners_count', '2');
 

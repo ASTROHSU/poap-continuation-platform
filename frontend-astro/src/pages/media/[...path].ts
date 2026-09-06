@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { createUpstreamHeaders } from "../../lib/upstream-proxy";
 
 export const prerender = false;
 
@@ -8,9 +9,10 @@ const workerOrigin =
 export const GET: APIRoute = async ({ params, request }) => {
   const incomingUrl = new URL(request.url);
   const targetUrl = new URL(`/media/${params.path ?? ""}${incomingUrl.search}`, workerOrigin);
-  const upstream = await fetch(targetUrl, {
-    headers: { Accept: request.headers.get("accept") ?? "*/*" },
-  });
+  const requestHeaders = createUpstreamHeaders(
+    new Headers({ Accept: request.headers.get("accept") ?? "*/*" }),
+  );
+  const upstream = await fetch(targetUrl, { headers: requestHeaders });
   const headers = new Headers(upstream.headers);
   headers.delete("content-length");
   headers.delete("content-encoding");

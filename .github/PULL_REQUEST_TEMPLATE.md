@@ -28,6 +28,6 @@ or privacy impact. Write "None" when not applicable. -->
 - [ ] Tests cover new behavior and important failure paths.
 - [ ] Documentation and the changelog are updated when appropriate.
 - [ ] No archive ZIP, database dump, secret, or unlicensed media is included.
-- [ ] No production `wrangler.pilot.jsonc`, `.dev.vars`, access code, or deployment output is included.
+- [ ] Production configuration is versioned without secret values; no `.dev.vars`, access codes, or deployment output is included.
 - [ ] Schema changes include forward and rollback guidance.
 - [ ] New data or media includes provenance and a redistribution basis.

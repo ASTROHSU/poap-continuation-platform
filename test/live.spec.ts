@@ -30,6 +30,12 @@ import {
   recordLiveClaimRelayTransaction,
 } from "../src/worker/live";
 import type { Bindings } from "../src/worker/types";
+import {
+  listIssuerEvents,
+  loadIssuerEvent,
+  transitionIssuerEvent,
+  updateIssuerEvent,
+} from "../src/worker/issuer-admin";
 
 interface LiveTestBindings extends Bindings {
   TEST_LIVE_FIXTURE: string;
@@ -45,6 +51,130 @@ beforeAll(async () => {
 });
 
 describe("continuation claim API", () => {
+  it("lists and loads only Base mainnet events in the production issuer manager", async () => {
+    await bindings.LIVE_DB.prepare(
+      `INSERT INTO live_events (
+         event_id, slug, title, description, image_url, starts_at,
+         claim_opens_at, claim_closes_at, chain_id, max_supply, status
+       ) VALUES (
+         'event-admin-sepolia', 'admin-sepolia', '不應出現的測試活動', '',
+         '/brand/logo_poap.svg', '2026-08-01T00:00:00.000Z',
+         '2026-07-01T00:00:00.000Z', '2099-12-31T23:59:59.999Z',
+         84532, 20, 'published'
+       )`,
+    ).run();
+
+    const events = await listIssuerEvents(bindings.LIVE_DB);
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((event) => event.chainId === 8453)).toBe(true);
+    expect(events.some((event) => event.slug === "admin-sepolia")).toBe(false);
+    await expect(loadIssuerEvent(bindings, "admin-sepolia")).resolves.toBeNull();
+  });
+
+  it("updates mutable issuer fields while preserving chain identity and records revisions", async () => {
+    await bindings.ARCHIVE_BUCKET.put(
+      "live/events/mvp-demo/metadata.json",
+      JSON.stringify({
+        name: "MVP Launch Badge",
+        description: "Original",
+        image: "https://example.test/old.png",
+        attributes: [
+          { trait_type: "Issuer", value: "Original issuer" },
+          { trait_type: "Custom", value: "preserved" },
+        ],
+      }),
+      { httpMetadata: { contentType: "application/json; charset=utf-8" } },
+    );
+    const before = await loadIssuerEvent(bindings, "mvp-demo");
+    expect(before).not.toBeNull();
+    const chainIdentity = {
+      chainId: before!.chainId,
+      contractAddress: before!.contractAddress,
+      tokenId: before!.tokenId,
+      maxSupply: before!.maxSupply,
+    };
+    const result = await updateIssuerEvent(
+      bindings,
+      { email: "admin@example.test", address: address as `0x${string}` },
+      {
+        slug: before!.slug,
+        expectedUpdatedAt: before!.updatedAt,
+        title: "更新後的活動",
+        issuer: "新的發行單位",
+        description: "更新後的說明",
+        eventUrl: "https://example.test/event",
+        startsAt: "2026-08-01T00:00:00.000Z",
+        claimOpensAt: "2026-07-01T00:00:00.000Z",
+        claimClosesAt: "2099-12-31T23:59:59.999Z",
+        eventType: "共學活動",
+        location: "台北",
+        collaborators: ["夥伴一", "夥伴二"],
+      },
+    );
+    expect(result.event).toMatchObject({
+      title: "更新後的活動",
+      issuer: "新的發行單位",
+      eventType: "共學活動",
+      location: "台北",
+      collaborators: ["夥伴一", "夥伴二"],
+      ...chainIdentity,
+    });
+    const metadata = JSON.parse(
+      await (await bindings.ARCHIVE_BUCKET.get("live/events/mvp-demo/metadata.json"))!.text(),
+    );
+    expect(metadata).toMatchObject({ name: "更新後的活動", description: "更新後的說明" });
+    expect(metadata.attributes).toContainEqual({ trait_type: "Custom", value: "preserved" });
+    const audit = await bindings.LIVE_DB.prepare(
+      "SELECT action, created_by_address FROM live_event_revisions WHERE revision_id = ?",
+    )
+      .bind(result.revisionId)
+      .first<{ action: string; created_by_address: string }>();
+    expect(audit).toEqual({ action: "update", created_by_address: address });
+  });
+
+  it("uses optimistic versions and permits only explicit close/reopen transitions", async () => {
+    const current = await loadIssuerEvent(bindings, "mvp-demo");
+    expect(current).not.toBeNull();
+    await expect(
+      updateIssuerEvent(
+        bindings,
+        { email: "admin@example.test", address: address as `0x${string}` },
+        {
+          slug: current!.slug,
+          expectedUpdatedAt: "stale-version",
+          title: current!.title,
+          issuer: current!.issuer,
+          startsAt: current!.startsAt,
+          claimOpensAt: current!.claimOpensAt,
+          claimClosesAt: current!.claimClosesAt,
+        },
+      ),
+    ).rejects.toMatchObject({ status: 409, code: "issuer_event_conflict" });
+
+    const closed = await transitionIssuerEvent(
+      bindings,
+      { email: "admin@example.test", address: address as `0x${string}` },
+      { slug: current!.slug, expectedUpdatedAt: current!.updatedAt, status: "closed" },
+    );
+    expect(closed.event.status).toBe("closed");
+    const reopened = await transitionIssuerEvent(
+      bindings,
+      { email: "admin@example.test", address: address as `0x${string}` },
+      {
+        slug: closed.event.slug,
+        expectedUpdatedAt: closed.event.updatedAt,
+        status: "published",
+      },
+    );
+    expect(reopened.event.status).toBe("published");
+  });
+
+  it("does not expose issuer event administration without authentication", async () => {
+    const response = await SELF.fetch("https://example.test/api/admin/issuer/events");
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ code: "access_required" });
+  });
+
   it("exposes live-only app mode without touching archive databases", async () => {
     const response = await SELF.fetch("https://example.test/api/app-config");
     expect(response.status).toBe(200);
@@ -125,10 +255,35 @@ describe("continuation claim API", () => {
     expect(response.headers.get("cache-control")).toBe("public, max-age=300");
     await expect(response.json()).resolves.toEqual({ name: "MVP Launch Badge" });
 
+    for (const filename of [
+      "artwork-v2.png",
+      "artwork-v3.png",
+      "artwork-49903b801e2391089ca2.png",
+    ]) {
+      await bindings.ARCHIVE_BUCKET.put(`live/events/mvp-demo/${filename}`, "png", {
+        httpMetadata: {
+          contentType: "image/png",
+          cacheControl: "public, max-age=31536000, immutable",
+        },
+      });
+      const artwork = await SELF.fetch(
+        `https://example.test/media/live/events/mvp-demo/${filename}`,
+      );
+      expect(artwork.status).toBe(200);
+      expect(artwork.headers.get("content-type")).toBe("image/png");
+      await artwork.arrayBuffer();
+      await bindings.ARCHIVE_BUCKET.delete(`live/events/mvp-demo/${filename}`);
+    }
+
     const traversal = await SELF.fetch(
       "https://example.test/media/live/events/mvp-demo/not-allowed.txt",
     );
     expect(traversal.status).toBe(404);
+
+    const unsafeVersion = await SELF.fetch(
+      "https://example.test/media/live/events/mvp-demo/artwork-v2%2Fsecret.png",
+    );
+    expect(unsafeVersion.status).toBe(404);
   });
 
   it("claims a one-time link without exposing the internal reservation as a collection", async () => {
@@ -153,6 +308,7 @@ describe("continuation claim API", () => {
 
     const ownerResponse = await SELF.fetch(`https://example.test/api/live/owners/${address}`);
     expect(ownerResponse.status).toBe(200);
+    expect(ownerResponse.headers.get("cache-control")).toBe("public, max-age=15, s-maxage=30");
     await expect(ownerResponse.json()).resolves.toMatchObject({
       address,
       items: [],

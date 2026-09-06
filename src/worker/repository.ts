@@ -355,10 +355,12 @@ export async function fetchDropDetailBatch(
 
 export async function fetchOwner(
   holdingsDb: D1ReadClient,
-  catalogDb: D1ReadClient,
+  catalogDb: D1ReadClient | null,
   collectionsDb: D1ReadClient | null,
   query: OwnerQuery,
   holdingsSnapshotId: string,
+  holdingsMediaReleaseId: string,
+  holdingsMediaCollectionsSnapshotId: string,
   catalogSnapshotId: string,
   collectionsSnapshotId: string,
   mediaBaseUrl: string,
@@ -392,12 +394,14 @@ export async function fetchOwner(
   const allRows = tokenResult.results as HoldingRow[];
   const hasNext = allRows.length > query.limit;
   const rows = allRows.slice(0, query.limit);
-  const catalog = await fetchCatalogSummaries(
-    catalogDb,
-    rows.map((row) => row.drop_id),
-    mediaBaseUrl,
-    catalogSnapshotId,
-  );
+  const catalog = catalogDb
+    ? await fetchCatalogSummaries(
+        catalogDb,
+        rows.map((row) => row.drop_id),
+        mediaBaseUrl,
+        catalogSnapshotId,
+      )
+    : new Map<number, DropSummary>();
   const privateCandidateIds = rows
     .map((row) => row.drop_id)
     .filter((dropId) => !catalog.has(dropId));
@@ -423,9 +427,10 @@ export async function fetchOwner(
           holdingsDb,
           holdingCandidateIds,
           holdingsSnapshotId,
+          holdingsMediaReleaseId,
           mediaBaseUrl,
           catalogSnapshotId,
-          collectionsSnapshotId,
+          holdingsMediaCollectionsSnapshotId,
         )
       : new Map<number, DropDetail>();
   const items = rows.map((row) => {
@@ -516,6 +521,8 @@ export async function fetchPersonalHoldingsPage(
   collectionsDb: D1ReadClient,
   query: PersonalHoldingsQuery,
   holdingsSnapshotId: string,
+  holdingsMediaReleaseId: string,
+  holdingsMediaCollectionsSnapshotId: string,
   catalogSnapshotId: string,
   collectionsSnapshotId: string,
   collectionsReleaseId: string,
@@ -573,9 +580,10 @@ export async function fetchPersonalHoldingsPage(
           holdingsDb,
           holdingCandidateIds,
           holdingsSnapshotId,
+          holdingsMediaReleaseId,
           mediaBaseUrl,
           catalogSnapshotId,
-          collectionsSnapshotId,
+          holdingsMediaCollectionsSnapshotId,
         )
       : new Map<number, DropDetail>();
   const items = rows.map((row): PersonalHoldingReference => {
@@ -681,6 +689,7 @@ export function toDropSummary(
   snapshotId: string,
 ): DropSummary {
   const dropId = numeric(row.drop_id);
+  const hasArtwork = numeric(row.has_artwork) === 1;
   return {
     dropId,
     fancyId: row.fancy_id,
@@ -690,8 +699,8 @@ export function toDropSummary(
     country: row.country,
     year: numeric(row.year),
     isVirtual: row.is_virtual === null ? null : numeric(row.is_virtual) === 1,
-    imageUrl: artworkUrl(mediaBaseUrl, snapshotId, dropId),
-    hasArtwork: numeric(row.has_artwork) === 1,
+    imageUrl: hasArtwork ? artworkUrl(mediaBaseUrl, snapshotId, dropId) : null,
+    hasArtwork,
     tokenCount: numeric(row.token_count),
   };
 }
@@ -828,7 +837,7 @@ function fallbackDrop(row: HoldingRow, mediaBaseUrl: string, snapshotId: string)
     country: null,
     year: 0,
     isVirtual: null,
-    imageUrl: artworkUrl(mediaBaseUrl, snapshotId, dropId),
+    imageUrl: null,
     hasArtwork: false,
     tokenCount: 0,
   };
