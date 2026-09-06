@@ -96,6 +96,25 @@ describe("durable sponsored mint jobs", () => {
     expect(JSON.stringify(mintJobPublicStatus(retried!))).not.toContain("nonce");
   });
 
+  it("exposes terminal failure without leaking its internal diagnostic", async () => {
+    const created = await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput(recipient, `0x${"5a".repeat(32)}`),
+    );
+    await bindings.LIVE_DB.prepare(
+      "UPDATE live_mint_jobs SET status = 'failed', last_error = ? WHERE job_id = ?",
+    )
+      .bind("over rate limit: private rpc detail", created.jobId)
+      .run();
+    const failed = await fetchMintJob(bindings.LIVE_DB.withSession("first-primary"), created.jobId);
+    expect(mintJobPublicStatus(failed!)).toEqual({
+      jobId: created.jobId,
+      mintStatus: "failed",
+      transactionHash: null,
+    });
+    expect(JSON.stringify(mintJobPublicStatus(failed!))).not.toContain("rate limit");
+  });
+
   it("recovers unfinished work from D1 after the coordinator is recreated", async () => {
     const created = await createOrReuseMintJob(
       bindings.LIVE_DB,

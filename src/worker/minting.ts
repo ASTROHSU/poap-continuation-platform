@@ -2,6 +2,7 @@ import {
   createPublicClient,
   createWalletClient,
   decodeEventLog,
+  fallback,
   getAddress,
   http,
   isAddressEqual,
@@ -21,6 +22,13 @@ import { supportedLiveChain } from "../shared/live-chains";
 import type { LiveClaimRecord, LiveEventRecord } from "./live";
 
 type MintEvent = Pick<LiveEventRecord, "chainId" | "contractAddress" | "tokenId">;
+type RpcUrls = string | readonly string[];
+
+function rpcTransport(rpcUrls: RpcUrls) {
+  const urls = typeof rpcUrls === "string" ? [rpcUrls] : rpcUrls;
+  const transports = urls.map((url) => http(url));
+  return transports.length === 1 ? transports[0] : fallback(transports, { rank: false });
+}
 
 export interface MintAuthorization {
   chainId: number;
@@ -79,7 +87,7 @@ export function isExpiredMintAuthorizationError(error: unknown): boolean {
 }
 
 export async function relayMintAuthorization(
-  rpcUrl: string,
+  rpcUrls: RpcUrls,
   event: MintEvent,
   authorization: MintAuthorization,
   privateKey: string,
@@ -108,12 +116,12 @@ export async function relayMintAuthorization(
   const client = createWalletClient({
     account,
     chain,
-    transport: http(rpcUrl),
+    transport: rpcTransport(rpcUrls),
   });
   const feeOptions =
     transactionNonce === undefined
       ? {}
-      : await transactionFeeOptions(rpcUrl, chain.id, Math.max(0, feeBumpBps));
+      : await transactionFeeOptions(rpcUrls, chain.id, Math.max(0, feeBumpBps));
   return client.writeContract({
     address: contractAddress,
     abi: associationBadgesAbi,
@@ -130,10 +138,10 @@ export async function relayMintAuthorization(
   });
 }
 
-async function transactionFeeOptions(rpcUrl: string, chainId: number, feeBumpBps: number) {
+async function transactionFeeOptions(rpcUrls: RpcUrls, chainId: number, feeBumpBps: number) {
   const chain = supportedLiveChain(chainId);
   if (!chain) throw new Error(`Unsupported live chain: ${chainId}`);
-  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+  const publicClient = createPublicClient({ chain, transport: rpcTransport(rpcUrls) });
   const fees = await publicClient.estimateFeesPerGas();
   const multiplier = 10_000n + BigInt(Math.min(feeBumpBps, 10_000));
   return {
@@ -150,25 +158,25 @@ export function mintRelayerAddress(privateKey: string): Address {
 }
 
 export async function pendingTransactionNonce(
-  rpcUrl: string,
+  rpcUrls: RpcUrls,
   chainId: number,
   address: Address,
 ): Promise<number> {
   const chain = supportedLiveChain(chainId);
   if (!chain) throw new Error(`Unsupported live chain: ${chainId}`);
-  const client = createPublicClient({ chain, transport: http(rpcUrl) });
+  const client = createPublicClient({ chain, transport: rpcTransport(rpcUrls) });
   return client.getTransactionCount({ address, blockTag: "pending" });
 }
 
 export async function hasMintedBadge(
-  rpcUrl: string,
+  rpcUrls: RpcUrls,
   event: MintEvent,
   account: Address,
 ): Promise<boolean> {
   if (!event.contractAddress || event.tokenId === null) return false;
   const chain = supportedLiveChain(event.chainId);
   if (!chain) return false;
-  const client = createPublicClient({ chain, transport: http(rpcUrl) });
+  const client = createPublicClient({ chain, transport: rpcTransport(rpcUrls) });
   return client.readContract({
     address: getAddress(event.contractAddress),
     abi: associationBadgesAbi,
@@ -178,13 +186,13 @@ export async function hasMintedBadge(
 }
 
 export async function verifyMintTransaction(
-  rpcUrl: string,
+  rpcUrls: RpcUrls,
   transactionHash: Hash,
   event: MintEvent,
   account: Address,
 ): Promise<"confirmed" | "pending" | "invalid"> {
   if (!event.contractAddress || event.tokenId === null) return "invalid";
-  const client = createPublicClient({ transport: http(rpcUrl) });
+  const client = createPublicClient({ transport: rpcTransport(rpcUrls) });
   let receipt: TransactionReceipt;
   try {
     receipt = await client.getTransactionReceipt({ hash: transactionHash });

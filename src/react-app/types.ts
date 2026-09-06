@@ -130,14 +130,14 @@ export interface LiveRelayResponse {
   slug: string;
   address: string;
   jobId: string | null;
-  mintStatus: "minting" | "minted";
+  mintStatus: "minting" | "minted" | "failed";
   transactionHash: `0x${string}` | null;
   explorerUrl: string | null;
 }
 
 export interface MintJobResponse {
   jobId: string;
-  mintStatus: "minting" | "minted";
+  mintStatus: "minting" | "minted" | "failed";
   transactionHash: `0x${string}` | null;
   explorerUrl: string | null;
 }

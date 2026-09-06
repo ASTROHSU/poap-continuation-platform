@@ -213,6 +213,9 @@ export function EmailCollectionPage() {
       const relayed = await relayEmailReservationMint(reservation.reservationId, account);
       if (relayed.jobId) {
         const completed = await waitForLiveMintJob(relayed.jobId);
+        if (completed.mintStatus === "failed") {
+          throw new Error("鑄造暫時失敗，請再按一次領取。");
+        }
         if (completed.mintStatus !== "minted") {
           setMessage("正在鑄造");
           return;

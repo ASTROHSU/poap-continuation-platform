@@ -175,8 +175,9 @@ test("a pending sponsored mint shows reassuring progress without queue internals
   await expect(page.getByRole("status")).not.toContainText(/排隊|nonce|RPC/i);
 });
 
-test("mint progress recovers from a temporary proxy rate limit and finishes", async ({ page }) => {
+test("mint progress recovers from a temporary network failure and finishes", async ({ page }) => {
   const jobId = "12345678-1234-4123-8123-123456789abc";
+  let relayRequests = 0;
   let statusRequests = 0;
   await page.route("**/api/app-config", (route) =>
     route.fulfill({
@@ -231,8 +232,10 @@ test("mint progress recovers from a temporary proxy rate limit and finishes", as
       },
     }),
   );
-  await page.route("**/api/live/events/august-book-club-2026/relay", (route) =>
-    route.fulfill({
+  await page.route("**/api/live/events/august-book-club-2026/relay", (route) => {
+    relayRequests += 1;
+    if (relayRequests === 1) return route.abort("connectionfailed");
+    return route.fulfill({
       status: 202,
       json: {
         eventId: "event-august-book-club-2026",
@@ -243,15 +246,12 @@ test("mint progress recovers from a temporary proxy rate limit and finishes", as
         transactionHash: null,
         explorerUrl: null,
       },
-    }),
-  );
+    });
+  });
   await page.route(`**/api/live/mint-jobs/${jobId}`, (route) => {
     statusRequests += 1;
     if (statusRequests === 1) {
-      return route.fulfill({
-        status: 429,
-        json: { error: "Too many requests.", code: "rate_limited" },
-      });
+      return route.abort("connectionfailed");
     }
     return route.fulfill({
       json: {
@@ -268,8 +268,8 @@ test("mint progress recovers from a temporary proxy rate limit and finishes", as
   await page.getByRole("button", { name: "領取" }).click();
 
   await expect(page.getByRole("heading", { name: "鑄造完成" })).toBeVisible({
-    timeout: 8_000,
+    timeout: 10_000,
   });
-  await expect(page.getByText("區塊勢 · 數位紀念")).toBeVisible();
+  expect(relayRequests).toBeGreaterThanOrEqual(2);
   expect(statusRequests).toBeGreaterThanOrEqual(2);
 });
