@@ -45,6 +45,7 @@ export interface GasReport {
   missingReceipts: number;
   incompleteFees: number;
   indexerSyncedAt: string | null;
+  indexerLagBlocks: number | null;
   periods: { days7: Totals; days30: Totals; all: Totals };
   breakdown: Array<{
     date: string;
@@ -237,6 +238,7 @@ async function collectReport(
   balance: bigint,
   previous: Level,
   now: number,
+  finalized: bigint,
 ): Promise<GasReport> {
   const [receipts, mints, jobs, cursor] = await Promise.all([
     env.LIVE_DB.prepare(
@@ -259,10 +261,10 @@ async function collectReport(
       .bind(CHAIN)
       .all<{ status: string; count: number }>(),
     env.LIVE_DB.prepare(
-      `SELECT MIN(last_synced_at) AS synced FROM live_chain_cursors WHERE chain_id = ?`,
+      `SELECT MIN(last_synced_at) AS synced, MIN(next_block) AS nextBlock FROM live_chain_cursors WHERE chain_id = ?`,
     )
       .bind(CHAIN)
-      .first<{ synced: string | null }>(),
+      .first<{ synced: string | null; nextBlock: number | null }>(),
   ]);
   const periods = {
     days7: summarize(receipts.results, mints.results, relayer, now - 7 * DAY),
@@ -346,6 +348,8 @@ async function collectReport(
     missingReceipts: receipts.results.filter((r) => !r.occurred_at).length,
     incompleteFees: receipts.results.filter((r) => r.occurred_at && r.fee_wei === null).length,
     indexerSyncedAt: cursor?.synced ?? null,
+    indexerLagBlocks:
+      cursor?.nextBlock == null ? null : Math.max(0, Number(finalized) - cursor.nextBlock + 1),
     periods,
     breakdown: [...groups.values()]
       .map((g) => ({
@@ -384,7 +388,7 @@ export function gasCaption(report: GasReport, recovery = true): string {
     `餘額：${money(report.balanceWei, report)}`,
     `按近30天均值約可鑄造：${report.estimatedMints ?? "樣本不足"}筆（未扣待處理交易）`,
     `待處理 ${report.pendingJobs} 筆／失敗 ${report.failedJobs} 筆`,
-    `索引最近同步（最舊合約）：${report.indexerSyncedAt ?? "未知"}；尚未索引的鑄造不含在份數中。`,
+    `索引落後約 ${report.indexerLagBlocks ?? "未知"} 區塊；最近同步（最舊合約）：${report.indexerSyncedAt ?? "未知"}。尚未索引的鑄造不含在份數中。`,
   ];
   for (const [label, p] of [
     ["近7天", report.periods.days7],
@@ -464,7 +468,7 @@ export function gasTelegramCaption(report: GasReport): string {
       ? `平均約 NT$${(Number(formatEther(BigInt(p.averageWei))) * report.twdPerEth).toFixed(4)}／筆（本次匯價）`
       : "台幣匯價暫無資料",
     `工作待處理 ${report.pendingJobs}／失敗 ${report.failedJobs}；收據待補 ${report.missingReceipts}／費用不完整 ${report.incompleteFees}`,
-    `索引最近同步（最舊合約）：${report.indexerSyncedAt ?? "未知"}；未索引份數不計。`,
+    `索引落後約 ${report.indexerLagBlocks ?? "未知"} 區塊；最舊同步 ${report.indexerSyncedAt ?? "未知"}。未索引份數不計。`,
     "CSV：活動、台灣上鏈日期及是否符合目前登錄活動日。",
     `補款地址（Base ETH）：${report.relayer}`,
     "估計不保證可用筆數；不含未記錄的舊失敗交易或其他轉帳。不會自動補款。",
@@ -531,6 +535,7 @@ export async function runGasMonitor(env: Bindings, now = Date.now()): Promise<{ 
       BigInt(balanceHex),
       state!.notified_level,
       now,
+      BigInt(finalized.number),
     );
     const configured = Boolean(env.TELEGRAM_GAS_BOT_TOKEN && env.TELEGRAM_GAS_CHAT_ID);
     let notified = false;

@@ -221,16 +221,19 @@ describe("finalized Base chain indexer", () => {
   it("uses the historical indexer endpoint independently of the mint RPC", async () => {
     await bindings.LIVE_DB.prepare("UPDATE live_chain_cursors SET chain_id=8453").run();
     const urls: string[] = [];
+    const ranges: number[] = [];
     const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const request = input instanceof Request ? input : new Request(input, init);
       urls.push(request.url);
       const body = (await request.json()) as any;
+      if (body.method === "eth_getLogs")
+        ranges.push(Number(BigInt(body.params[0].toBlock) - BigInt(body.params[0].fromBlock) + 1n));
       const result =
         body.method === "eth_chainId"
           ? "0x2105"
           : body.method === "eth_getBlockByNumber"
             ? {
-                number: "0x63",
+                number: "0x7d0",
                 hash: `0x${"11".repeat(32)}`,
                 gasLimit: "0x0",
                 gasUsed: "0x0",
@@ -250,6 +253,7 @@ describe("finalized Base chain indexer", () => {
       });
       expect(result.failures).toBe(0);
       expect(urls.length).toBeGreaterThan(0);
+      expect(ranges).toEqual([1000, 901]);
       expect(urls.every((u) => u.startsWith("https://history.example.test"))).toBe(true);
     } finally {
       spy.mockRestore();

@@ -11,7 +11,7 @@ import { associationBadgesAbi } from "../shared/association-badges";
 import { baseMainnetRpcUrl } from "./rpc-config";
 import type { Bindings, D1ReadClient } from "./types";
 
-const BLOCKS_PER_CHUNK = 1_900n;
+const BLOCKS_PER_CHUNK = 1_000n;
 const ALCHEMY_FREE_BLOCKS_PER_CHUNK = 10n;
 const MAX_CHUNKS_PER_TARGET = 30;
 const MAX_TRANSFERS_PER_CHUNK = 400;

@@ -72,9 +72,14 @@ Balance and receipt reads still worked; mint RPC health did not prove historical
 indexing worked.
 
 BASE_MAINNET_INDEXER_RPC_URL selects an independently verified historical RPC
-for the existing indexer. Production uses https://mainnet.base.org and 1,900-block
+for the existing indexer. Production uses https://base.gateway.tenderly.co and 1,000-block
 chunks, resuming the saved cursor without skipping blocks. Mint and balance RPC
 selection is unchanged. This public endpoint has no SLA; persistent rate limits
 require replacing this setting with a dedicated archive-capable endpoint.
-Reports display the oldest Base cursor synchronization time and explicitly
+Reports display the oldest Base cursor synchronization time, lag against the
+current finalized head, and explicitly
 exclude not-yet-indexed mint units.
+
+Validation from a Cloudflare remote preview confirmed a known historical mint
+with this endpoint at 1,000 blocks per request. The previously tested mainnet
+public endpoint was rate-limited from Cloudflare despite working from a desktop.

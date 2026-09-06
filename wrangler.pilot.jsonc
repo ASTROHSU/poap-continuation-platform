@@ -92,7 +92,7 @@
   ],
   "vars": {
     "GAS_MONITOR_ENABLED": "true",
-    "BASE_MAINNET_INDEXER_RPC_URL": "https://mainnet.base.org",
+    "BASE_MAINNET_INDEXER_RPC_URL": "https://base.gateway.tenderly.co",
     "GAS_MONITOR_LOW_ETH": "0.0002",
     "GAS_MONITOR_CRITICAL_ETH": "0.00002",
     "APP_MODE": "live-only",
