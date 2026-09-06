@@ -17,7 +17,7 @@ const bindings = {
   GAS_MONITOR_ENABLED: "true",
   TELEGRAM_GAS_BOT_TOKEN: "test-token",
   TELEGRAM_GAS_CHAT_ID: "test-recipient",
-  BASE_MAINNET_ALCHEMY_RPC_URL: "https://rpc.example.test",
+  BASE_MAINNET_RPC_URL: "https://rpc.example.test",
 } as any;
 beforeAll(async () => applyD1Migrations(bindings.LIVE_DB, bindings.TEST_LIVE_MIGRATIONS));
 afterEach(() => vi.restoreAllMocks());

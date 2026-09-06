@@ -28,7 +28,6 @@ export interface Bindings {
   ETHEREUM_RPC_URL: string;
   BASE_RPC_URL: string;
   BASE_MAINNET_RPC_URL: string;
-  BASE_MAINNET_ALCHEMY_RPC_URL?: string;
   ARBITRUM_MAINNET_RPC_URL: string;
   GNOSIS_MAINNET_RPC_URL: string;
   MINT_SIGNER_PRIVATE_KEY: string;

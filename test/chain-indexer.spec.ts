@@ -248,7 +248,6 @@ describe("finalized Base chain indexer", () => {
     try {
       const result = await runLiveChainIndexer({
         ...bindings,
-        BASE_MAINNET_ALCHEMY_RPC_URL: "https://mint.example.test",
         BASE_MAINNET_INDEXER_RPC_URL: "https://history.example.test",
       });
       expect(result.failures).toBe(0);
