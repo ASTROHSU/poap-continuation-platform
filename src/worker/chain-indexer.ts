@@ -95,12 +95,18 @@ export interface ChainIndexerStatus {
 export async function runLiveChainIndexer(
   env: Pick<
     Bindings,
-    "LIVE_DB" | "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL" | "BASE_MAINNET_ALCHEMY_RPC_URL"
+    | "LIVE_DB"
+    | "BASE_RPC_URL"
+    | "BASE_MAINNET_RPC_URL"
+    | "BASE_MAINNET_ALCHEMY_RPC_URL"
+    | "BASE_MAINNET_INDEXER_RPC_URL"
   >,
   rpcFactory: (target: ChainIndexerTarget) => ChainIndexerRpc = (target) =>
     createChainIndexerRpc(
       rpcUrlForChain(env, target.chainId),
-      target.chainId === 8453 && env.BASE_MAINNET_ALCHEMY_RPC_URL?.trim()
+      target.chainId === 8453 &&
+        !env.BASE_MAINNET_INDEXER_RPC_URL?.trim() &&
+        env.BASE_MAINNET_ALCHEMY_RPC_URL?.trim()
         ? ALCHEMY_FREE_BLOCKS_PER_CHUNK
         : undefined,
     ),
@@ -387,11 +393,17 @@ async function fetchTrackedTokenIds(
 }
 
 function rpcUrlForChain(
-  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL" | "BASE_MAINNET_ALCHEMY_RPC_URL">,
+  env: Pick<
+    Bindings,
+    | "BASE_RPC_URL"
+    | "BASE_MAINNET_RPC_URL"
+    | "BASE_MAINNET_ALCHEMY_RPC_URL"
+    | "BASE_MAINNET_INDEXER_RPC_URL"
+  >,
   chainId: number,
 ): string {
   if (chainId === 84532) return env.BASE_RPC_URL;
-  if (chainId === 8453) return baseMainnetRpcUrl(env);
+  if (chainId === 8453) return env.BASE_MAINNET_INDEXER_RPC_URL?.trim() || baseMainnetRpcUrl(env);
   throw new Error(`Unsupported chain ID ${chainId}.`);
 }
 

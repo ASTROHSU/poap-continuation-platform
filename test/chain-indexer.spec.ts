@@ -8,10 +8,11 @@ import {
   type Hash,
   type Hex,
 } from "viem";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { associationBadgesAbi } from "../src/shared/association-badges";
 import {
   decodeTrackedTransfers,
+  runLiveChainIndexer,
   fetchChainIndexerStatus,
   fetchChainIndexerTargets,
   syncChainIndexerChunk,
@@ -215,6 +216,44 @@ describe("finalized Base chain indexer", () => {
 
     const invalid = await SELF.fetch("https://example.test/api/live/indexer/status?verbose=true");
     expect(invalid.status).toBe(400);
+  });
+
+  it("uses the historical indexer endpoint independently of the mint RPC", async () => {
+    await bindings.LIVE_DB.prepare("UPDATE live_chain_cursors SET chain_id=8453").run();
+    const urls: string[] = [];
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      urls.push(request.url);
+      const body = (await request.json()) as any;
+      const result =
+        body.method === "eth_chainId"
+          ? "0x2105"
+          : body.method === "eth_getBlockByNumber"
+            ? {
+                number: "0x63",
+                hash: `0x${"11".repeat(32)}`,
+                gasLimit: "0x0",
+                gasUsed: "0x0",
+                size: "0x0",
+                timestamp: "0x0",
+                difficulty: "0x0",
+                transactions: [],
+              }
+            : [];
+      return Response.json({ jsonrpc: "2.0", id: body.id, result });
+    });
+    try {
+      const result = await runLiveChainIndexer({
+        ...bindings,
+        BASE_MAINNET_ALCHEMY_RPC_URL: "https://mint.example.test",
+        BASE_MAINNET_INDEXER_RPC_URL: "https://history.example.test",
+      });
+      expect(result.failures).toBe(0);
+      expect(urls.length).toBeGreaterThan(0);
+      expect(urls.every((u) => u.startsWith("https://history.example.test"))).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("honors provider-specific log range limits", async () => {

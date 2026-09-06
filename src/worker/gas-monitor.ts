@@ -384,6 +384,7 @@ export function gasCaption(report: GasReport, recovery = true): string {
     `餘額：${money(report.balanceWei, report)}`,
     `按近30天均值約可鑄造：${report.estimatedMints ?? "樣本不足"}筆（未扣待處理交易）`,
     `待處理 ${report.pendingJobs} 筆／失敗 ${report.failedJobs} 筆`,
+    `索引最近同步（最舊合約）：${report.indexerSyncedAt ?? "未知"}；尚未索引的鑄造不含在份數中。`,
   ];
   for (const [label, p] of [
     ["近7天", report.periods.days7],
@@ -463,6 +464,7 @@ export function gasTelegramCaption(report: GasReport): string {
       ? `平均約 NT$${(Number(formatEther(BigInt(p.averageWei))) * report.twdPerEth).toFixed(4)}／筆（本次匯價）`
       : "台幣匯價暫無資料",
     `工作待處理 ${report.pendingJobs}／失敗 ${report.failedJobs}；收據待補 ${report.missingReceipts}／費用不完整 ${report.incompleteFees}`,
+    `索引最近同步（最舊合約）：${report.indexerSyncedAt ?? "未知"}；未索引份數不計。`,
     "CSV：活動、台灣上鏈日期及是否符合目前登錄活動日。",
     `補款地址（Base ETH）：${report.relayer}`,
     "估計不保證可用筆數；不含未記錄的舊失敗交易或其他轉帳。不會自動補款。",
