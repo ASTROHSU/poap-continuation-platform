@@ -1,21 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { baseMainnetRpcUrl } from "../src/worker/rpc-config";
+import { baseMainnetHistoryRpcUrl, baseMainnetRpcUrl } from "../src/worker/rpc-config";
 
-describe("baseMainnetRpcUrl", () => {
-  it("prefers the dedicated secret endpoint", () => {
+describe("Base mainnet RPC routing", () => {
+  it("keeps live operations on the original RPC", () => {
     expect(
       baseMainnetRpcUrl({
-        BASE_MAINNET_RPC_URL: "https://fallback.example",
-        BASE_MAINNET_ALCHEMY_RPC_URL: " https://dedicated.example ",
+        BASE_MAINNET_RPC_URL: "https://live.example",
       }),
-    ).toBe("https://dedicated.example");
+    ).toBe("https://live.example");
   });
 
-  it("keeps the public endpoint as a zero-downtime fallback", () => {
+  it("uses the isolated historical RPC only for historical reads", () => {
     expect(
-      baseMainnetRpcUrl({
-        BASE_MAINNET_RPC_URL: "https://fallback.example",
+      baseMainnetHistoryRpcUrl({
+        BASE_MAINNET_RPC_URL: "https://live.example",
+        BASE_MAINNET_INDEXER_RPC_URL: " https://history.example ",
       }),
-    ).toBe("https://fallback.example");
+    ).toBe("https://history.example");
+  });
+
+  it("falls back to the original RPC when no historical endpoint is configured", () => {
+    expect(
+      baseMainnetHistoryRpcUrl({
+        BASE_MAINNET_RPC_URL: "https://live.example",
+      }),
+    ).toBe("https://live.example");
   });
 });

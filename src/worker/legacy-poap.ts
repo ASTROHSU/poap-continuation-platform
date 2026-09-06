@@ -128,7 +128,6 @@ export async function fetchLegacyPoapHoldings(
     | "ETHEREUM_RPC_URL"
     | "GNOSIS_MAINNET_RPC_URL"
     | "BASE_MAINNET_RPC_URL"
-    | "BASE_MAINNET_ALCHEMY_RPC_URL"
     | "ARBITRUM_MAINNET_RPC_URL"
   >,
   owner: Address,
@@ -178,7 +177,6 @@ function networkDefinitions(
     | "ETHEREUM_RPC_URL"
     | "GNOSIS_MAINNET_RPC_URL"
     | "BASE_MAINNET_RPC_URL"
-    | "BASE_MAINNET_ALCHEMY_RPC_URL"
     | "ARBITRUM_MAINNET_RPC_URL"
   >,
 ): NetworkDefinition[] {

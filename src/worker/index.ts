@@ -2971,7 +2971,7 @@ function isUniqueConstraintError(error: unknown): boolean {
 }
 
 function liveRpcUrl(
-  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL" | "BASE_MAINNET_ALCHEMY_RPC_URL">,
+  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL">,
   chainId: number,
 ): string {
   if (chainId === 84532) return env.BASE_RPC_URL;

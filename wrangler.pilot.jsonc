@@ -25,7 +25,6 @@
   },
   "secrets": {
     "required": [
-      "BASE_MAINNET_ALCHEMY_RPC_URL",
       "MAGIC_SECRET_KEY",
       "ISSUER_ADMIN_EMAILS",
       "ACCESS_TEAM_DOMAIN",

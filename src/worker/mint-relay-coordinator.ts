@@ -160,10 +160,7 @@ function receiptTimedOut(submittedAt: string | null): boolean {
   return Date.now() - Date.parse(submittedAt) >= RECEIPT_TIMEOUT_MS;
 }
 
-function liveRpcUrl(
-  env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL" | "BASE_MAINNET_ALCHEMY_RPC_URL">,
-  chainId: number,
-) {
+function liveRpcUrl(env: Pick<Bindings, "BASE_RPC_URL" | "BASE_MAINNET_RPC_URL">, chainId: number) {
   if (chainId === 84532) return env.BASE_RPC_URL;
   if (chainId === 8453) return baseMainnetRpcUrl(env);
   throw new Error(`Unsupported live chain: ${chainId}`);
