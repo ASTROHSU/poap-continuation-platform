@@ -17,6 +17,7 @@ execFileSync(
     "frontend-astro/src/layouts/AdminLayout.astro",
     "migrations/live/0010_live_event_issuer.sql",
     "migrations/live/0011_live_event_revisions.sql",
+    "migrations/live/0012_gas_monitor.sql",
   ],
   { stdio: "pipe" },
 );

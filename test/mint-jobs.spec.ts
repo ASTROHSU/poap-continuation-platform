@@ -9,6 +9,7 @@ import {
   markMintJobConfirmed,
   markMintJobRetry,
   markMintJobSubmitting,
+  markMintJobSubmitted,
   mintJobPublicStatus,
   mintRelayShardKey,
   renewExpiredMintJobAuthorization,
@@ -143,6 +144,23 @@ describe("durable sponsored mint jobs", () => {
       .first<{ minted_tx_hash: string; minted_at: string }>();
     expect(claim?.minted_tx_hash).toBe(transactionHash);
     expect(claim?.minted_at).toBeTruthy();
+  });
+
+  it("retains each submitted transaction hash when a job retries", async () => {
+    const created = await createOrReuseMintJob(
+      bindings.LIVE_DB,
+      await jobInput(recipient, `0x${"ab".repeat(32)}`),
+    );
+    const first = `0x${"cd".repeat(32)}` as const;
+    const second = `0x${"ef".repeat(32)}` as const;
+    await markMintJobSubmitted(bindings.LIVE_DB, created, first);
+    await markMintJobRetry(bindings.LIVE_DB, created, new Error("retry"));
+    await markMintJobSubmitted(bindings.LIVE_DB, created, second);
+    await markMintJobSubmitted(bindings.LIVE_DB, created, second);
+    const rows = await bindings.LIVE_DB.prepare(
+      "SELECT transaction_hash FROM gas_receipts ORDER BY transaction_hash",
+    ).all();
+    expect(rows.results.map((r) => r.transaction_hash)).toEqual([first, second]);
   });
 
   it("renews an expired authorization and makes the persisted job immediately retryable", async () => {
