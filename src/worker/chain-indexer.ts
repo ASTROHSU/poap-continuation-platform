@@ -8,7 +8,7 @@ import {
   type Hex,
 } from "viem";
 import { associationBadgesAbi } from "../shared/association-badges";
-import { baseMainnetRpcUrl } from "./rpc-config";
+import { baseMainnetHistoryRpcUrl } from "./rpc-config";
 import type { Bindings, D1ReadClient } from "./types";
 
 const BLOCKS_PER_CHUNK = 1_000n;
@@ -403,7 +403,7 @@ function rpcUrlForChain(
   chainId: number,
 ): string {
   if (chainId === 84532) return env.BASE_RPC_URL;
-  if (chainId === 8453) return env.BASE_MAINNET_INDEXER_RPC_URL?.trim() || baseMainnetRpcUrl(env);
+  if (chainId === 8453) return baseMainnetHistoryRpcUrl(env);
   throw new Error(`Unsupported chain ID ${chainId}.`);
 }
 

@@ -83,3 +83,8 @@ exclude not-yet-indexed mint units.
 Validation from a Cloudflare remote preview confirmed a known historical mint
 with this endpoint at 1,000 blocks per request. The previously tested mainnet
 public endpoint was rate-limited from Cloudflare despite working from a desktop.
+
+The same historical endpoint is used for receipt and block-date backfill, through
+the shared RPC selector. Balance reads keep the mint endpoint. This avoids
+restoring event indexing while silently leaving fee history on an endpoint that
+rejects historical data.

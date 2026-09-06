@@ -122,6 +122,7 @@ describe("gas accounting and notification policy", () => {
 describe("durable scheduled gas monitor", () => {
   it("backfills a finalized receipt with its block date and actual L1-inclusive fee", async () => {
     const hash = "0x" + "a".repeat(64);
+    const requests: Array<{ url: string; methods: string[] }> = [];
     await bindings.LIVE_DB.prepare(
       "INSERT INTO gas_receipts (chain_id, transaction_hash) VALUES (8453, ?)",
     )
@@ -130,6 +131,7 @@ describe("durable scheduled gas monitor", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       if (String(input).includes("coinbase")) return Response.json({});
       const calls = JSON.parse(String(init?.body));
+      requests.push({ url: String(input), methods: calls.map((c: any) => c.method) });
       return Response.json(
         calls.map((c: any) => ({
           id: c.id,
@@ -150,7 +152,17 @@ describe("durable scheduled gas monitor", () => {
         })),
       );
     });
-    await runGasMonitor({ ...bindings, TELEGRAM_GAS_CHAT_ID: "" });
+    await runGasMonitor({
+      ...bindings,
+      TELEGRAM_GAS_CHAT_ID: "",
+      BASE_MAINNET_INDEXER_RPC_URL: "https://history.example.test",
+    });
+    expect(requests.find((r) => r.methods.includes("eth_getTransactionReceipt"))?.url).toBe(
+      "https://history.example.test",
+    );
+    expect(requests.find((r) => r.methods.includes("eth_getBalance"))?.url).toBe(
+      "https://rpc.example.test",
+    );
     const row = await bindings.LIVE_DB.prepare(
       "SELECT fee_wei, occurred_at FROM gas_receipts WHERE transaction_hash=?",
     )

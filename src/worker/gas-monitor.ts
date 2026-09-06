@@ -1,6 +1,6 @@
 import { formatEther, parseEther } from "viem";
 import { mintRelayerAddress } from "./minting";
-import { baseMainnetRpcUrl } from "./rpc-config";
+import { baseMainnetRpcUrl, baseMainnetHistoryRpcUrl } from "./rpc-config";
 import type { Bindings } from "./types";
 
 const CHAIN = 8453;
@@ -525,7 +525,7 @@ export async function runGasMonitor(env: Bindings, now = Date.now()): Promise<{ 
     if (typeof balanceHex !== "string" || !/^0x[0-9a-f]+$/i.test(balanceHex) || !finalized?.number)
       throw new Error("gas_balance_unknown");
     try {
-      await backfill(env, rpc, now, BigInt(finalized.number));
+      await backfill(env, baseMainnetHistoryRpcUrl(env), now, BigInt(finalized.number));
     } catch {
       console.error("Gas receipt backfill incomplete; balance monitoring continues.");
     }
