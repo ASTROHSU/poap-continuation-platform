@@ -16,9 +16,7 @@ export async function verifyMintRelayCoordinatorConfig(configPath) {
   if (!/"BASE_MAINNET_RPC_URL"\s*:\s*"https:\/\/mainnet\.base\.org"/.test(source)) {
     missing.push("original Base mainnet RPC endpoint");
   }
-  if (
-    !/"BASE_MAINNET_FALLBACK_RPC_URL"\s*:\s*"https:\/\/base\.gateway\.tenderly\.co"/.test(source)
-  ) {
+  if (!/"BASE_MAINNET_FALLBACK_RPC_URL"\s*:\s*"https:\/\/base-rpc\.publicnode\.com"/.test(source)) {
     missing.push("independent Base mainnet fallback RPC endpoint");
   }
 
