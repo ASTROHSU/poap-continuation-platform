@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { withSnapshotCache } from "./cache";
 import {
   fetchCollectionArtistDrops,
@@ -96,6 +97,7 @@ import {
 import { transactionExplorerUrl } from "../shared/live-chains";
 import { publicMagicEmbeddedWalletConfig, verifyMagicIdentity } from "./magic-auth";
 import {
+  createIssuerEvent,
   listIssuerEvents,
   loadIssuerEvent,
   requireIssuerAdmin,
@@ -443,6 +445,28 @@ app.get("/api/admin/issuer/events", async (context) => {
     "Cache-Control": "private, no-store",
   });
 });
+
+app.post(
+  "/api/admin/issuer/events",
+  bodyLimit({
+    maxSize: 4_400_000,
+    onError: (context) =>
+      context.json(
+        { error: "圖片與表單內容過大，請縮小圖片後重試。", code: "issuer_draft_body_too_large" },
+        413,
+      ),
+  }),
+  async (context) => {
+    assertNoQuery(new URL(context.req.url));
+    assertSameOrigin(context.req.raw);
+    const identity = await requireIssuerAdmin(context.env, context.req.raw);
+    const body = await parseJsonObject(context.req.raw, "Issuer event draft");
+    const result = await createIssuerEvent(context.env, identity, body);
+    return context.json(result, result.replayed ? 200 : 201, {
+      "Cache-Control": "private, no-store",
+    });
+  },
+);
 
 app.get("/api/admin/issuer/events/:slug", async (context) => {
   assertNoQuery(new URL(context.req.url));

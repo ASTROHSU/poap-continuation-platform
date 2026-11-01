@@ -54,3 +54,12 @@ Magic Dashboard 也必須把 `https://admin.poap.blocktrend.today` 加入允許�
 ## 緊急撤銷
 
 先在 Cloudflare Access policy 移除管理者或停用 application，再撤銷 Magic session／更換 Worker allowlist。Access 位於最外層，這一步可以立即阻止新的管理請求抵達應用程式。
+
+## 新增活動草稿
+
+管理頁的「建立新活動設定」前往同一管理網域的 `/issuer/`，沿用相同 Access 與 Magic 驗證。
+填妥活動代號、名稱、發行單位、說明、時間、預定上限與圖片後，`POST /api/admin/issuer/events`
+只建立 `draft`；不產生領取資格、Token、交易或發行簽名。請求 ID 綁定管理者及內容，原表單
+重試不會新增第二場；不同請求撞到既有代號會回 409。圖片儲存暫時失敗時保留表單重試。
+先套用 `0013_live_event_draft_requests.sql`，再發布新版 Worker，最後發布包含 `/issuer/` 的前端。
+正式合約及 Token 未設定的新增草稿無法開放領取。

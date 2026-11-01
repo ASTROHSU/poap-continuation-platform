@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   loginWithMagicEmail,
   logoutMagicEmailSession,
@@ -45,7 +45,22 @@ interface SavedResult {
 
 const blankMessage = { text: "", error: false };
 
-export default function IssuerAdmin() {
+export default function IssuerAdmin({ createMode = false }: { createMode?: boolean }) {
+  const createLock = useRef(false);
+  const requestId = useRef("");
+  const [createdSlug, setCreatedSlug] = useState("");
+  const [draft, setDraft] = useState({
+    slug: "",
+    title: "",
+    issuer: "",
+    description: "",
+    eventUrl: "",
+    startsAt: "",
+    claimOpensAt: "",
+    claimClosesAt: "",
+    maxSupply: "",
+    claimMode: "shared",
+  });
   const [publishableKey, setPublishableKey] = useState("");
   const [emailTemplateName, setEmailTemplateName] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -165,6 +180,35 @@ export default function IssuerAdmin() {
     });
   }
 
+  async function createDraft() {
+    if (!session || createLock.current || createdSlug) return;
+    createLock.current = true;
+    if (!requestId.current) requestId.current = crypto.randomUUID();
+    await run(async () => {
+      if (!artwork) throw new Error("請上傳活動圖片。");
+      const active = await freshSession(session);
+      const response = await adminRequest<{ event: ManagedEvent }>(
+        "/api/admin/issuer/events",
+        active,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            ...draft,
+            requestId: requestId.current,
+            artwork,
+            maxSupply: Number(draft.maxSupply),
+            startsAt: new Date(draft.startsAt).toISOString(),
+            claimOpensAt: new Date(draft.claimOpensAt).toISOString(),
+            claimClosesAt: new Date(draft.claimClosesAt).toISOString(),
+          }),
+        },
+      );
+      setCreatedSlug(response.event.slug);
+      setMessage({ text: "草稿已儲存。尚未發行 NFT，也尚未開放領取。", error: false });
+    });
+    createLock.current = false;
+  }
+
   async function save() {
     if (!event || !session) return;
     await run(async () => {
@@ -235,7 +279,13 @@ export default function IssuerAdmin() {
   }
 
   async function pickArtwork(file: File | undefined) {
-    if (!file) return;
+    if (!file) {
+      setArtwork(null);
+      setPreview("");
+      return;
+    }
+    setArtwork(null);
+    setPreview("");
     if (file.size > 3 * 1024 * 1024) {
       setMessage({ text: "Artwork 不可超過 3 MiB。", error: true });
       return;
@@ -310,6 +360,158 @@ export default function IssuerAdmin() {
             {message.text}
           </p>
         )}
+      </section>
+    );
+  }
+
+  if (createMode) {
+    const patchDraft = (key: keyof typeof draft, value: string) =>
+      setDraft((current) => ({ ...current, [key]: value }));
+    return (
+      <section className="mx-auto max-w-3xl">
+        <a href="/" className="font-bold text-purple underline">
+          ← 返回活動管理
+        </a>
+        <div className="soft-card mt-6 rounded-[2rem] p-6 md:p-10">
+          <h1 className="text-3xl font-black">新增活動草稿</h1>
+          <p className="mt-3 text-ink/60">
+            先儲存活動資料與圖片。草稿不會發行 NFT、產生領取資格或自動開放領取。
+          </p>
+          {createdSlug ? (
+            <div className="mt-6" role="status">
+              <p className="font-bold">草稿已儲存：{draft.title}</p>
+              <p className="mt-2">活動代號：{createdSlug}</p>
+              <a className="btn-primary mt-5" href="/">
+                返回管理並查看草稿
+              </a>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void createDraft();
+              }}
+            >
+              <fieldset disabled={busy} className="disabled:opacity-60">
+                <Field label="活動代號（英文小寫、數字與連字號；建立後不可修改）">
+                  <input
+                    required
+                    minLength={3}
+                    maxLength={80}
+                    pattern="[a-z0-9][a-z0-9-]{1,78}[a-z0-9]"
+                    value={draft.slug}
+                    onChange={(e) => patchDraft("slug", e.target.value)}
+                  />
+                </Field>
+                <Field label="活動名稱">
+                  <input
+                    required
+                    maxLength={160}
+                    value={draft.title}
+                    onChange={(e) => patchDraft("title", e.target.value)}
+                  />
+                </Field>
+                <Field label="發行單位">
+                  <input
+                    required
+                    maxLength={160}
+                    value={draft.issuer}
+                    onChange={(e) => patchDraft("issuer", e.target.value)}
+                  />
+                </Field>
+                <Field label="活動說明">
+                  <textarea
+                    required
+                    maxLength={1000}
+                    rows={4}
+                    value={draft.description}
+                    onChange={(e) => patchDraft("description", e.target.value)}
+                  />
+                </Field>
+                <Field label="活動網址（選填，HTTPS）">
+                  <input
+                    type="url"
+                    value={draft.eventUrl}
+                    onChange={(e) => patchDraft("eventUrl", e.target.value)}
+                  />
+                </Field>
+                <p className="mt-5 text-sm text-ink/60">
+                  以下時間使用此裝置的時區：{Intl.DateTimeFormat().resolvedOptions().timeZone}
+                </p>
+                <Field label="活動開始時間">
+                  <input
+                    required
+                    type="datetime-local"
+                    value={draft.startsAt}
+                    onChange={(e) => patchDraft("startsAt", e.target.value)}
+                  />
+                </Field>
+                <Field label="預定開放領取時間">
+                  <input
+                    required
+                    type="datetime-local"
+                    value={draft.claimOpensAt}
+                    onChange={(e) => patchDraft("claimOpensAt", e.target.value)}
+                  />
+                </Field>
+                <Field label="預定結束領取時間">
+                  <input
+                    required
+                    type="datetime-local"
+                    value={draft.claimClosesAt}
+                    onChange={(e) => patchDraft("claimClosesAt", e.target.value)}
+                  />
+                </Field>
+                <Field label="預定發行上限">
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={1000000}
+                    step={1}
+                    value={draft.maxSupply}
+                    onChange={(e) => patchDraft("maxSupply", e.target.value)}
+                  />
+                </Field>
+                <Field label="預定領取模式">
+                  <select
+                    className="rounded-2xl border-2 border-purple/20 p-3"
+                    value={draft.claimMode}
+                    onChange={(e) => patchDraft("claimMode", e.target.value)}
+                  >
+                    <option value="shared">共用 QR</option>
+                    <option value="unique">每人獨立連結</option>
+                  </select>
+                </Field>
+                <Field label="活動圖片（PNG、JPEG、WebP、GIF，最大 3 MiB）">
+                  <input
+                    required
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={(e) => {
+                      void pickArtwork(e.target.files?.[0]);
+                    }}
+                  />
+                </Field>
+                {preview && (
+                  <img
+                    className="mt-5 h-48 w-48 rounded-2xl object-contain"
+                    src={preview}
+                    alt="活動圖片預覽"
+                  />
+                )}
+                <button className="btn-primary mt-8" type="submit" disabled={busy}>
+                  {busy ? "儲存中…" : "儲存草稿"}
+                </button>
+              </fieldset>
+            </form>
+          )}
+          {message.text && (
+            <p className="mt-5 font-bold" role={message.error ? "alert" : "status"}>
+              {message.text}
+            </p>
+          )}
+        </div>
       </section>
     );
   }

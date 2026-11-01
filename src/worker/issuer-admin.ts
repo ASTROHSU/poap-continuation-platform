@@ -142,6 +142,203 @@ export async function loadIssuerEvent(
   return mapManagedEvent(row, metadata);
 }
 
+// Creating a draft never assigns a token, generates claim credentials or calls a chain RPC.
+export async function createIssuerEvent(
+  env: Pick<Bindings, "LIVE_DB" | "ARCHIVE_BUCKET">,
+  identity: IssuerAdminIdentity,
+  input: Record<string, unknown>,
+): Promise<{ event: IssuerManagedEvent; replayed: boolean }> {
+  const allowed = new Set([
+    "requestId",
+    "slug",
+    "title",
+    "issuer",
+    "description",
+    "eventUrl",
+    "startsAt",
+    "claimOpensAt",
+    "claimClosesAt",
+    "maxSupply",
+    "claimMode",
+    "artwork",
+    "eventType",
+    "location",
+    "collaborators",
+  ]);
+  if (Object.keys(input).some((key) => !allowed.has(key))) {
+    throw new ApiError(400, "草稿包含不支援的欄位。", "issuer_draft_field_invalid");
+  }
+  const requestId = String(input.requestId || "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(requestId)) {
+    throw new ApiError(400, "請重新開啟新增活動表單。", "issuer_draft_request_invalid");
+  }
+  const slug = validSlug(input.slug);
+  const maxSupply = input.maxSupply;
+  if (
+    typeof maxSupply !== "number" ||
+    !Number.isSafeInteger(maxSupply) ||
+    maxSupply < 1 ||
+    maxSupply > 1_000_000
+  ) {
+    throw new ApiError(
+      400,
+      "預定發行上限必須是 1 至 1,000,000 的整數。",
+      "issuer_draft_supply_invalid",
+    );
+  }
+  if (input.claimMode !== "unique" && input.claimMode !== "shared") {
+    throw new ApiError(400, "請選擇領取模式。", "issuer_draft_mode_invalid");
+  }
+  const artwork = parseArtwork(input.artwork);
+  if (!artwork) throw new ApiError(400, "請上傳活動圖片。", "issuer_event_field_required");
+  const artworkHash = await sha256Hex(artwork.bytes);
+  const eventId = `draft-${requestId}`;
+  const imageUrl = `${LIVE_MEDIA_PREFIX}/${slug}/artwork-${artworkHash.slice(0, 20)}.${artwork.extension}`;
+  const candidate = normalizeUpdate(
+    {
+      eventId,
+      slug,
+      maxSupply,
+      claimMode: input.claimMode,
+      imageUrl,
+      chainId: BASE_MAINNET_CHAIN_ID,
+      contractAddress: null,
+      tokenId: null,
+      status: "draft",
+      title: "",
+      issuer: "",
+      description: "",
+      eventUrl: null,
+      startsAt: "",
+      claimOpensAt: "",
+      claimClosesAt: "",
+      updatedAt: "",
+      eventType: "",
+      location: "",
+      collaborators: [],
+    },
+    input,
+  );
+  candidate.description = requiredText(input.description, "活動說明", 1_000);
+  if (Date.parse(candidate.claimClosesAt) <= Date.parse(candidate.startsAt)) {
+    throw new ApiError(400, "結束領取時間必須晚於活動開始時間。", "issuer_event_time_invalid");
+  }
+  const inputHash = await sha256Hex(
+    new TextEncoder().encode(JSON.stringify({ candidate, artworkHash })),
+  );
+  type DraftRequest = {
+    input_hash: string;
+    event_id: string;
+    created_by_address: string;
+    created_at: string;
+  };
+  const readRequest = () =>
+    env.LIVE_DB.prepare(
+      "SELECT input_hash, event_id, created_by_address, created_at FROM live_event_draft_requests WHERE request_id = ?",
+    )
+      .bind(requestId)
+      .first<DraftRequest>();
+  let request = await readRequest();
+  let replayed = Boolean(request);
+  if (!request) {
+    const createdAt = new Date().toISOString();
+    try {
+      // Reserve the slug and idempotency record atomically before writing any R2 object.
+      await env.LIVE_DB.batch([
+        env.LIVE_DB.prepare(
+          `INSERT INTO live_events
+          (event_id, slug, title, issuer, description, image_url, event_url, starts_at,
+           claim_opens_at, claim_closes_at, chain_id, max_supply, status, claim_mode, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 8453, ?, 'draft', ?, ?)`,
+        ).bind(
+          eventId,
+          slug,
+          candidate.title,
+          candidate.issuer,
+          candidate.description,
+          imageUrl,
+          candidate.eventUrl,
+          candidate.startsAt,
+          candidate.claimOpensAt,
+          candidate.claimClosesAt,
+          maxSupply,
+          input.claimMode,
+          createdAt,
+        ),
+        env.LIVE_DB.prepare(
+          `INSERT INTO live_event_draft_requests
+          (request_id, event_id, input_hash, created_by_address, created_at) VALUES (?, ?, ?, ?, ?)`,
+        ).bind(requestId, eventId, inputHash, identity.address, createdAt),
+      ]);
+    } catch {
+      request = await readRequest();
+      if (!request) {
+        const collision = await env.LIVE_DB.prepare(
+          "SELECT event_id FROM live_events WHERE slug = ?",
+        )
+          .bind(slug)
+          .first();
+        if (collision)
+          throw new ApiError(
+            409,
+            "活動代號已存在，請返回管理頁確認或使用其他代號。",
+            "issuer_event_exists",
+          );
+        throw new ApiError(503, "草稿暫時無法儲存，請保留表單重試。", "issuer_draft_save_failed");
+      }
+      replayed = true;
+    }
+    request = await readRequest();
+  }
+  if (
+    !request ||
+    request.input_hash !== inputHash ||
+    request.created_by_address !== identity.address ||
+    request.event_id !== eventId
+  ) {
+    throw new ApiError(
+      409,
+      "這份表單已用於其他草稿內容，請重新開啟新增活動表單。",
+      "issuer_draft_request_conflict",
+    );
+  }
+  const current = await loadIssuerEvent(env, slug);
+  if (!current)
+    throw new ApiError(503, "無法重新載入草稿，請保留表單重試。", "issuer_draft_save_failed");
+  // A replay must never revert later edits or overwrite another revision's metadata.
+  if (current.updatedAt !== request.created_at) return { event: current, replayed: true };
+  const metadata = buildManagedMetadata(candidate, {});
+  try {
+    await env.ARCHIVE_BUCKET.put(imageUrl.replace("/media/", ""), artwork.bytes, {
+      httpMetadata: {
+        contentType: artwork.contentType,
+        cacheControl: "public, max-age=31536000, immutable",
+      },
+      customMetadata: { updatedBy: identity.address },
+    });
+    // Never replace metadata written by a later edit, including a concurrent one.
+    await env.ARCHIVE_BUCKET.put(
+      `live/events/${slug}/metadata.json`,
+      JSON.stringify(metadata, null, 2),
+      {
+        onlyIf: { etagDoesNotMatch: "*" },
+        httpMetadata: {
+          contentType: "application/json; charset=utf-8",
+          cacheControl: "public, max-age=300",
+        },
+        customMetadata: { updatedBy: identity.address },
+      },
+    );
+  } catch {
+    throw new ApiError(
+      503,
+      "草稿已保留，但圖片儲存尚未完成；請保留這份表單並重試。",
+      "issuer_draft_media_pending",
+    );
+  }
+  return { event: { ...candidate, updatedAt: current.updatedAt }, replayed };
+}
+
 export async function updateIssuerEvent(
   env: Pick<Bindings, "LIVE_DB" | "ARCHIVE_BUCKET">,
   identity: IssuerAdminIdentity,
@@ -265,6 +462,21 @@ export async function transitionIssuerEvent(
   if (!nextStatus) throw new ApiError(400, "活動狀態不正確。", "issuer_event_status_invalid");
   if (!allowedTransition(current.status, nextStatus)) {
     throw new ApiError(409, "目前的活動狀態不能執行這個操作。", "issuer_event_transition_invalid");
+  }
+  const createdAsDraft =
+    nextStatus === "published"
+      ? await env.LIVE_DB.prepare(
+          "SELECT request_id FROM live_event_draft_requests WHERE event_id = ?",
+        )
+          .bind(current.eventId)
+          .first()
+      : null;
+  if (createdAsDraft && (!current.contractAddress || current.tokenId === null)) {
+    throw new ApiError(
+      409,
+      "活動尚未設定正式合約與 Token，請先完成發行準備。",
+      "issuer_event_not_ready",
+    );
   }
   const updatedAt = new Date().toISOString();
   const revisionId = (
