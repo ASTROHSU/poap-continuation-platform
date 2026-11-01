@@ -6,7 +6,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && astro build && node --test test/build.test.mjs",
+    "build": "npm run test:issuer-wallet && astro check && astro build && node --test test/build.test.mjs",
+    "test:issuer-wallet": "node --experimental-strip-types --test test/issuer-wallet.test.mjs",
     "preview": "astro preview",
     "check": "astro check"
   },
@@ -21,7 +22,8 @@
     "magic-sdk": "^33.10.0",
     "react": "latest",
     "react-dom": "latest",
-    "tailwindcss": "latest"
+    "tailwindcss": "latest",
+    "viem": "2.55.4"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
