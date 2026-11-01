@@ -13,6 +13,8 @@ execFileSync(
     "wrangler.admin.jsonc",
     "wrangler.pilot.jsonc",
     "frontend-astro/src/pages/issuer/manage.astro",
+    "frontend-astro/src/pages/issuer/index.astro",
+    "migrations/live/0013_live_event_draft_requests.sql",
     "frontend-astro/src/components/IssuerAdmin.tsx",
     "frontend-astro/src/layouts/AdminLayout.astro",
     "migrations/live/0010_live_event_issuer.sql",
