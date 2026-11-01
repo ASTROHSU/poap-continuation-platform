@@ -6,6 +6,7 @@ import {
   type MagicEmbeddedSession,
 } from "../lib/magic-wallet";
 import { getAppConfig } from "../lib/live-api";
+import IssuerWalletPanel from "./IssuerWalletPanel";
 
 type Status = "draft" | "published" | "closed";
 
@@ -624,6 +625,8 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
                 </span>
               </div>
             </div>
+
+            <IssuerWalletPanel key={event.slug} event={event} status={event.status} />
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
               <form
