@@ -89,6 +89,7 @@ describe("production admin release contract", () => {
     ["events/example", "GET"],
     ["events/example", "PUT"],
     ["events/example/status", "POST"],
+    ["events/example/issuance", "POST"],
   ])(
     "%s %s exists and rejects unauthenticated requests in live-only mode",
     async (path, method) => {

@@ -104,6 +104,7 @@ import {
   transitionIssuerEvent,
   updateIssuerEvent,
 } from "./issuer-admin";
+import { synchronizeIssuerIssuance, recoverIssuerIssuances } from "./issuer-issuance";
 import { requireAccessAdmin } from "./access-auth";
 import { runGasMonitor, gasCaption, gasCsv } from "./gas-monitor";
 import {
@@ -498,6 +499,21 @@ app.post("/api/admin/issuer/events/:slug/status", async (context) => {
   return context.json(await transitionIssuerEvent(context.env, identity, { ...body, slug }), 200, {
     "Cache-Control": "private, no-store",
   });
+});
+
+app.post("/api/admin/issuer/events/:slug/issuance", async (context) => {
+  assertNoQuery(new URL(context.req.url));
+  assertSameOrigin(context.req.raw);
+  const identity = await requireIssuerAdmin(context.env, context.req.raw);
+  const slug = normalizeLiveSlug(context.req.param("slug"));
+  const body = await parseJsonObject(context.req.raw, "Issuer issuance synchronization");
+  return context.json(
+    await synchronizeIssuerIssuance(context.env, identity, slug, body.transactionHash),
+    200,
+    {
+      "Cache-Control": "private, no-store",
+    },
+  );
 });
 
 app.get("/api/meta", async (context) => {
@@ -3084,6 +3100,7 @@ export default {
       gasMonitor,
       holdingsArtwork,
       liveArtwork,
+      issuerIssuances,
     ] = await Promise.all([
       runLiveChainIndexer(env),
       pruneExpiredEmailAuthArtifacts(env.LIVE_DB),
@@ -3100,6 +3117,10 @@ export default {
         env.HOLDINGS_MEDIA_COLLECTIONS_SNAPSHOT_ID,
       ),
       fetchLiveMediaReadiness(env.LIVE_DB.withSession("first-primary"), env.ARCHIVE_BUCKET),
+      recoverIssuerIssuances(env).catch(() => {
+        console.error("Owner issuance synchronization will retry independently.");
+        return { synchronized: 0 };
+      }),
     ]);
     if (!holdingsArtwork.ready) {
       console.error("Holdings artwork release is not ready", holdingsArtwork);
@@ -3115,6 +3136,7 @@ export default {
       gasMonitor,
       holdingsArtwork,
       liveArtwork,
+      issuerIssuances,
     });
   },
 };
