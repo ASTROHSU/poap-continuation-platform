@@ -47,6 +47,7 @@ interface SavedResult {
 const blankMessage = { text: "", error: false };
 
 export default function IssuerAdmin({ createMode = false }: { createMode?: boolean }) {
+  const selectionEpoch = useRef(0);
   const createLock = useRef(false);
   const requestId = useRef("");
   const [createdSlug, setCreatedSlug] = useState("");
@@ -82,7 +83,7 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
 
   const statusLabel = useMemo(() => {
     if (!event) return "";
-    return event.status === "published" ? "開放中" : event.status === "closed" ? "已關閉" : "草稿";
+    return event.status === "published" ? "已發行" : event.status === "closed" ? "已關閉" : "草稿";
   }, [event]);
 
   useEffect(() => {
@@ -162,6 +163,8 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
   }
 
   async function chooseEvent(slug: string) {
+    const epoch = ++selectionEpoch.current;
+    setEvent(null);
     setSavedResult(null);
     setSelectedSlug(slug);
     if (!slug || !session) {
@@ -174,11 +177,43 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
         `/api/admin/issuer/events/${encodeURIComponent(slug)}`,
         active,
       );
+      if (selectionEpoch.current !== epoch) return;
       setEvent(response.event);
       setPreview(response.event.imageUrl);
       setArtwork(null);
       setMessage({ text: `已載入「${response.event.title}」。`, error: false });
     });
+  }
+
+  async function synchronizeIssuance(slug: string, transactionHash?: string) {
+    if (!session) throw new Error("請先登入管理後台。");
+    const active = await freshSession(session);
+    const result = await adminRequest<{
+      event: ManagedEvent;
+      claimUrl: string;
+      transactionHash: string;
+    }>(`/api/admin/issuer/events/${encodeURIComponent(slug)}/issuance`, active, {
+      method: "POST",
+      body: JSON.stringify({ transactionHash }),
+    });
+    setEvents((items) => items.map((item) => (item.slug === slug ? result.event : item)));
+    // Preserve edits if the user was typing while verification completed.
+    setEvent((current) =>
+      current?.slug === slug
+        ? {
+            ...current,
+            status: result.event.status,
+            tokenId: result.event.tokenId,
+            contractAddress: result.event.contractAddress,
+            updatedAt: result.event.updatedAt,
+          }
+        : current,
+    );
+    return {
+      claimUrl: result.claimUrl,
+      transactionHash: result.transactionHash,
+      status: result.event.status,
+    };
   }
 
   async function createDraft() {
@@ -538,6 +573,7 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
           id="issuer-event-select"
           className="mt-2 w-full rounded-2xl border-2 border-purple/20 bg-white px-3 py-3"
           value={selectedSlug}
+          disabled={busy}
           onChange={(input) => void chooseEvent(input.target.value)}
         >
           <option value="">選擇活動</option>
@@ -576,6 +612,13 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
             )}
           </div>
         )}
+        <div className={event && !savedResult ? "mb-6" : "hidden"}>
+          <IssuerWalletPanel
+            event={savedResult ? null : event}
+            status={event?.status ?? ""}
+            onSynchronize={synchronizeIssuance}
+          />
+        </div>
         {savedResult ? (
           <div
             className="soft-card rounded-[2rem] px-7 py-12 text-center sm:px-14 sm:py-16"
@@ -625,8 +668,6 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
                 </span>
               </div>
             </div>
-
-            <IssuerWalletPanel key={event.slug} event={event} status={event.status} />
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
               <form
@@ -848,7 +889,7 @@ function dateTimeLocal(value: string): string {
 }
 
 function statusText(status: ManagedEvent["status"]): string {
-  if (status === "published") return "開放領取";
+  if (status === "published") return "已發行";
   if (status === "closed") return "已關閉";
   return "草稿";
 }

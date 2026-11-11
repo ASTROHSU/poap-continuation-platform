@@ -1,9 +1,10 @@
 // Run with the local Vite harness. All wallet and RPC traffic is mocked; no real wallet is connected.
-import { chromium, webkit } from "playwright";
+const { chromium, webkit } = await import(process.env.ISSUER_PLAYWRIGHT_MODULE || "playwright");
 import assert from "node:assert/strict";
 
 const mock = `
 export async function createMobilePairing({onUri}) {
+  window.__pairings = (window.__pairings || 0) + 1;
   let reject, approved = false;
   const listeners = new Map();
   const provider = {
@@ -20,7 +21,7 @@ export async function createMobilePairing({onUri}) {
     connect() { onUri('wc:'+'a'.repeat(64)+'@2?relay-protocol=irn&symKey='+'b'.repeat(64));
       return new Promise((resolve,r) => {reject=r;window.__approveRabby=()=>{approved=true;resolve({id:'rabby-mobile-walletconnect',name:'手機 Rabby（WalletConnect）',provider});};});
     },
-    async cancel() { if(!approved) reject?.(new Error('已取消手機錢包連線')); listeners.get('disconnect')?.(); },
+    async cancel() { window.__disconnects = (window.__disconnects || 0) + 1; if(!approved) reject?.(new Error('已取消手機錢包連線')); listeners.get('disconnect')?.(); },
     async disconnect() { listeners.get('disconnect')?.(); }
   };
 }`;
@@ -74,6 +75,38 @@ for (const [name, engine] of [
       await page.getByRole("button", { name: "本人確認發行", exact: true }).isEnabled(),
       false,
     );
+    // Switching events (including the empty list) must keep the exact mobile session and owner.
+    await page.getByRole("button", { name: "選擇 12", exact: true }).click();
+    await page.getByRole("heading", { name: "12 月線上讀書會", exact: true }).waitFor();
+    await page.getByText("已核對 owner：", { exact: false }).waitFor();
+    await page.getByText("已發行。交易、200 份領取資格", { exact: false }).waitFor();
+    await page.getByRole("button", { name: "回到列表", exact: true }).click();
+    await page.getByRole("button", { name: "選擇 13", exact: true }).click();
+    await page.getByRole("button", { name: "手機 Rabby 已連接", exact: true }).waitFor();
+    await page.getByText("已核對 owner：", { exact: false }).waitFor();
+    assert.equal(await page.evaluate(() => window.__pairings), 1);
+    assert.equal(await page.evaluate(() => window.__disconnects || 0), 0);
+    // A late synchronization for 11 cannot attach its credential/message to selected 12.
+    await page.evaluate(() => {
+      window.__deferSync = true;
+    });
+    await page.getByRole("button", { name: "選擇 11", exact: true }).click();
+    await page.waitForFunction(
+      () => window.__syncResolvers?.["platform-operations-okx-bybit-2026-11"],
+    );
+    await page.getByRole("button", { name: "選擇 12", exact: true }).click();
+    await page.waitForFunction(() => window.__syncResolvers?.["december-book-club-2026"]);
+    await page.evaluate(() => window.__syncResolvers["platform-operations-okx-bybit-2026-11"]());
+    await page.getByRole("status").filter({ hasText: "正在核對鏈上交易" }).waitFor();
+    assert.equal(await page.getByRole("link", { name: "開啟活動共用領取連結" }).count(), 0);
+    await page.evaluate(() => {
+      window.__deferSync = false;
+      window.__syncResolvers["december-book-club-2026"]();
+    });
+    const claim = page.getByRole("link", { name: "開啟活動共用領取連結" });
+    await claim.waitFor();
+    assert.match(await claim.getAttribute("href"), /december-book-club-2026/);
+    assert.equal(await page.evaluate(() => window.__pairings), 1);
     await page.getByRole("button", { name: "斷開手機錢包", exact: true }).click();
     await page.getByRole("button", { name: "連接手機 Rabby", exact: true }).waitFor();
     await page.getByRole("button", { name: "連接手機 Rabby", exact: true }).click();
@@ -108,7 +141,7 @@ for (const [name, engine] of [
     assert.deepEqual(external, []);
     assert.deepEqual(errors, []);
     console.log(
-      `${name}: QR, owner check, disconnect, cancel and stalled-SDK timeout pass; no external requests or transactions`,
+      `${name}: QR, owner check, persistent event switching, stale synchronization, disconnect, cancel and stalled-SDK timeout pass; no external requests or transactions`,
     );
   } finally {
     await browser.close();

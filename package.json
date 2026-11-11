@@ -78,7 +78,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "test:gas": "vitest run test/gas-monitor.spec.ts test/mint-jobs.spec.ts",
-    "test:admin": "vitest run test/access-auth.spec.ts test/admin-gateway.spec.ts test/issuer-admin.spec.ts test/admin-release.spec.ts",
+    "test:admin": "vitest run test/access-auth.spec.ts test/admin-gateway.spec.ts test/issuer-admin.spec.ts test/admin-release.spec.ts test/issuer-issuance.spec.ts",
     "predeploy:pilot": "node tools/launch-readiness/verify-release-source.mjs",
     "deploy:admin": "node tools/launch-readiness/verify-release-source.mjs && npm run test:admin && wrangler deploy --config wrangler.admin.jsonc",
     "deploy:frontend": "node tools/launch-readiness/verify-release-source.mjs && cd frontend-astro && vercel deploy --prod"
