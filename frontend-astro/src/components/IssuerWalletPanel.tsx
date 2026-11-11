@@ -16,6 +16,9 @@ import {
   type IssuanceJournal,
   type WalletChoice,
 } from "../lib/issuer-wallet";
+import type { MobilePairing } from "../lib/issuer-mobile-wallet";
+
+const mobileProjectId = import.meta.env.PUBLIC_WALLETCONNECT_PROJECT_ID || "";
 
 export default function IssuerWalletPanel({
   event,
@@ -32,7 +35,13 @@ export default function IssuerWalletPanel({
   const [message, setMessage] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pairing, setPairing] = useState(false);
+  const [pairingQr, setPairingQr] = useState("");
+  const [mobileConnected, setMobileConnected] = useState(false);
+  const mobileRef = useRef<MobilePairing | null>(null);
+  const pairingEpoch = useRef(0);
   const busyRef = useRef(false);
+  const operationRef = useRef(0);
   const generation = useRef(0);
   const mounted = useRef(true);
   let plan: ReturnType<typeof issuancePlan> = null;
@@ -55,6 +64,8 @@ export default function IssuerWalletPanel({
       cleanup();
       mounted.current = false;
       generation.current++;
+      pairingEpoch.current++;
+      void mobileRef.current?.cancel().catch(() => {});
     };
   }, []);
   useEffect(() => {
@@ -87,24 +98,102 @@ export default function IssuerWalletPanel({
       setReview(null);
       setMessage("錢包帳戶、網路或連線已變更；請重新連接並核對。已有交易請先查核，勿重送。");
     };
+    const disconnected = () => {
+      changed();
+      if (choice.id === "rabby-mobile-walletconnect") setMobileConnected(false);
+    };
     choice.provider.on?.("accountsChanged", changed);
     choice.provider.on?.("chainChanged", changed);
-    choice.provider.on?.("disconnect", changed);
+    choice.provider.on?.("disconnect", disconnected);
     return () => {
       choice.provider.removeListener?.("accountsChanged", changed);
       choice.provider.removeListener?.("chainChanged", changed);
-      choice.provider.removeListener?.("disconnect", changed);
+      choice.provider.removeListener?.("disconnect", disconnected);
     };
   }, [choice]);
 
+  async function connectMobile() {
+    await run(async () => {
+      const epoch = ++pairingEpoch.current;
+      setPairing(true);
+      setPairingQr("");
+      setMessage("正在準備連線，請開啟手機 Rabby 的 WalletConnect 掃描功能。");
+      try {
+        const [{ createMobilePairing }, qr] = await Promise.all([
+          import("../lib/issuer-mobile-wallet"),
+          import("qrcode"),
+        ]);
+        const connection = await createMobilePairing({
+          projectId: mobileProjectId,
+          origin: window.location.origin,
+          onUri(uri) {
+            // Pairing URIs contain connection keys: render locally; never log, upload or persist them.
+            void qr
+              .toDataURL(uri, { width: 320, margin: 2 })
+              .then((data) => {
+                if (mounted.current && epoch === pairingEpoch.current) setPairingQr(data);
+              })
+              .catch(() => {
+                if (mounted.current && epoch === pairingEpoch.current)
+                  setMessage("無法顯示連線 QR Code，請取消後重試。");
+              });
+          },
+        });
+        if (!mounted.current || epoch !== pairingEpoch.current) {
+          await connection.cancel();
+          return;
+        }
+        mobileRef.current = connection;
+        const next = await connection.connect();
+        if (!mounted.current || epoch !== pairingEpoch.current) {
+          await connection.disconnect();
+          return;
+        }
+        setWallets((current) => [...current.filter((wallet) => wallet.id !== next.id), next]);
+        setSelected(next.id);
+        setMobileConnected(true);
+        setMessage("手機 Rabby 已連接。請按「連接並核對 owner」，核對原發行錢包。");
+      } finally {
+        if (mounted.current && epoch === pairingEpoch.current) {
+          setPairing(false);
+          setPairingQr("");
+        }
+      }
+    });
+  }
+
+  async function cancelMobile() {
+    if (pairing) {
+      operationRef.current++;
+      busyRef.current = false;
+      setBusy(false);
+    }
+    pairingEpoch.current++;
+    setPairing(false);
+    setPairingQr("");
+    setMobileConnected(false);
+    setAccount("");
+    setReview(null);
+    generation.current++;
+    setWallets((current) => current.filter((wallet) => wallet.id !== "rabby-mobile-walletconnect"));
+    if (selected === "rabby-mobile-walletconnect") setSelected("");
+    try {
+      await mobileRef.current?.cancel();
+      setMessage("手機錢包已斷開；已有的交易紀錄仍保留，可繼續查核。");
+    } catch {
+      setMessage("已停止使用此連線。請也在手機 Rabby 中斷開連線；已有交易請先查核。");
+    }
+  }
+
   async function run(action: () => Promise<void>) {
     if (busyRef.current) return;
+    const operation = ++operationRef.current;
     busyRef.current = true;
     setBusy(true);
     try {
       await action();
     } catch (error) {
-      if (mounted.current) {
+      if (mounted.current && operationRef.current === operation) {
         setMessage(readable(error));
         if (plan) {
           try {
@@ -115,8 +204,10 @@ export default function IssuerWalletPanel({
         }
       }
     } finally {
-      busyRef.current = false;
-      if (mounted.current) setBusy(false);
+      if (operationRef.current === operation) {
+        busyRef.current = false;
+        if (mounted.current) setBusy(false);
+      }
     }
   }
 
@@ -152,9 +243,7 @@ export default function IssuerWalletPanel({
       if (!choice || !plan || !account || !review || review.issued)
         throw new Error("請先連接 owner 錢包並完成資料核對。");
       if (!navigator.locks)
-        throw new Error(
-          "此瀏覽器不支援防止重複發行的安全鎖。請使用裝有 Rabby 的最新版桌面瀏覽器。",
-        );
+        throw new Error("此瀏覽器不支援防止重複發行的安全鎖，請更新 Safari 或 Chrome 後再試。");
       const epoch = generation.current;
       setMessage("請在本人錢包核對並確認。本頁不會替你確認；若視窗未回應，請勿重送。");
       const result = await navigator.locks.request(
@@ -197,8 +286,7 @@ export default function IssuerWalletPanel({
     <section className="soft-card rounded-[2rem] p-6 sm:p-9" aria-label="本人錢包發行">
       <h2 className="font-display text-2xl font-black">本人錢包發行</h2>
       <p className="mt-2 text-sm text-ink/65">
-        使用你自己的 Rabby 或 Trust Wallet 瀏覽器。Email 管理登入與 owner
-        錢包分開；不需要提供私鑰或助記詞。
+        留在 Safari 或 Chrome 完成管理登入，再連接手機 Rabby 核對與簽署交易。
       </p>
       {planError ? (
         <p role="alert" className="mt-4 text-red-800">
@@ -251,8 +339,56 @@ export default function IssuerWalletPanel({
                 <dd>附帶 ETH 金額為 0；本人錢包需要支付 Base Gas，金額以錢包確認畫面為準。</dd>
               </div>
             </dl>
+            <div className="mt-6 rounded-2xl border border-purple/25 p-5">
+              <h3 className="font-bold">連接手機 Rabby</h3>
+              <p className="mt-2 text-sm text-ink/65">
+                在這裡顯示 QR Code，再用手機 Rabby 的 WalletConnect 掃描並允許連線。
+                連線後，發行交易會送到手機讓你核對。
+              </p>
+              <button
+                type="button"
+                className="btn-secondary mt-4"
+                disabled={busy || mobileConnected || !mobileProjectId}
+                onClick={() => void connectMobile()}
+              >
+                {pairing
+                  ? "等待手機連線…"
+                  : mobileConnected
+                    ? "手機 Rabby 已連接"
+                    : "連接手機 Rabby"}
+              </button>
+              {!mobileProjectId && <p className="mt-3 text-sm">手機錢包連線正在設定中。</p>}
+              {(pairing || mobileConnected) && (
+                <button
+                  type="button"
+                  className="btn-secondary ml-3 mt-4"
+                  disabled={busy && !pairing}
+                  onClick={() => void cancelMobile()}
+                >
+                  {pairing ? "取消連線" : "斷開手機錢包"}
+                </button>
+              )}
+              {pairingQr && (
+                <div
+                  className="mt-5 flex flex-col items-center gap-3"
+                  role="region"
+                  aria-label="手機錢包連線 QR Code"
+                >
+                  <img
+                    src={pairingQr}
+                    width="320"
+                    height="320"
+                    alt="請用手機 Rabby 掃描的 WalletConnect 連線 QR Code"
+                    className="max-w-full rounded-2xl"
+                  />
+                  <p className="text-center text-sm">
+                    掃描後只會連接錢包；發行時仍需要你另行確認交易。
+                  </p>
+                </div>
+              )}
+            </div>
             <label className="mt-6 block font-bold">
-              選擇本人錢包
+              已連接或瀏覽器內的錢包
               <select
                 className="mt-2 w-full rounded-xl border p-3"
                 value={selected}
@@ -269,8 +405,8 @@ export default function IssuerWalletPanel({
             </label>
             {!wallets.length && (
               <p className="mt-3 text-sm">
-                此瀏覽器沒有提供錢包。請在自己已安裝 Rabby 的瀏覽器開啟此後台，或使用 Trust Wallet
-                的 DApp 瀏覽器；不要使用 ChatGPT 預填分頁。
+                尚未連接錢包。Safari 可使用上方「連接手機 Rabby」；Chrome 也可選擇已安裝的 Rabby
+                擴充套件。
               </p>
             )}
             {account && <p className="mt-3 break-all text-sm">已核對 owner：{account}</p>}
@@ -297,7 +433,7 @@ export default function IssuerWalletPanel({
                 disabled={busy || !account || !review || review.issued || !!journal}
                 onClick={() => void issue()}
               >
-                {busy ? "處理中，請勿重送…" : "本人確認發行"}
+                {busy && !pairing ? "處理中，請勿重送…" : "本人確認發行"}
               </button>
             </div>
             {journal && (
