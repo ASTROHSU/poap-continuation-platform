@@ -3,6 +3,30 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { createMobilePairing } from "../src/lib/issuer-mobile-wallet.ts";
 import { requireOwnerWallet, ISSUER_OWNER } from "../src/lib/issuer-wallet.ts";
+import { waitForConnection } from "../src/lib/issuer-connection-wait.ts";
+
+test("a stalled SDK initialization returns the timeout reason without waiting forever", async () => {
+  const controller = new AbortController();
+  const waiting = waitForConnection(new Promise(() => {}), controller.signal);
+  controller.abort(new Error("Reown 允許來源尚未設定"));
+  await assert.rejects(waiting, /允許來源/);
+});
+
+test("an aborted connection setup cannot return a late initialization result", async () => {
+  const controller = new AbortController();
+  let finish;
+  const pending = new Promise((resolve) => {
+    finish = resolve;
+  });
+  const waiting = waitForConnection(pending, controller.signal);
+  controller.abort(new Error("cancelled"));
+  await assert.rejects(waiting, /cancelled/);
+  finish("late SDK result");
+  assert.equal(
+    await waitForConnection(Promise.resolve("ready"), new AbortController().signal),
+    "ready",
+  );
+});
 
 const options = {
   projectId: "a".repeat(32),

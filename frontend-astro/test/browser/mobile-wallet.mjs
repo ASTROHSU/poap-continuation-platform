@@ -85,10 +85,30 @@ for (const [name, engine] of [
       true,
     );
     assert.equal(await page.evaluate(() => window.__transactionRequests || 0), 0);
+    await page.route("**/src/lib/issuer-mobile-wallet.ts*", (route) =>
+      route.fulfill({
+        contentType: "application/javascript",
+        body: "export function createMobilePairing() { return new Promise(() => {}); }",
+      }),
+    );
+    await page.reload();
+    await page.clock.install();
+    await page.getByRole("button", { name: "連接手機 Rabby", exact: true }).click();
+    await page.getByRole("status").filter({ hasText: "正在取得連線 QR Code" }).waitFor();
+    await page.clock.fastForward(16_000);
+    await page.getByRole("status").filter({ hasText: "Reown 允許來源" }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "連接手機 Rabby", exact: true }).isEnabled(),
+      true,
+    );
+    assert.equal(
+      await page.getByRole("button", { name: "本人確認發行", exact: true }).isEnabled(),
+      false,
+    );
     assert.deepEqual(external, []);
     assert.deepEqual(errors, []);
     console.log(
-      `${name}: QR rendered without injected wallet; phone owner verified; disconnect and cancel work; no external requests or transactions`,
+      `${name}: QR, owner check, disconnect, cancel and stalled-SDK timeout pass; no external requests or transactions`,
     );
   } finally {
     await browser.close();

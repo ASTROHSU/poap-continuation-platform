@@ -21,6 +21,10 @@ EIP-6963 discovery 只列出錢包，不自動索取帳戶、切鏈或送交易�
 在此專案擁有者的 Reown Dashboard 建立專案，設定允許來源
 `https://admin.poap.blocktrend.today`。建置環境設置公開識別碼
 `PUBLIC_WALLETCONNECT_PROJECT_ID`，重新建置後部署；缺少設定時手機按鈕停用，既有擴充套件仍可用。
+Reown 的本機來源永遠允許，因此本機 QR 成功不能代表正式來源已放行。
+發布前須另外檢查正式 admin origin 的 Relay 握手，不能以移除來源檢查、偽造本機來源或取消後台登入來處理 403。
+允許來源變更可能需要 15 分鐘生效。未取得 QR 的初始化在 15 秒後結束等待並顯示重試／來源設定提示；
+QR 出現後不限制使用者掃描時間，也不替簽署交易設定此逾時。
 不得使用其他網站或範例的 Project ID。這個識別碼可以放前端，但任何管理憑證仍不得公開。
 
 WalletConnect SDK 僅在本人點擊時載入，要求 Base 8453 與 `eth_sendTransaction`；

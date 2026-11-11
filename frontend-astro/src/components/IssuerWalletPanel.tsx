@@ -17,6 +17,7 @@ import {
   type WalletChoice,
 } from "../lib/issuer-wallet";
 import type { MobilePairing } from "../lib/issuer-mobile-wallet";
+import { waitForConnection } from "../lib/issuer-connection-wait";
 
 const mobileProjectId = import.meta.env.PUBLIC_WALLETCONNECT_PROJECT_ID || "";
 
@@ -39,6 +40,7 @@ export default function IssuerWalletPanel({
   const [pairingQr, setPairingQr] = useState("");
   const [mobileConnected, setMobileConnected] = useState(false);
   const mobileRef = useRef<MobilePairing | null>(null);
+  const connectionAbort = useRef<AbortController | null>(null);
   const pairingEpoch = useRef(0);
   const busyRef = useRef(false);
   const operationRef = useRef(0);
@@ -65,6 +67,7 @@ export default function IssuerWalletPanel({
       mounted.current = false;
       generation.current++;
       pairingEpoch.current++;
+      connectionAbort.current?.abort();
       void mobileRef.current?.cancel().catch(() => {});
     };
   }, []);
@@ -115,15 +118,27 @@ export default function IssuerWalletPanel({
   async function connectMobile() {
     await run(async () => {
       const epoch = ++pairingEpoch.current;
+      const controller = new AbortController();
+      connectionAbort.current = controller;
+      let activeConnection: MobilePairing | undefined;
+      const deadline = setTimeout(
+        () =>
+          controller.abort(
+            new Error(
+              "無法取得錢包連線 QR Code。請確認後台網址已加入 Reown 允許來源，或稍後重試。",
+            ),
+          ),
+        15_000,
+      );
       setPairing(true);
       setPairingQr("");
-      setMessage("正在準備連線，請開啟手機 Rabby 的 WalletConnect 掃描功能。");
+      setMessage("正在取得連線 QR Code…");
       try {
-        const [{ createMobilePairing }, qr] = await Promise.all([
-          import("../lib/issuer-mobile-wallet"),
-          import("qrcode"),
-        ]);
-        const connection = await createMobilePairing({
+        const [{ createMobilePairing }, qr] = await waitForConnection(
+          Promise.all([import("../lib/issuer-mobile-wallet"), import("qrcode")]),
+          controller.signal,
+        );
+        const creating = createMobilePairing({
           projectId: mobileProjectId,
           origin: window.location.origin,
           onUri(uri) {
@@ -131,20 +146,36 @@ export default function IssuerWalletPanel({
             void qr
               .toDataURL(uri, { width: 320, margin: 2 })
               .then((data) => {
-                if (mounted.current && epoch === pairingEpoch.current) setPairingQr(data);
+                if (
+                  mounted.current &&
+                  epoch === pairingEpoch.current &&
+                  !controller.signal.aborted
+                ) {
+                  clearTimeout(deadline);
+                  setPairingQr(data);
+                  setMessage("請用手機 Rabby 的 WalletConnect 掃描 QR Code，並允許連線。");
+                }
               })
               .catch(() => {
-                if (mounted.current && epoch === pairingEpoch.current)
-                  setMessage("無法顯示連線 QR Code，請取消後重試。");
+                controller.abort(new Error("無法顯示連線 QR Code，請稍後重試。"));
               });
           },
         });
+        // An SDK initialization may finish after timeout/cancel. Never connect that old attempt.
+        void creating
+          .then((connection) => {
+            if (controller.signal.aborted) return connection.cancel();
+          })
+          .catch(() => {});
+        const connection = await waitForConnection(creating, controller.signal);
+        activeConnection = connection;
         if (!mounted.current || epoch !== pairingEpoch.current) {
           await connection.cancel();
           return;
         }
         mobileRef.current = connection;
-        const next = await connection.connect();
+        const next = await waitForConnection(connection.connect(), controller.signal);
+        clearTimeout(deadline);
         if (!mounted.current || epoch !== pairingEpoch.current) {
           await connection.disconnect();
           return;
@@ -154,6 +185,9 @@ export default function IssuerWalletPanel({
         setMobileConnected(true);
         setMessage("手機 Rabby 已連接。請按「連接並核對 owner」，核對原發行錢包。");
       } finally {
+        clearTimeout(deadline);
+        if (controller.signal.aborted) void activeConnection?.cancel().catch(() => {});
+        if (connectionAbort.current === controller) connectionAbort.current = null;
         if (mounted.current && epoch === pairingEpoch.current) {
           setPairing(false);
           setPairingQr("");
@@ -163,6 +197,7 @@ export default function IssuerWalletPanel({
   }
 
   async function cancelMobile() {
+    connectionAbort.current?.abort(new Error("已取消手機錢包連線。"));
     if (pairing) {
       operationRef.current++;
       busyRef.current = false;
@@ -352,7 +387,9 @@ export default function IssuerWalletPanel({
                 onClick={() => void connectMobile()}
               >
                 {pairing
-                  ? "等待手機連線…"
+                  ? pairingQr
+                    ? "等待手機掃描…"
+                    : "正在取得連線 QR Code…"
                   : mobileConnected
                     ? "手機 Rabby 已連接"
                     : "連接手機 Rabby"}
