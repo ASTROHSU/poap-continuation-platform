@@ -801,21 +801,23 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
                       </dd>
                     </div>
                   </dl>
-                  {event.status === "closed" ? (
-                    <button
-                      className="mt-6 w-full rounded-2xl border-2 border-leaf bg-mint px-4 py-3 font-black"
-                      disabled={busy}
-                      onClick={() => void transition("published")}
-                    >
-                      重新開放領取
-                    </button>
-                  ) : (
+                  <ReleaseStages event={event} />
+                  {event.status === "published" && (
                     <button
                       className="mt-6 w-full rounded-2xl border-2 border-pink-400 bg-pink-50 px-4 py-3 font-black text-pink-800"
                       disabled={busy}
                       onClick={() => void transition("closed")}
                     >
                       關閉並停止領取
+                    </button>
+                  )}
+                  {event.status === "closed" && isOnChain(event) && (
+                    <button
+                      className="mt-6 w-full rounded-2xl border-2 border-leaf bg-mint px-4 py-3 font-black"
+                      disabled={busy}
+                      onClick={() => void transition("published")}
+                    >
+                      重新開放領取
                     </button>
                   )}
                 </div>
@@ -831,6 +833,76 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
           </p>
         )}
       </section>
+    </div>
+  );
+}
+
+function isOnChain(event: Pick<ManagedEvent, "contractAddress" | "tokenId">): boolean {
+  return Boolean(event.contractAddress) && event.tokenId !== null && event.tokenId !== "";
+}
+
+/**
+ * Release runs in fixed stages; each one unlocks only after the previous one is done:
+ * 1. draft saved → 2. owner wallet issues on chain → 3. issuance sync creates claim
+ * entitlements and opens claiming. Claim controls appear only at stage 3.
+ */
+function ReleaseStages({ event }: { event: ManagedEvent }) {
+  const onChain = isOnChain(event);
+  const live = event.status === "published" && onChain;
+  const stages = [
+    { label: "建立草稿", detail: "活動資料與圖片已儲存", done: true },
+    {
+      label: "本人錢包鏈上發行",
+      detail: onChain ? `Token #${event.tokenId} 已建立` : "在上方「本人錢包發行」面板簽名",
+      done: onChain,
+    },
+    {
+      label: "同步領取資格並開放領取",
+      detail: live
+        ? "領取連結已產生"
+        : event.status === "closed"
+          ? "已關閉，停止領取"
+          : "鏈上發行確認後自動同步",
+      done: live || (onChain && event.status === "closed"),
+    },
+  ];
+  const current = stages.findIndex((stage) => !stage.done);
+  return (
+    <div className="mt-6 border-t border-purple/15 pt-5">
+      <p className="text-sm font-black">發行進度</p>
+      <ol className="mt-3 space-y-3 text-sm">
+        {stages.map((stage, index) => {
+          const locked = current !== -1 && index > current;
+          return (
+            <li
+              key={stage.label}
+              className={`flex gap-3 ${locked ? "text-ink/35" : "text-ink"}`}
+              aria-current={index === current ? "step" : undefined}
+            >
+              <span
+                className={`grid size-6 shrink-0 place-items-center rounded-full border-2 text-xs font-black ${
+                  stage.done
+                    ? "border-leaf bg-mint"
+                    : index === current
+                      ? "border-purple text-purple"
+                      : "border-ink/20"
+                }`}
+              >
+                {stage.done ? "✓" : locked ? "🔒" : index + 1}
+              </span>
+              <span>
+                <span className="block font-bold">{stage.label}</span>
+                <span className="block text-xs text-ink/50">{stage.detail}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {!onChain && (
+        <p className="mt-4 rounded-2xl bg-purple/5 p-3 text-xs leading-6 text-ink/60">
+          尚未部署合約與 Token，目前無法領取，也不能開放或關閉領取。
+        </p>
+      )}
     </div>
   );
 }

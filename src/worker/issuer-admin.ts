@@ -698,7 +698,11 @@ function matchesArtworkSignature(bytes: Uint8Array, contentType: string): boolea
 function allowedTransition(from: string, to: string): boolean {
   return (
     from === to ||
-    (from === "draft" && (to === "published" || to === "closed")) ||
+    // A draft has no contract or claim entitlements, so it cannot be "closed".
+    // Closing it would also block the later on-chain issuance sync, which only
+    // accepts drafts. Drafts leave this state only through issuance sync (or the
+    // guarded publish below for legacy events that already carry chain fields).
+    (from === "draft" && to === "published") ||
     (from === "published" && to === "closed") ||
     (from === "closed" && to === "published")
   );

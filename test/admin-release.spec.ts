@@ -171,6 +171,12 @@ describe("authenticated draft creation", () => {
     });
     expect(earlyPublish.status).toBe(409);
     expect(await earlyPublish.json()).toMatchObject({ code: "issuer_event_not_ready" });
+    const earlyClose = await request(`events/${input.slug}/status`, "POST", true, {
+      status: "closed",
+      expectedUpdatedAt: data.event.updatedAt,
+    });
+    expect(earlyClose.status).toBe(409);
+    expect(await earlyClose.json()).toMatchObject({ code: "issuer_event_transition_invalid" });
   });
 
   it("rejects a competing slug or a changed request without replacing stored artwork", async () => {
