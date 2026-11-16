@@ -7,6 +7,7 @@ import {
 } from "../lib/magic-wallet";
 import { getAppConfig } from "../lib/live-api";
 import IssuerWalletPanel from "./IssuerWalletPanel";
+import { issuancePlan } from "../lib/issuer-issuance";
 
 type Status = "draft" | "published" | "closed";
 
@@ -849,11 +850,21 @@ function isOnChain(event: Pick<ManagedEvent, "contractAddress" | "tokenId">): bo
 function ReleaseStages({ event }: { event: ManagedEvent }) {
   const onChain = isOnChain(event);
   const live = event.status === "published" && onChain;
+  let issuable = false;
+  try {
+    issuable = issuancePlan(event) !== null;
+  } catch {
+    issuable = false;
+  }
   const stages = [
     { label: "建立草稿", detail: "活動資料與圖片已儲存", done: true },
     {
       label: "本人錢包鏈上發行",
-      detail: onChain ? `Token #${event.tokenId} 已建立` : "在上方「本人錢包發行」面板簽名",
+      detail: onChain
+        ? `Token #${event.tokenId} 已建立`
+        : issuable
+          ? "在上方「本人錢包發行」面板簽名"
+          : "此活動尚未指派發行 Token，需先由維護者設定",
       done: onChain,
     },
     {

@@ -35,6 +35,10 @@ const tokenIds: Record<string, number> = {
   "platform-operations-okx-bybit-2026-11": 11,
   "december-book-club-2026": 12,
   "platform-operations-firstrade-etoro-2026-12": 13,
+  // 2026 donor credentials (verified unconfigured on chain before assignment).
+  "donation-monthly-2026": 14,
+  "donation-quarterly-2026": 15,
+  "donation-yearly-2026": 16,
 };
 
 export interface IssuanceEvent {

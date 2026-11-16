@@ -78,12 +78,15 @@ const input = (provider, store, overrides = {}) => ({
   ...overrides,
 });
 
-test("all four fixed plans bind unique tokens and do not assign other activities", () => {
+test("fixed plans bind unique tokens and do not assign other activities", () => {
   for (const [slug, id] of [
     ["november-book-club-2026", 10],
     [event.slug, 11],
     ["december-book-club-2026", 12],
     ["platform-operations-firstrade-etoro-2026-12", 13],
+    ["donation-monthly-2026", 14],
+    ["donation-quarterly-2026", 15],
+    ["donation-yearly-2026", 16],
   ]) {
     assert.equal(issuancePlan({ ...event, slug }).tokenId, id);
   }
