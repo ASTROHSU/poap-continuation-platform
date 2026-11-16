@@ -34,7 +34,18 @@ export default function IssuerWalletPanel({
 }) {
   const [claimUrl, setClaimUrl] = useState("");
   const [claimQr, setClaimQr] = useState("");
+  const [copied, setCopied] = useState(false);
   const [syncingSlug, setSyncingSlug] = useState("");
+  async function copyClaimUrl() {
+    try {
+      await navigator.clipboard.writeText(claimUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard can be blocked; the read-only field stays selectable for manual copy.
+      setCopied(false);
+    }
+  }
   const synchronizeRef = useRef(onSynchronize);
   synchronizeRef.current = onSynchronize;
   const scope = event
@@ -586,13 +597,37 @@ export default function IssuerWalletPanel({
               </div>
             )}
             {claimUrl && (
-              <p className="mt-5 rounded-2xl bg-mint p-4 text-sm">
-                <strong>已發行</strong> ·{" "}
-                <a href={claimUrl} target="_blank" rel="noopener noreferrer" className="underline">
-                  開啟活動共用領取連結
-                </a>
-                <span className="mt-1 block">此連結包含領取資格，請只分享給活動參加者。</span>
-              </p>
+              <div className="mt-5 rounded-2xl bg-mint p-4 text-sm">
+                <p>
+                  <strong>已發行</strong> · 活動共用領取連結
+                </p>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    readOnly
+                    value={claimUrl}
+                    aria-label="活動共用領取連結"
+                    data-claim-url={event.slug}
+                    className="min-w-0 flex-1 rounded-xl border-2 border-purple/20 bg-white px-3 py-2 font-mono text-xs"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary shrink-0"
+                    onClick={() => void copyClaimUrl()}
+                  >
+                    {copied ? "已複製" : "複製連結"}
+                  </button>
+                  <a
+                    className="btn-secondary shrink-0 text-center"
+                    href={claimUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    開啟
+                  </a>
+                </div>
+                <span className="mt-2 block">此連結包含領取資格，請只分享給活動參加者。</span>
+              </div>
             )}
             {plan.tokenId !== 10 && (
               <button
