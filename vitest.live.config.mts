@@ -12,6 +12,9 @@ export default defineWorkersConfig({
         miniflare: {
           bindings: {
             APP_MODE: "live-only",
+            ACCESS_TEAM_DOMAIN: "https://titsia-test.cloudflareaccess.com",
+            ACCESS_POLICY_AUD: "test-admin-audience",
+            ACCESS_ADMIN_EMAILS: "admin@example.test",
             TEST_LIVE_FIXTURE: liveFixture,
             TEST_LIVE_MIGRATIONS: liveMigrations,
             HOLDINGS_SNAPSHOT_ID: "2026-07-02-v1",
