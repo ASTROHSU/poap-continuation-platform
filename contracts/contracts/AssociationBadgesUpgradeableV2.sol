@@ -8,11 +8,11 @@ import {AssociationBadgesUpgradeable} from "./AssociationBadgesUpgradeable.sol";
 /// @dev Adds no storage and preserves every V1 event, balance, claim nonce, and permission.
 /// @custom:oz-upgrades-unsafe-allow missing-initializer
 contract AssociationBadgesUpgradeableV2 is AssociationBadgesUpgradeable {
-    function symbol() external pure override returns (string memory) {
+    function symbol() external pure virtual override returns (string memory) {
         return "TW";
     }
 
-    function implementationVersion() external pure override returns (uint64) {
+    function implementationVersion() external pure virtual override returns (uint64) {
         return 2;
     }
 }

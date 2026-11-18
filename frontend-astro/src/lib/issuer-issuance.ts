@@ -27,6 +27,7 @@ export const issuerAbi = parseAbi([
   "function eventConfig(uint256 tokenId) view returns (uint128 maxSupply, bool active, string metadataUri)",
   "function createEvent(uint256 tokenId, uint128 maxSupply, string metadataUri)",
   "event EventConfigured(uint256 indexed tokenId, uint256 maxSupply, string metadataUri)",
+  "function increaseMaxSupply(uint256[] tokenIds, uint128 newMaxSupply)",
   "error EventDoesNotExist(uint256 tokenId)",
 ]);
 
@@ -51,12 +52,19 @@ export interface IssuanceEvent {
   contractAddress: string | null;
 }
 
+// New events default to a generous cap: unclaimed supply costs nothing, and a cap that is
+// too small can only be raised later through a contract call.
+export const DEFAULT_MAX_SUPPLY = 3000;
+export const MAX_SUPPLY_LIMIT = 1_000_000;
+const validMaxSupply = (value: number) =>
+  Number.isSafeInteger(value) && value >= 1 && value <= MAX_SUPPLY_LIMIT;
+
 export function issuancePlan(event: IssuanceEvent) {
   const tokenId = tokenIds[event.slug];
   if (!tokenId) return null;
   if (
     event.chainId !== ISSUER_CHAIN ||
-    event.maxSupply !== 200 ||
+    !validMaxSupply(event.maxSupply) ||
     (event.tokenId !== null && event.tokenId !== String(tokenId)) ||
     (event.contractAddress !== null && event.contractAddress.toLowerCase() !== ISSUER_CONTRACT)
   )
@@ -65,12 +73,12 @@ export function issuancePlan(event: IssuanceEvent) {
   return {
     slug: event.slug,
     tokenId,
-    maxSupply: 200,
+    maxSupply: event.maxSupply,
     metadataUri,
     data: encodeFunctionData({
       abi: issuerAbi,
       functionName: "createEvent",
-      args: [BigInt(tokenId), 200n, metadataUri],
+      args: [BigInt(tokenId), BigInt(event.maxSupply), metadataUri],
     }),
   };
 }
@@ -109,7 +117,7 @@ export async function verifyIssuanceReceipt(
       });
       return (
         decoded.args.tokenId === BigInt(plan.tokenId) &&
-        decoded.args.maxSupply === 200n &&
+        decoded.args.maxSupply === BigInt(plan.maxSupply) &&
         decoded.args.metadataUri === plan.metadataUri
       );
     } catch {

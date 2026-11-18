@@ -1,7 +1,11 @@
 import { applyD1Migrations, env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeAbiParameters, encodeEventTopics } from "viem";
-import { synchronizeIssuerIssuance, recoverIssuerIssuances } from "../src/worker/issuer-issuance";
+import {
+  synchronizeIssuerIssuance,
+  synchronizeIssuerSupply,
+  recoverIssuerIssuances,
+} from "../src/worker/issuer-issuance";
 import {
   issuancePlan,
   issuerAbi,
@@ -173,5 +177,108 @@ describe("verified issuer synchronization", () => {
     await expect(
       synchronizeIssuerIssuance(bindings, identity, slug, hash, client()),
     ).rejects.toMatchObject({ code: "issuer_sync_existing_pool" });
+  });
+});
+
+describe("on-chain max supply synchronization", () => {
+  const chainSupply = (max: bigint) =>
+    ({
+      readContract: vi.fn(async ({ functionName }: { functionName: string }) =>
+        functionName === "owner" ? ISSUER_OWNER : [max, true, plan.metadataUri],
+      ),
+    }) as any;
+  const counts = async () => ({
+    slots: (await bindings.LIVE_DB.prepare("SELECT COUNT(*) c FROM live_claim_codes").first()).c,
+    pools: (
+      await bindings.LIVE_DB.prepare(
+        "SELECT COUNT(DISTINCT access_code_hash) c FROM live_claim_codes",
+      ).first()
+    ).c,
+    max: (await bindings.LIVE_DB.prepare("SELECT max_supply m FROM live_events").first()).m,
+  });
+
+  it("refuses drafts and leaves them untouched", async () => {
+    await expect(
+      synchronizeIssuerSupply(bindings, identity, slug, chainSupply(3000n)),
+    ).rejects.toMatchObject({ code: "issuer_supply_unsupported" });
+    expect(await counts()).toEqual({ slots: 0, pools: 0, max: 200 });
+  });
+
+  it("adds slots up to the raised on-chain cap, keeps the claim link, and is idempotent", async () => {
+    const issued = await synchronizeIssuerIssuance(bindings, identity, slug, hash, client());
+    expect(await counts()).toEqual({ slots: 200, pools: 1, max: 200 });
+
+    const unchanged = await synchronizeIssuerSupply(bindings, identity, slug, chainSupply(200n));
+    expect(unchanged).toMatchObject({ maxSupply: 200, added: 0 });
+
+    const raised = await synchronizeIssuerSupply(bindings, identity, slug, chainSupply(3000n));
+    expect(raised).toMatchObject({ maxSupply: 3000, added: 2800 });
+    expect(raised.event.maxSupply).toBe(3000);
+    expect(await counts()).toEqual({ slots: 3000, pools: 1, max: 3000 });
+
+    const again = await synchronizeIssuerSupply(bindings, identity, slug, chainSupply(3000n));
+    expect(again).toMatchObject({ maxSupply: 3000, added: 0 });
+    expect(await counts()).toEqual({ slots: 3000, pools: 1, max: 3000 });
+
+    // The original 200 slot hashes are unchanged and the shared link still resolves.
+    const replay = await synchronizeIssuerIssuance(bindings, identity, slug, hash, client());
+    expect(replay.claimUrl).toBe(issued.claimUrl);
+  });
+
+  it("rejects a lower on-chain cap or a different owner without writes", async () => {
+    await synchronizeIssuerIssuance(bindings, identity, slug, hash, client());
+    await expect(
+      synchronizeIssuerSupply(bindings, identity, slug, chainSupply(100n)),
+    ).rejects.toMatchObject({ code: "issuer_supply_mismatch" });
+    const otherOwner = {
+      readContract: vi.fn(async ({ functionName }: { functionName: string }) =>
+        functionName === "owner"
+          ? "0x0000000000000000000000000000000000000001"
+          : [3000n, true, plan.metadataUri],
+      ),
+    } as any;
+    await expect(
+      synchronizeIssuerSupply(bindings, identity, slug, otherOwner),
+    ).rejects.toMatchObject({ code: "issuer_supply_mismatch" });
+    expect(await counts()).toEqual({ slots: 200, pools: 1, max: 200 });
+  });
+
+  it("publishes a new event with its own cap (3000) in one atomic batch", async () => {
+    await bindings.LIVE_DB.prepare("UPDATE live_events SET max_supply=3000").run();
+    const big = issuancePlan({ ...event, maxSupply: 3000 })!;
+    expect(big.maxSupply).toBe(3000);
+    const c = client();
+    c.getTransaction.mockResolvedValue({
+      to: ISSUER_CONTRACT,
+      from: ISSUER_OWNER,
+      value: 0n,
+      input: big.data,
+    });
+    c.getTransactionReceipt.mockResolvedValue({
+      to: ISSUER_CONTRACT,
+      from: ISSUER_OWNER,
+      status: "success",
+      blockNumber: 100n,
+      logs: [
+        {
+          address: ISSUER_CONTRACT,
+          topics: encodeEventTopics({
+            abi: issuerAbi,
+            eventName: "EventConfigured",
+            args: { tokenId: 11n },
+          }),
+          data: encodeAbiParameters(
+            [{ type: "uint256" }, { type: "string" }],
+            [3000n, big.metadataUri],
+          ),
+        },
+      ],
+    });
+    c.readContract.mockImplementation(async ({ functionName }: { functionName: string }) =>
+      functionName === "owner" ? ISSUER_OWNER : [3000n, true, big.metadataUri],
+    );
+    const result = await synchronizeIssuerIssuance(bindings, identity, slug, hash, c);
+    expect(result.event.status).toBe("published");
+    expect(await counts()).toEqual({ slots: 3000, pools: 1, max: 3000 });
   });
 });

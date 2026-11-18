@@ -24,6 +24,7 @@ export default function IssuerWalletPanel({
   event,
   status,
   onSynchronize,
+  onSynchronizeSupply,
 }: {
   event: IssuanceEvent | null;
   status: string;
@@ -31,6 +32,7 @@ export default function IssuerWalletPanel({
     slug: string,
     hash?: string,
   ) => Promise<{ claimUrl: string; transactionHash: string; status: string }>;
+  onSynchronizeSupply?: (slug: string) => Promise<{ maxSupply: number; added: number }>;
 }) {
   const [claimUrl, setClaimUrl] = useState("");
   const [claimQr, setClaimQr] = useState("");
@@ -384,6 +386,19 @@ export default function IssuerWalletPanel({
     }, true);
   }
 
+  async function synchronizeSupply() {
+    if (!event || !onSynchronizeSupply) return;
+    await run(async () => {
+      setMessage("正在讀取鏈上份數上限並補齊領取名額…");
+      const result = await onSynchronizeSupply(event.slug);
+      setMessage(
+        result.added > 0
+          ? `已同步：份數上限為 ${result.maxSupply} 份，新增 ${result.added} 個領取名額；領取連結不變。`
+          : `份數上限已是最新（${result.maxSupply} 份），沒有變更。`,
+      );
+    }, true);
+  }
+
   async function synchronize(target: IssuanceEvent, hash?: string) {
     const sync = synchronizeRef.current;
     if (!sync || syncing.current.has(target.slug)) return;
@@ -403,7 +418,7 @@ export default function IssuerWalletPanel({
         setMessage(
           result.status === "closed"
             ? "已發行，此活動目前已關閉。"
-            : "已發行。交易、200 份領取資格與活動狀態已同步；依原訂日期開放領取。",
+            : `已發行。交易、${target.maxSupply} 份領取資格與活動狀態已同步；依原訂日期開放領取。`,
         );
         setReview((current) => (current ? { ...current, issued: true, active: true } : current));
       }
@@ -637,6 +652,16 @@ export default function IssuerWalletPanel({
                 onClick={() => void verify()}
               >
                 {syncingSlug === event.slug ? "正在同步發行狀態…" : "重新同步發行狀態"}
+              </button>
+            )}
+            {plan.tokenId !== 10 && claimUrl && onSynchronizeSupply && (
+              <button
+                type="button"
+                className="btn-secondary mt-4 sm:ml-3"
+                disabled={busy}
+                onClick={() => void synchronizeSupply()}
+              >
+                同步鏈上份數上限
               </button>
             )}
             {journal && (

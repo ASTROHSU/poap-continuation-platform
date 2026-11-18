@@ -3,6 +3,7 @@ import { base } from "viem/chains";
 import {
   issuancePlan,
   issuerAbi,
+  MAX_SUPPLY_LIMIT,
   ISSUER_CONTRACT,
   ISSUER_OWNER,
   verifyIssuanceReceipt,
@@ -82,7 +83,7 @@ export async function synchronizeIssuerIssuance(
   const metadata = await metadataObject?.json<{ name: string; image: string }>();
   if (
     owner.toLowerCase() !== ISSUER_OWNER ||
-    config[0] !== 200n ||
+    config[0] !== BigInt(plan.maxSupply) ||
     !config[1] ||
     config[2] !== plan.metadataUri ||
     metadata?.name !== current.title ||
@@ -107,9 +108,7 @@ export async function synchronizeIssuerIssuance(
   const code = randomToken();
   const encrypted = await encryptEmail(code, env.EMAIL_DATA_KEY);
   const accessHash = await sha256Hex(code);
-  const slotHashes = await Promise.all(
-    Array.from({ length: 200 }, (_, i) => sha256Hex(`${code}:slot:${i + 1}`)),
-  );
+  const slotHashes = await slotHashRange(code, 1, plan.maxSupply);
   const now = new Date().toISOString();
   // First writer owns the credential. All pool inserts and publication are conditional
   // on that same credential and event version; D1 rolls the entire batch back on failure.
@@ -133,24 +132,13 @@ export async function synchronizeIssuerIssuance(
       current.eventId,
     ),
   ];
-  // 25 rows per statement stays below D1's bound-parameter limit.
-  for (let i = 0; i < 200; i += 25) {
-    const slots = slotHashes.slice(i, i + 25);
-    statements.push(
-      env.LIVE_DB.prepare(
-        `WITH slots(code_hash) AS (VALUES ${slots.map(() => "(?)").join(",")})
-      INSERT OR IGNORE INTO live_claim_codes (code_hash,event_id,access_code_hash)
-      SELECT slots.code_hash, ?, ? FROM slots
-      WHERE EXISTS (SELECT 1 FROM live_event_issuances WHERE event_id=? AND access_code_hash=?)`,
-      ).bind(...slots, current.eventId, accessHash, current.eventId, accessHash),
-    );
-  }
+  statements.push(...slotInserts(env, slotHashes, current.eventId, accessHash));
   statements.push(
     env.LIVE_DB.prepare(
       `UPDATE live_events SET contract_address=?,token_id=?,contract_start_block=?,status='published',updated_at=?
     WHERE event_id=? AND updated_at=? AND status='draft'
     AND EXISTS (SELECT 1 FROM live_event_issuances WHERE event_id=? AND access_code_hash=?)
-    AND (SELECT COUNT(*) FROM live_claim_codes WHERE event_id=? AND access_code_hash=?)=200`,
+    AND (SELECT COUNT(*) FROM live_claim_codes WHERE event_id=? AND access_code_hash=?)=?`,
     ).bind(
       ISSUER_CONTRACT,
       String(plan.tokenId),
@@ -162,6 +150,7 @@ export async function synchronizeIssuerIssuance(
       accessHash,
       current.eventId,
       accessHash,
+      plan.maxSupply,
     ),
   );
   await env.LIVE_DB.batch(statements);
@@ -213,4 +202,116 @@ export async function recoverIssuerIssuances(env: IssuanceEnv) {
     }
   }
   return { synchronized };
+}
+
+// 90 slot hashes + 2 bindings stay below D1's 100 bound-parameter limit per statement;
+// a batch counts as one query against the per-invocation limit.
+const SLOTS_PER_STATEMENT = 90;
+
+function slotHashRange(code: string, from: number, to: number) {
+  return Promise.all(
+    Array.from({ length: Math.max(0, to - from + 1) }, (_, i) =>
+      sha256Hex(`${code}:slot:${from + i}`),
+    ),
+  );
+}
+
+function slotInserts(env: IssuanceEnv, slotHashes: string[], eventId: string, accessHash: string) {
+  const statements = [];
+  for (let i = 0; i < slotHashes.length; i += SLOTS_PER_STATEMENT) {
+    const slots = slotHashes.slice(i, i + SLOTS_PER_STATEMENT);
+    statements.push(
+      env.LIVE_DB.prepare(
+        `WITH slots(code_hash) AS (VALUES ${slots.map(() => "(?)").join(",")})
+      INSERT OR IGNORE INTO live_claim_codes (code_hash,event_id,access_code_hash)
+      SELECT slots.code_hash, ?, ? FROM slots
+      WHERE EXISTS (SELECT 1 FROM live_event_issuances WHERE event_id=? AND access_code_hash=?)`,
+      ).bind(...slots, eventId, accessHash, eventId, accessHash),
+    );
+  }
+  return statements;
+}
+
+/**
+ * After the owner raises an event's on-chain max supply (V4 `increaseMaxSupply`), add the
+ * matching shared-claim slots and record the new cap. Reads the cap from chain; never trusts
+ * client input. Idempotent: a second call with no further on-chain change writes nothing.
+ * The shared claim link stays the same.
+ */
+export async function synchronizeIssuerSupply(
+  env: IssuanceEnv,
+  _identity: IssuerAdminIdentity,
+  slug: string,
+  client = clientFor(env),
+) {
+  const current = await loadIssuerEvent(env, slug);
+  if (!current) throw new ApiError(404, "找不到活動。", "issuer_event_not_found");
+  if (current.status === "draft" || current.claimMode !== "shared" || !current.tokenId)
+    throw new ApiError(
+      409,
+      "只有已發行的共用領取活動可以同步份數上限。",
+      "issuer_supply_unsupported",
+    );
+  if (current.contractAddress?.toLowerCase() !== ISSUER_CONTRACT)
+    throw new ApiError(409, "活動合約不符，已停止同步。", "issuer_supply_mismatch");
+  const issuance = await env.LIVE_DB.prepare(
+    "SELECT * FROM live_event_issuances WHERE event_id = ?",
+  )
+    .bind(current.eventId)
+    .first<IssuanceRow>();
+  if (!issuance) throw new ApiError(409, "找不到發行紀錄。", "issuer_supply_unsupported");
+  const [owner, config] = await Promise.all([
+    client.readContract({ address: ISSUER_CONTRACT, abi: issuerAbi, functionName: "owner" }),
+    client.readContract({
+      address: ISSUER_CONTRACT,
+      abi: issuerAbi,
+      functionName: "eventConfig",
+      args: [BigInt(current.tokenId)],
+    }),
+  ]);
+  if (owner.toLowerCase() !== ISSUER_OWNER)
+    throw new ApiError(409, "合約 owner 不符，已停止同步。", "issuer_supply_mismatch");
+  const onChain = config[0];
+  if (onChain > BigInt(MAX_SUPPLY_LIMIT))
+    throw new ApiError(409, "鏈上份數超過平台上限，已停止同步。", "issuer_supply_mismatch");
+  const target = Number(onChain);
+  const pool = await env.LIVE_DB.prepare(
+    "SELECT COUNT(*) AS count FROM live_claim_codes WHERE event_id = ? AND access_code_hash = ?",
+  )
+    .bind(current.eventId, issuance.access_code_hash)
+    .first<{ count: number }>();
+  const have = pool?.count ?? 0;
+  if (target < current.maxSupply)
+    throw new ApiError(409, "鏈上份數低於平台紀錄，已停止同步。", "issuer_supply_mismatch");
+  if (target === current.maxSupply && have >= current.maxSupply)
+    return { event: current, maxSupply: current.maxSupply, added: 0 };
+  const code = await decryptEmail(
+    issuance.claim_code_ciphertext,
+    issuance.claim_code_iv,
+    env.EMAIL_DATA_KEY,
+  );
+  if ((await sha256Hex(code)) !== issuance.access_code_hash)
+    throw new ApiError(409, "領取資格驗證失敗，已停止同步。", "issuer_supply_mismatch");
+  const slotHashes = await slotHashRange(code, have + 1, target);
+  const now = new Date().toISOString();
+  await env.LIVE_DB.batch([
+    ...slotInserts(env, slotHashes, current.eventId, issuance.access_code_hash),
+    env.LIVE_DB.prepare(
+      `UPDATE live_events SET max_supply=?, updated_at=?
+      WHERE event_id=? AND max_supply<=?
+      AND (SELECT COUNT(*) FROM live_claim_codes WHERE event_id=? AND access_code_hash=?)=?`,
+    ).bind(
+      target,
+      now,
+      current.eventId,
+      target,
+      current.eventId,
+      issuance.access_code_hash,
+      target,
+    ),
+  ]);
+  const event = await loadIssuerEvent(env, slug);
+  if (!event || event.maxSupply !== target)
+    throw new ApiError(409, "份數同步未完成，請重新同步。", "issuer_supply_incomplete");
+  return { event, maxSupply: target, added: slotHashes.length };
 }
