@@ -91,8 +91,15 @@ test("fixed plans bind unique tokens and do not assign other activities", () => 
     assert.equal(issuancePlan({ ...event, slug }).tokenId, id);
   }
   assert.equal(issuancePlan({ ...event, slug: "other" }), null);
+  for (const maxSupply of [201, 3000]) {
+    const plan = issuancePlan({ ...event, maxSupply });
+    assert.equal(plan.maxSupply, maxSupply);
+    assert.ok(plan.data.toLowerCase().includes(maxSupply.toString(16).padStart(64, "0")));
+  }
   for (const change of [
-    { maxSupply: 201 },
+    { maxSupply: 0 },
+    { maxSupply: 1.5 },
+    { maxSupply: 1_000_001 },
     { chainId: 1 },
     { tokenId: "10" },
     { contractAddress: ISSUER_OWNER },

@@ -36,7 +36,9 @@ contract AssociationBadgesUpgradeable is
     bytes32 public constant CLAIM_TYPEHASH =
         keccak256("Claim(address account,uint256 tokenId,uint256 deadline,bytes32 nonce)");
 
-    mapping(uint256 tokenId => EventConfig config) private _events;
+    /// @dev Internal (not private) so later implementations can raise a configured max supply.
+    ///      Visibility does not affect storage layout.
+    mapping(uint256 tokenId => EventConfig config) internal _events;
     mapping(uint256 tokenId => mapping(address account => bool claimed)) public hasClaimed;
     mapping(bytes32 nonce => bool used) public usedNonces;
 
@@ -202,7 +204,7 @@ contract AssociationBadgesUpgradeable is
     }
 
     /// @notice Human-readable collection name for explorer and wallet compatibility.
-    function name() external pure returns (string memory) {
+    function name() external pure virtual returns (string memory) {
         return _COLLECTION_NAME;
     }
 

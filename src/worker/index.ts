@@ -104,7 +104,11 @@ import {
   transitionIssuerEvent,
   updateIssuerEvent,
 } from "./issuer-admin";
-import { synchronizeIssuerIssuance, recoverIssuerIssuances } from "./issuer-issuance";
+import {
+  synchronizeIssuerIssuance,
+  synchronizeIssuerSupply,
+  recoverIssuerIssuances,
+} from "./issuer-issuance";
 import { requireAccessAdmin } from "./access-auth";
 import { runGasMonitor, gasCaption, gasCsv } from "./gas-monitor";
 import {
@@ -514,6 +518,16 @@ app.post("/api/admin/issuer/events/:slug/issuance", async (context) => {
       "Cache-Control": "private, no-store",
     },
   );
+});
+
+app.post("/api/admin/issuer/events/:slug/supply", async (context) => {
+  assertNoQuery(new URL(context.req.url));
+  assertSameOrigin(context.req.raw);
+  const identity = await requireIssuerAdmin(context.env, context.req.raw);
+  const slug = normalizeLiveSlug(context.req.param("slug"));
+  return context.json(await synchronizeIssuerSupply(context.env, identity, slug), 200, {
+    "Cache-Control": "private, no-store",
+  });
 });
 
 app.get("/api/meta", async (context) => {

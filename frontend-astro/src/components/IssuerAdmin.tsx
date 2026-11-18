@@ -7,7 +7,7 @@ import {
 } from "../lib/magic-wallet";
 import { getAppConfig } from "../lib/live-api";
 import IssuerWalletPanel from "./IssuerWalletPanel";
-import { issuancePlan } from "../lib/issuer-issuance";
+import { DEFAULT_MAX_SUPPLY, issuancePlan } from "../lib/issuer-issuance";
 
 type Status = "draft" | "published" | "closed";
 
@@ -61,7 +61,7 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
     startsAt: "",
     claimOpensAt: "",
     claimClosesAt: "",
-    maxSupply: "",
+    maxSupply: String(DEFAULT_MAX_SUPPLY),
     claimMode: "shared",
   });
   const [publishableKey, setPublishableKey] = useState("");
@@ -184,6 +184,23 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
       setArtwork(null);
       setMessage({ text: `已載入「${response.event.title}」。`, error: false });
     });
+  }
+
+  async function synchronizeSupply(slug: string) {
+    if (!session) throw new Error("請先登入管理後台。");
+    const active = await freshSession(session);
+    const result = await adminRequest<{ event: ManagedEvent; maxSupply: number; added: number }>(
+      `/api/admin/issuer/events/${encodeURIComponent(slug)}/supply`,
+      active,
+      { method: "POST", body: "{}" },
+    );
+    setEvents((items) => items.map((item) => (item.slug === slug ? result.event : item)));
+    setEvent((current) =>
+      current?.slug === slug
+        ? { ...current, maxSupply: result.event.maxSupply, updatedAt: result.event.updatedAt }
+        : current,
+    );
+    return { maxSupply: result.maxSupply, added: result.added };
   }
 
   async function synchronizeIssuance(slug: string, transactionHash?: string) {
@@ -618,6 +635,7 @@ export default function IssuerAdmin({ createMode = false }: { createMode?: boole
             event={savedResult ? null : event}
             status={event?.status ?? ""}
             onSynchronize={synchronizeIssuance}
+            onSynchronizeSupply={synchronizeSupply}
           />
         </div>
         {savedResult ? (

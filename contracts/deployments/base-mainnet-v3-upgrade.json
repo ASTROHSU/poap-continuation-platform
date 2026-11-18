@@ -1,0 +1,17 @@
+{
+  "network": "baseMainnet",
+  "chainId": 8453,
+  "proxyKind": "uups",
+  "proxyAddress": "0x9375B610859B1a5fEeA3C7c7C45FC20712F506cB",
+  "previousImplementationAddress": "0x77462940580286B37E90728a0C91DcFb21f2981B",
+  "implementationAddress": "0x58F889e1a75C76549188ec7779Eb9B4Ec9f25AF2",
+  "implementationContract": "AssociationBadgesUpgradeableV3",
+  "implementationDeploymentTransactionHash": "0x2d70261af671b3cc9240c77e0800cf5e207f99dd030310f64d689e1c9ff57b09",
+  "upgradeTransactionHash": "0xf3a7f55b8ca87fbb5d24dd5dc3f9ae956f59d4e546db48f1a8d28bbbebbe1248",
+  "blockNumber": 49852035,
+  "owner": "0xB3492740f78C046b5BD6c6d4c188623BceCc36aC",
+  "contractName": "底加（TĪ-TSIA）：有來過，就會記底加",
+  "contractSymbol": "HERE",
+  "implementationVersion": "3",
+  "upgradedAt": "2026-08-12T00:10:17.000Z"
+}
